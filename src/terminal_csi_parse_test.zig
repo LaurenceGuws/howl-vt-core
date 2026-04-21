@@ -1,5 +1,6 @@
-//! First proof test - CSI parser tokenization.
-//! Demonstrates that core parser primitives work: feed bytes, parse sequences, capture params.
+//! Responsibility: verify CSI/UTF-8/stream parser primitives.
+//! Ownership: terminal parser test layer.
+//! Reason: keep parser primitive contracts explicit and regression-safe.
 
 const std = @import("std");
 const parser_mod = @import("terminal/parser.zig");

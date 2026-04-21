@@ -1,6 +1,6 @@
-//! Parser dispatch and edge-case tests.
-//! Deterministic event-order harness with exact sequence assertions.
-//! Tests: mixed streams, split input, control boundaries, stray ESC contract.
+//! Responsibility: validate parser dispatch behavior and edge boundaries.
+//! Ownership: terminal parser test layer.
+//! Reason: lock parser contracts with deterministic transcript assertions.
 
 const std = @import("std");
 const parser_mod = @import("terminal/parser.zig");

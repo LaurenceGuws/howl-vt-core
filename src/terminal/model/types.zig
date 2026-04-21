@@ -1,3 +1,7 @@
+//! Responsibility: define terminal model value types and default style helpers.
+//! Ownership: terminal model core type definitions.
+//! Reason: provide a single source of truth for parser/runtime shared data shapes.
+
 pub const CursorPos = struct {
     row: usize,
     col: usize,
@@ -32,10 +36,12 @@ pub const Cell = struct {
     attrs: CellAttrs,
 };
 
+/// Return true when cell is a continuation fragment of a wide/tall glyph.
 pub fn isCellContinuation(cell: Cell) bool {
     return cell.x != 0 or cell.y != 0;
 }
 
+/// Return true when cell is the root of a multi-row glyph.
 pub fn isMultiRowCellRoot(cell: Cell) bool {
     return cell.height > 1 and cell.x == 0 and cell.y == 0;
 }
@@ -132,6 +138,7 @@ pub const VTERM_MOD_SHIFT: Modifier = 1;
 pub const VTERM_MOD_ALT: Modifier = 2;
 pub const VTERM_MOD_CTRL: Modifier = 4;
 
+/// Create a default blank cell with default foreground/background styling.
 pub fn defaultCell() Cell {
     return Cell{
         .codepoint = 0,
@@ -191,12 +198,14 @@ pub const ansiBrightColors = [_]Color{
     .{ .r = 255, .g = 255, .b = 255 }, // bright white
 };
 
+/// Clamp signed color index into valid 0..255 range.
 pub fn clampColorIndex(value: i32) u8 {
     if (value <= 0) return 0;
     if (value >= 255) return 255;
     return @intCast(value);
 }
 
+/// Convert 256-color palette index into RGBA color.
 pub fn indexToRgb(idx: u8) Color {
     if (idx < 8) return ansiColors[idx];
     if (idx < 16) return ansiBrightColors[idx - 8];

@@ -1,4 +1,6 @@
-//! Howl Terminal: VT sequence parser primitives and state machine.
+//! Responsibility: expose parser primitives and parser state machine APIs.
+//! Ownership: terminal parser module boundary.
+//! Reason: keep parser imports stable while internals evolve.
 
 pub const stream = @import("parser/stream.zig");
 pub const utf8 = @import("parser/utf8.zig");

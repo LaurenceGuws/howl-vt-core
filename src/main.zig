@@ -1,3 +1,7 @@
+//! Responsibility: provide local package smoke entrypoint.
+//! Ownership: package executable stub.
+//! Reason: keep a minimal runnable binary during module extraction phase.
+
 const std = @import("std");
 const terminal = @import("terminal");
 

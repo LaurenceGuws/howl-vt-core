@@ -1,4 +1,6 @@
-//! Howl Terminal: core data model primitives.
+//! Responsibility: expose terminal model primitives and shared types.
+//! Ownership: terminal model module boundary.
+//! Reason: provide a stable model API independent of parser internals.
 
 pub const types = @import("model/types.zig");
 pub const selection = @import("model/selection.zig");
