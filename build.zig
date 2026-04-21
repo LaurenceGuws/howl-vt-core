@@ -179,6 +179,42 @@ pub fn build(b: *std.Build) void {
     });
     const run_parser_core_event_pipeline_tests = b.addRunArtifact(parser_core_event_pipeline_tests);
 
+    const parser_core_semantic_consumer_test_mod = b.addModule("parser_core_semantic_consumer_tests", .{
+        .root_source_file = b.path("src/terminal_parser_core_semantic_consumer_test.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "terminal", .module = mod },
+        },
+    });
+    const parser_core_semantic_consumer_tests = b.addTest(.{
+        .root_module = parser_core_semantic_consumer_test_mod,
+    });
+    const run_parser_core_semantic_consumer_tests = b.addRunArtifact(parser_core_semantic_consumer_tests);
+
+    const terminal_screen_state_test_mod = b.addModule("terminal_screen_state_tests", .{
+        .root_source_file = b.path("src/terminal_screen_state_test.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "terminal", .module = mod },
+        },
+    });
+    const terminal_screen_state_tests = b.addTest(.{
+        .root_module = terminal_screen_state_test_mod,
+    });
+    const run_terminal_screen_state_tests = b.addRunArtifact(terminal_screen_state_tests);
+
+    const terminal_pipeline_cursor_replay_test_mod = b.addModule("terminal_pipeline_cursor_replay_tests", .{
+        .root_source_file = b.path("src/terminal_pipeline_cursor_replay_test.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "terminal", .module = mod },
+        },
+    });
+    const terminal_pipeline_cursor_replay_tests = b.addTest(.{
+        .root_module = terminal_pipeline_cursor_replay_test_mod,
+    });
+    const run_terminal_pipeline_cursor_replay_tests = b.addRunArtifact(terminal_pipeline_cursor_replay_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the run steps do not depend on one another, this will
     // make them run in parallel.
@@ -189,6 +225,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_parser_dispatch_tests.step);
     test_step.dependOn(&run_parser_core_event_bridge_tests.step);
     test_step.dependOn(&run_parser_core_event_pipeline_tests.step);
+    test_step.dependOn(&run_parser_core_semantic_consumer_tests.step);
+    test_step.dependOn(&run_terminal_screen_state_tests.step);
+    test_step.dependOn(&run_terminal_pipeline_cursor_replay_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

@@ -1,6 +1,8 @@
 const std = @import("std");
 const parser_mod = @import("parser.zig");
 const bridge_mod = @import("parser_core_event_bridge.zig");
+const semantic_mod = @import("parser_core_semantic_consumer.zig");
+const screen_mod = @import("terminal_screen_state.zig");
 
 pub const CoreEvent = bridge_mod.CoreEvent;
 
@@ -53,5 +55,14 @@ pub const Pipeline = struct {
     pub fn reset(self: *Pipeline) void {
         self.bridge.clear();
         self.parser.reset();
+    }
+
+    pub fn applyToScreen(self: *Pipeline, screen: *screen_mod.ScreenState) void {
+        for (self.bridge.events.items) |ev| {
+            if (semantic_mod.process(ev)) |sem_ev| {
+                screen.apply(sem_ev);
+            }
+        }
+        self.bridge.clear();
     }
 };
