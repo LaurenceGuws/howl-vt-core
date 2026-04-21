@@ -1,4 +1,4 @@
-//! Howl Terminal: VT100 escape sequence parser with callback dispatch.
+//! Howl Terminal: ANSI/DEC escape sequence parser with callback dispatch.
 //! State machine for parsing escape sequences, OSC/APC/DCS, and character streams.
 //! No session/app coupling; all events dispatched via callback interface.
 //!

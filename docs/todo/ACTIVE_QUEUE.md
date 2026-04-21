@@ -45,8 +45,8 @@ Howl boundaries and naming rules.
 | `HT-007` | `done` | Wire parser proof tests into build test execution. | `build.zig`, `src/root.zig` | Parser tests run deterministically via `zig build test`. |
 | `HT-008` | `done` | Add standalone parser state machine with callback dispatch. | `src/terminal/parser/parser.zig`, `src/terminal/parser.zig` | Parser: 386 lines, no app/session/FFI coupling, callback Sink interface. |
 | `HT-009` | `done` | Add parser dispatch proof tests and wire into build. | `src/terminal_parser_dispatch_test.zig`, `build.zig` | 9 dispatch tests pass: mixed stream, terminators, UTF-8/ASCII, CSI params. |
-| `HT-010` | `ready` | Harden parser: errdefer cleanup, explicit stray-ESC contract. | `src/terminal/parser/parser.zig` | Memory-safe init; contract documented: ESC marker dropped in OSC/APC/DCS. |
-| `HT-011` | `ready` | Strengthen test assertions; sync queue to reflect completed work. | `src/terminal_parser_dispatch_test.zig`, `docs/todo/ACTIVE_QUEUE.md` | Exact event sequence + payload assertions; queue reflects HT-001..009 done. |
+| `HT-010` | `done` | Harden parser: errdefer cleanup, explicit stray-ESC contract. | `src/terminal/parser/parser.zig` | Memory-safe init; contract documented: ESC marker dropped in OSC/APC/DCS. |
+| `HT-011` | `done` | Strengthen test assertions; sync queue to reflect completed work. | `src/terminal_parser_dispatch_test.zig`, `docs/todo/ACTIVE_QUEUE.md` | Exact event sequence + payload assertions; queue reflects HT-001..011 done. |
 
 ## First Core-Copy Default
 
