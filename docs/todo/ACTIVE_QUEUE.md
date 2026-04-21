@@ -22,16 +22,18 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 
 | ID | Status | Intent | Primary files | Exit |
 | --- | --- | --- | --- | --- |
-| `HT-015` | `done` | Deterministic parser transcript assertions (no count-only checks). | `src/terminal_parser_dispatch_test.zig` | Parser dispatch assertions are exact type/order/payload transcripts. |
-| `HT-016` | `done` | Incremental-feed boundary fixtures (UTF-8/CSI/OSC/APC/DCS). | `src/terminal_parser_dispatch_test.zig` | Multi-call boundary behavior is covered by explicit fixtures. |
-| `HT-017A` | `done` | Report-integrity rules/checklist. | `docs/todo/ACTIVE_QUEUE.md`, `docs/todo/REPORT_CHECKLIST.md` | Commit claims are required to map to `git show --name-status`. |
+| `HT-021` | `done` | Freeze bridge seam contract. | `app_architecture/terminal/PARSER_CORE_EVENT_BRIDGE_CONTRACT.md` | Contract document is normative authority for CoreEvent and bridge. |
+| `HT-022` | `done` | Harden bridge correctness tests. | `src/terminal_parser_core_event_bridge_test.zig` | OSC/APC/DCS/invalid/ownership policies locked by explicit assertions. |
+| `HT-023` | `done` | Bridge queue API (len/isEmpty/clear/drainInto). | `src/terminal/parser_core_event_bridge.zig`, `src/terminal_parser_core_event_bridge_test.zig` | Bridge usable as reusable seam with explicit queue operations. |
+| `HT-024` | `done` | Parser core event pipeline module. | `src/terminal/parser_core_event_pipeline.zig`, `src/terminal_parser_core_event_pipeline_test.zig`, `build.zig` | Pipeline owns parser+bridge; feedByte/feedSlice/events/reset; exported from root. |
+| `HT-025` | `done` | Replay-style pipeline fixtures. | `src/terminal_parser_core_event_pipeline_test.zig` | Stray-ESC, invalid UTF-8, split CSI, interleaved feed FIFO locked by deterministic fixtures. |
 
 ## Next
 
 | ID | Status | Intent | Primary files | Exit |
 | --- | --- | --- | --- | --- |
-| `HT-018` | `ready` | Freeze parser API contract in architecture authority. | `app_architecture/terminal/PARSER_API_CONTRACT.md` | Stable parser/model entrypoints documented with breaking-change rule. |
-| `HT-019` | `ready` | Add first parser integration seam (no host coupling). | `src/terminal/**` | Adapter consumes `parser.Parser` + `Sink` and emits minimal core event surface. |
+| `HT-027` | `ready` | VT cursor movement consumer in pipeline. | `src/terminal/**` | Pipeline emits cursor-move events for CUU/CUD/CUF/CUB/CUP CSI sequences. |
+| `HT-028` | `ready` | Screen model integration seam. | `src/terminal/**` | Pipeline connects to minimal screen model (rows/cols/cursor); no host coupling. |
 
 ## Guardrails
 

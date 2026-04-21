@@ -125,8 +125,6 @@ test "pipeline: OSC split across feeds" {
     try std.testing.expectEqualSlices(u8, "hello world", pl.events()[0].title_set);
 }
 
-// HT-025 replay fixtures
-
 test "replay: stray ESC inside OSC payload is dropped; following byte joins payload" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
