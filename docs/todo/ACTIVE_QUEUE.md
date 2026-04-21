@@ -53,6 +53,22 @@ Howl boundaries and naming rules.
 | `HT-015` | `done` | Deterministic parser transcript assertions (no count-based checks). | `src/terminal_parser_dispatch_test.zig` | All dispatch tests assert exact ordered events + payload; Harness records full event traces; no count-only checks. |
 | `HT-016` | `done` | Parser boundary correctness expansion for incremental feeds. | `src/terminal_parser_dispatch_test.zig` | 11 boundary fixtures validate UTF-8/CSI/OSC/APC/DCS reassembly across multi-call boundaries. |
 
+## Evidence Rule
+
+Every commit report must include:
+- Commit hash (short form, e.g., `69c1cc4`)
+- Exact files changed from `git show --name-status <hash>`
+- 1-line mapping of claim → changed file(s)
+
+Example:
+```
+COMMITS
+69c1cc4 HT-015: verify deterministic transcript assertions in parser tests
+  M src/terminal_parser_dispatch_test.zig  ← added 11 boundary tests + assertions
+```
+
+This ensures reported work always matches actual diffs.
+
 ## First Core-Copy Default
 
 Current default is parser/model heartbeat only (`HT-003`).
