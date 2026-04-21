@@ -1,6 +1,11 @@
 //! Howl Terminal: VT100 escape sequence parser with callback dispatch.
 //! State machine for parsing escape sequences, OSC/APC/DCS, and character streams.
 //! No session/app coupling; all events dispatched via callback interface.
+//!
+//! Contract: Stray ESC inside OSC/APC/DCS
+//! When ESC appears in OSC/APC/DCS data (not part of a final ST sequence),
+//! the ESC marker itself is dropped; the following byte is appended to the buffer.
+//! Example: OSC "ab\x1bcd" (where \x1b is not followed by \) yields data="abcd".
 
 const std = @import("std");
 const stream_mod = @import("stream.zig");
@@ -104,9 +109,14 @@ pub const Parser = struct {
     charset_target: CharsetTarget,
 
     pub fn init(allocator: std.mem.Allocator, sink: Sink) !Parser {
-        const osc_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
-        const apc_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
-        const dcs_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
+        var osc_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
+        errdefer osc_buffer.deinit(allocator);
+
+        var apc_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
+        errdefer apc_buffer.deinit(allocator);
+
+        var dcs_buffer = try std.ArrayList(u8).initCapacity(allocator, 256);
+        errdefer dcs_buffer.deinit(allocator);
 
         return .{
             .allocator = allocator,
