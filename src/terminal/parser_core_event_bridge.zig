@@ -26,13 +26,31 @@ pub const ParserCoreBridge = struct {
     }
 
     pub fn deinit(self: *ParserCoreBridge) void {
+        self.clear();
+        self.events.deinit(self.allocator);
+    }
+
+    pub fn len(self: *const ParserCoreBridge) usize {
+        return self.events.items.len;
+    }
+
+    pub fn isEmpty(self: *const ParserCoreBridge) bool {
+        return self.events.items.len == 0;
+    }
+
+    pub fn clear(self: *ParserCoreBridge) void {
         for (self.events.items) |event| {
             switch (event) {
                 .text, .title_set => |data| self.allocator.free(data),
                 else => {},
             }
         }
-        self.events.deinit(self.allocator);
+        self.events.clearRetainingCapacity();
+    }
+
+    pub fn drainInto(self: *ParserCoreBridge, dest: *std.ArrayList(CoreEvent), dest_allocator: std.mem.Allocator) !void {
+        try dest.appendSlice(dest_allocator, self.events.items);
+        self.events.clearRetainingCapacity();
     }
 
     pub fn toSink(self: *ParserCoreBridge) parser_mod.Sink {
