@@ -9,12 +9,20 @@ pub const SemanticEvent = union(enum) {
     cursor_forward: u16,
     cursor_back: u16,
     cursor_position: struct { row: u16, col: u16 },
+    write_text: []const u8,
+    write_codepoint: u21,
+    line_feed,
+    carriage_return,
+    backspace,
 };
 
 pub fn process(event: CoreEvent) ?SemanticEvent {
     switch (event) {
         .style_change => |sc| return processCsi(sc.final, sc.params, sc.param_count),
-        else => return null,
+        .text => |s| return SemanticEvent{ .write_text = s },
+        .codepoint => |cp| return SemanticEvent{ .write_codepoint = cp },
+        .control => |c| return processControl(c),
+        .title_set, .invalid_sequence => return null,
     }
 }
 
@@ -31,6 +39,15 @@ fn processCsi(final: u8, params: [16]i32, count: u8) ?SemanticEvent {
         },
         else => return null,
     }
+}
+
+fn processControl(c: u8) ?SemanticEvent {
+    return switch (c) {
+        0x0A => SemanticEvent.line_feed,
+        0x0D => SemanticEvent.carriage_return,
+        0x08 => SemanticEvent.backspace,
+        else => null,
+    };
 }
 
 fn paramOrDefault1(v: i32) u16 {

@@ -22,6 +22,7 @@ pub const ScreenState = struct {
                 self.cursor_row = @min(pos.row, self.rows -| 1);
                 self.cursor_col = @min(pos.col, self.cols -| 1);
             },
+            else => {},
         }
     }
 };

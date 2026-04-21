@@ -90,11 +90,6 @@ test "semantic_consumer: non-cursor CSI returns null" {
     try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
 }
 
-test "semantic_consumer: text event returns null" {
-    const ev = CoreEvent{ .text = "hello" };
-    try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
-}
-
 test "semantic_consumer: control event returns null" {
     const ev = CoreEvent{ .control = 0x07 };
     try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
@@ -102,5 +97,47 @@ test "semantic_consumer: control event returns null" {
 
 test "semantic_consumer: invalid_sequence returns null" {
     const ev = CoreEvent.invalid_sequence;
+    try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
+}
+
+test "semantic_consumer: text event maps to write_text" {
+    const ev = CoreEvent{ .text = "hello" };
+    const sem = consumer.process(ev) orelse return error.NoEvent;
+    try std.testing.expect(sem == .write_text);
+    try std.testing.expectEqualSlices(u8, "hello", sem.write_text);
+}
+
+test "semantic_consumer: codepoint event maps to write_codepoint" {
+    const ev = CoreEvent{ .codepoint = 0xE9 };
+    const sem = consumer.process(ev) orelse return error.NoEvent;
+    try std.testing.expect(sem == .write_codepoint);
+    try std.testing.expectEqual(@as(u21, 0xE9), sem.write_codepoint);
+}
+
+test "semantic_consumer: LF maps to line_feed" {
+    const ev = CoreEvent{ .control = 0x0A };
+    const sem = consumer.process(ev) orelse return error.NoEvent;
+    try std.testing.expect(sem == .line_feed);
+}
+
+test "semantic_consumer: CR maps to carriage_return" {
+    const ev = CoreEvent{ .control = 0x0D };
+    const sem = consumer.process(ev) orelse return error.NoEvent;
+    try std.testing.expect(sem == .carriage_return);
+}
+
+test "semantic_consumer: BS maps to backspace" {
+    const ev = CoreEvent{ .control = 0x08 };
+    const sem = consumer.process(ev) orelse return error.NoEvent;
+    try std.testing.expect(sem == .backspace);
+}
+
+test "semantic_consumer: unsupported control returns null" {
+    const ev = CoreEvent{ .control = 0x01 };
+    try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
+}
+
+test "semantic_consumer: title_set returns null" {
+    const ev = CoreEvent{ .title_set = "My Title" };
     try std.testing.expectEqual(@as(?SemanticEvent, null), consumer.process(ev));
 }
