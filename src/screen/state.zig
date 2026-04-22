@@ -117,10 +117,20 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const cursor_pos = @as(usize, self.cursor_row) * self.cols + self.cursor_col;
+        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, ._unused = 0 };
         switch (mode) {
-            0 => @memset(c[cursor_pos..], 0),
-            1 => @memset(c[0 .. cursor_pos + 1], 0),
-            2 => @memset(c, 0),
+            0 => {
+                @memset(c[cursor_pos..], 0);
+                if (self.cells_attr) |ca| @memset(ca[cursor_pos..], default_attr);
+            },
+            1 => {
+                @memset(c[0 .. cursor_pos + 1], 0);
+                if (self.cells_attr) |ca| @memset(ca[0 .. cursor_pos + 1], default_attr);
+            },
+            2 => {
+                @memset(c, 0);
+                if (self.cells_attr) |ca| @memset(ca, default_attr);
+            },
             3 => {},
         }
     }
@@ -129,10 +139,20 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const row_start = @as(usize, self.cursor_row) * self.cols;
+        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, ._unused = 0 };
         switch (mode) {
-            0 => @memset(c[row_start + self.cursor_col .. row_start + self.cols], 0),
-            1 => @memset(c[row_start .. row_start + self.cursor_col + 1], 0),
-            2 => @memset(c[row_start .. row_start + self.cols], 0),
+            0 => {
+                @memset(c[row_start + self.cursor_col .. row_start + self.cols], 0);
+                if (self.cells_attr) |ca| @memset(ca[row_start + self.cursor_col .. row_start + self.cols], default_attr);
+            },
+            1 => {
+                @memset(c[row_start .. row_start + self.cursor_col + 1], 0);
+                if (self.cells_attr) |ca| @memset(ca[row_start .. row_start + self.cursor_col + 1], default_attr);
+            },
+            2 => {
+                @memset(c[row_start .. row_start + self.cols], 0);
+                if (self.cells_attr) |ca| @memset(ca[row_start .. row_start + self.cols], default_attr);
+            },
             3 => {},
         }
     }
@@ -466,4 +486,34 @@ test "screen: color reset (0) distinct from white (8)" {
     s.apply(SemanticEvent{ .write_text = "d" });
     try std.testing.expectEqual(@as(u4, 8), s.cells_attr.?[0].fg);
     try std.testing.expectEqual(@as(u4, 0), s.cells_attr.?[1].fg);
+}
+
+test "screen: erase_line mode 0 clears attributes" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .style_fg_color = 4 });
+    s.apply(SemanticEvent{ .write_text = "styled" });
+    s.cursor_col = 2;
+    s.apply(SemanticEvent{ .erase_line = 0 });
+    try std.testing.expectEqual(true, s.cells_attr.?[0].bold);
+    try std.testing.expectEqual(true, s.cells_attr.?[1].bold);
+    try std.testing.expectEqual(false, s.cells_attr.?[2].bold);
+    try std.testing.expectEqual(@as(u4, 0), s.cells_attr.?[2].fg);
+}
+
+test "screen: erase_display mode 2 clears all attributes" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 3, 5);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .style_fg_color = 5 });
+    s.apply(SemanticEvent{ .write_text = "text" });
+    s.apply(SemanticEvent{ .erase_display = 2 });
+    for (0..15) |i| {
+        const attr = s.cells_attr.?[i];
+        try std.testing.expectEqual(false, attr.bold);
+        try std.testing.expectEqual(@as(u4, 0), attr.fg);
+    }
 }
