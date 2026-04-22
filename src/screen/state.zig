@@ -94,6 +94,7 @@ pub const ScreenState = struct {
                 self.wrap_pending = false;
                 self.horizontalTab();
             },
+            .reset_screen => self.reset(),
             .erase_display => |mode| {
                 self.wrap_pending = false;
                 self.eraseDisplay(mode);

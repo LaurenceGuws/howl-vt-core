@@ -9,7 +9,7 @@
 | `text` | `onAsciiSlice` | Owned slice of contiguous printable ASCII bytes; bridge-allocated copy |
 | `codepoint` | `onStreamEvent(.codepoint)` | Decoded Unicode scalar value (U+0080 and above) |
 | `control` | `onStreamEvent(.control)` | Raw C0/C1 control byte |
-| `style_change` | `onCsi` | CSI sequence: `final` byte, `params[16]i32`, `param_count` |
+| `style_change` | `onCsi` | CSI sequence: `final` byte, `params[16]i32`, `param_count`, `leader`, `private`, `intermediates[4]`, `intermediates_len` |
 | `title_set` | `onOsc` | Full raw OSC payload as bridge-allocated copy; command prefix not parsed |
 | `invalid_sequence` | `onStreamEvent(.invalid)` | Stream-level encoding error; no payload |
 
@@ -41,7 +41,7 @@ The following are intentionally not represented at this seam:
 - APC payload interpretation (e.g., Kitty graphics protocol)
 - DCS payload interpretation (e.g., DECRQSS responses)
 - ESC final-byte dispatch (e.g., character set designation)
-- Cursor movement, mode-set, or erase operations (no semantic VT model at this layer)
+- Cursor movement, mode-set, reset, or erase interpretation (semantic layer owns meaning)
 - Host, session, PTY, or platform coupling of any kind
 
 ## Breaking Change Rule

@@ -299,6 +299,24 @@ test "bridge: maps CSI sequence to style_change event" {
     try std.testing.expectEqual(@as(i32, 31), bridge.events.items[0].style_change.params[0]);
 }
 
+test "bridge: preserves CSI leader private and intermediates" {
+    const gpa = std.testing.allocator;
+    var bridge = bridge_mod.Bridge.init(gpa);
+    defer bridge.deinit();
+    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    defer parser.deinit();
+    parser.handleSlice("\x1b[?25h\x1b[!p");
+    try std.testing.expectEqual(@as(usize, 2), bridge.events.items.len);
+    try std.testing.expect(bridge.events.items[0] == .style_change);
+    try std.testing.expectEqual(@as(u8, '?'), bridge.events.items[0].style_change.leader);
+    try std.testing.expect(bridge.events.items[0].style_change.private);
+    try std.testing.expectEqual(@as(i32, 25), bridge.events.items[0].style_change.params[0]);
+    try std.testing.expectEqual(@as(u8, 0), bridge.events.items[1].style_change.leader);
+    try std.testing.expect(!bridge.events.items[1].style_change.private);
+    try std.testing.expectEqual(@as(u8, 1), bridge.events.items[1].style_change.intermediates_len);
+    try std.testing.expectEqual(@as(u8, '!'), bridge.events.items[1].style_change.intermediates[0]);
+}
+
 test "bridge: maps OSC to title_set event" {
     const gpa = std.testing.allocator;
     var bridge = bridge_mod.Bridge.init(gpa);
@@ -698,6 +716,22 @@ test "replay: cursor move then CSI K erase to end of line" {
     try std.testing.expectEqual(@as(u21, 'c'), screen.cellAt(0, 2));
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 3));
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 5));
+}
+
+test "replay: DECSTR resets visible screen state" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 2, 5);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "abcdef");
+    try std.testing.expectEqual(@as(u21, 'a'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
+    feed(&pl, &screen, "\x1b[!p");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(1, 0));
 }
 
 test "replay: existing text and cursor paths unaffected by erase additions" {

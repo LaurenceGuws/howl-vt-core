@@ -20,6 +20,7 @@ M1 scope is non-style core behavior: cursor motion, text and codepoint writes, c
 | `backspace` | — | Event.control(0x08) | Move cursor one column left |
 | `erase_display` | `u2` | CSI J | Erase screen region; mode 0=below, 1=above, 2=full |
 | `erase_line` | `u2` | CSI K | Erase line region; mode 0=right, 1=left, 2=full |
+| `reset_screen` | — | CSI ! p (DECSTR) | Reset screen state to origin and clear cells |
 
 ## Ownership and Lifetime
 
@@ -47,6 +48,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
 | `style_change` with final J | `erase_display` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with final K | `erase_line` | Param default 0; modes 0/1/2 only; other values map to 0 |
+| `style_change` with intermediate `!` and final p | `reset_screen` | DECSTR; no leader/private marker |
 | `style_change` with other finals | `null` | Explicitly ignored |
 | `text` | `write_text` | Borrowed slice |
 | `codepoint` | `write_codepoint` | Value copy |
@@ -85,7 +87,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
   - Mode 0: cursor position through end of screen (inclusive).
   - Mode 1: start of screen through cursor position (inclusive).
 - Mode 2: entire screen.
-- `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
+- `reset_screen` / `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
 
 ## Zero-Dimension Screen Behavior
 

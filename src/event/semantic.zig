@@ -21,6 +21,7 @@ pub const SemanticEvent = union(enum) {
     carriage_return,
     backspace,
     horizontal_tab,
+    reset_screen,
     erase_display: u2,
     erase_line: u2,
 };
@@ -28,7 +29,7 @@ pub const SemanticEvent = union(enum) {
 /// Convert a parser event into a semantic screen operation when supported.
 pub fn process(event: Event) ?SemanticEvent {
     switch (event) {
-        .style_change => |sc| return processCsi(sc.final, sc.params, sc.param_count),
+        .style_change => |sc| return processCsi(sc.final, sc.params, sc.param_count, sc.leader, sc.private, sc.intermediates, sc.intermediates_len),
         .text => |s| return SemanticEvent{ .write_text = s },
         .codepoint => |cp| return SemanticEvent{ .write_codepoint = cp },
         .control => |c| return processControl(c),
@@ -36,7 +37,8 @@ pub fn process(event: Event) ?SemanticEvent {
     }
 }
 
-fn processCsi(final: u8, params: [16]i32, count: u8) ?SemanticEvent {
+fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, intermediates: [4]u8, intermediates_len: u8) ?SemanticEvent {
+    if (leader != 0 or private) return null;
     switch (final) {
         'A' => return SemanticEvent{ .cursor_up = paramOrDefault1(params[0]) },
         'B' => return SemanticEvent{ .cursor_down = paramOrDefault1(params[0]) },
@@ -49,6 +51,12 @@ fn processCsi(final: u8, params: [16]i32, count: u8) ?SemanticEvent {
         },
         'J' => return SemanticEvent{ .erase_display = eraseMode(params[0]) },
         'K' => return SemanticEvent{ .erase_line = eraseMode(params[0]) },
+        'p' => {
+            if (count == 0 and intermediates_len == 1 and intermediates[0] == '!') {
+                return SemanticEvent.reset_screen;
+            }
+            return null;
+        },
         else => return null,
     }
 }
@@ -81,7 +89,30 @@ fn makeStyleChange(final: u8, p0: i32, p1: i32, count: u8) Event {
     var params = [_]i32{0} ** 16;
     params[0] = p0;
     params[1] = p1;
-    return Event{ .style_change = .{ .final = final, .params = params, .param_count = count } };
+    return Event{ .style_change = .{
+        .final = final,
+        .params = params,
+        .param_count = count,
+        .leader = 0,
+        .private = false,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+}
+
+fn makeStyleChangeWithIntermediate(final: u8, intermediate: u8) Event {
+    const params = [_]i32{0} ** 16;
+    var intermediates = [_]u8{0} ** 4;
+    intermediates[0] = intermediate;
+    return Event{ .style_change = .{
+        .final = final,
+        .params = params,
+        .param_count = 0,
+        .leader = 0,
+        .private = false,
+        .intermediates = intermediates,
+        .intermediates_len = 1,
+    } };
 }
 
 test "semantic: CUU explicit count" {
@@ -123,6 +154,26 @@ test "semantic: CUP no params defaults to origin" {
 
 test "semantic: non-cursor CSI returns null" {
     try std.testing.expectEqual(@as(?SemanticEvent, null), process(makeStyleChange('m', 1, 0, 1)));
+}
+
+test "semantic: DECSTR maps to reset_screen" {
+    const sem = process(makeStyleChangeWithIntermediate('p', '!')) orelse return error.NoEvent;
+    try std.testing.expect(sem == .reset_screen);
+}
+
+test "semantic: private CSI does not map to screen event" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 25;
+    const ev = Event{ .style_change = .{
+        .final = 'h',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(ev));
 }
 
 test "semantic: text event maps to write_text" {

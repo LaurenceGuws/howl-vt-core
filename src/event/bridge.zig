@@ -16,6 +16,10 @@ pub const Event = union(enum) {
         final: u8,
         params: [16]i32,
         param_count: u8,
+        leader: u8,
+        private: bool,
+        intermediates: [csi_mod.max_intermediates]u8,
+        intermediates_len: u8,
     },
     title_set: []const u8,
     invalid_sequence,
@@ -97,6 +101,10 @@ pub const Bridge = struct {
                 .final = action.final,
                 .params = action.params,
                 .param_count = action.count,
+                .leader = action.leader,
+                .private = action.private,
+                .intermediates = action.intermediates,
+                .intermediates_len = action.intermediates_len,
             },
         }) catch {};
     }
