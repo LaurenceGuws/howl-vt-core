@@ -1060,3 +1060,70 @@ test "replay: malformed dim parameter does not corrupt subsequent valid style" {
     try std.testing.expectEqual(false, screen.cells_attr.?[0].dim);
     try std.testing.expectEqual(true, screen.cells_attr.?[1].dim);
 }
+
+test "replay: parser CSI 5 blink on then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[5m");
+    feed(&pl, &screen, "on");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].blink);
+    try std.testing.expectEqual(true, screen.cells_attr.?[1].blink);
+}
+
+test "replay: parser CSI 25 blink off affects subsequent text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[5m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[25m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].blink);
+    try std.testing.expectEqual(false, screen.cells_attr.?[1].blink);
+}
+
+test "replay: mixed style batch with blink color and underline" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[5;31;4m");
+    feed(&pl, &screen, "m");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].blink);
+    try std.testing.expectEqual(@as(u8, 2), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].underline);
+}
+
+test "replay: reset clears blink for following writes" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[5m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[0m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].blink);
+    try std.testing.expectEqual(false, screen.cells_attr.?[1].blink);
+}
+
+test "replay: malformed style params do not block subsequent valid blink" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[38;2;255m");
+    feed(&pl, &screen, "x");
+    feed(&pl, &screen, "\x1b[5m");
+    feed(&pl, &screen, "y");
+    try std.testing.expectEqual(false, screen.cells_attr.?[0].blink);
+    try std.testing.expectEqual(true, screen.cells_attr.?[1].blink);
+}
