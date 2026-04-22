@@ -149,6 +149,8 @@ Deferred (future sprints):
 
 The following are intentionally outside this seam:
 
+- Local runnable demo binaries in this repository; `howl-terminal` is library/test-only.
+- Host/demo runtime ownership; runnable demos belong in `howl-hosts`.
 - Line wrapping or scrollback
 - Wide character (multi-column) glyph handling
 - Mode-set sequences (SM/RM/DECSET)

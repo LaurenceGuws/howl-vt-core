@@ -48,6 +48,10 @@ Freeze as-of: `HT-057E`.
 | `HT-057C` | `done` | Screen state + cell attrs persistence for underline color. |
 | `HT-057D` | `done` | Relay fixtures for underline color end-to-end continuity. |
 | `HT-057E` | `done` | Contract/queue close sync for underline color batch. |
+| `HT-059A` | `done` | Scope seed: library/test-only topology, demos in howl-hosts. |
+| `HT-059B` | `todo` | Remove local executable entrypoint and run target. |
+| `HT-059C` | `todo` | Build graph cleanup after executable removal. |
+| `HT-059D` | `todo` | Validation and queue close sync. |
 
 ## Guardrails
 
