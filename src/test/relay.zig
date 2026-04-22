@@ -2792,6 +2792,48 @@ test "parity-chunked: split CBT started after DECSTR remains identical" {
     });
 }
 
+test "parity-chunked: interrupted split private cursor mode remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked interrupted private cursor mode",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "x", "\x1b[?2", "\x1b[!p", "5l" },
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'x' },
+            .{ .row = 0, .col = 1, .codepoint = '!' },
+        },
+    });
+}
+
+test "parity-chunked: interrupted split private auto-wrap mode remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked interrupted private auto-wrap mode",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "x", "\x1b[?", "\x1b[!p", "7l" },
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = true,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'x' },
+            .{ .row = 0, .col = 1, .codepoint = '!' },
+        },
+    });
+}
+
 // --- Runtime engine facade tests ---
 
 test "runtime: init and deinit lifecycle" {
