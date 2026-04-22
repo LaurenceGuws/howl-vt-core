@@ -24,6 +24,8 @@ pub const StyleOp = union(enum) {
     underline_off,
     blink_on,
     blink_off,
+    conceal_on,
+    conceal_off,
     inverse_on,
     inverse_off,
     fg_color: u8,
@@ -62,6 +64,8 @@ pub const SemanticEvent = union(enum) {
     style_underline_off,
     style_blink_on,
     style_blink_off,
+    style_conceal_on,
+    style_conceal_off,
     style_inverse_on,
     style_inverse_off,
     style_fg_color: u8,
@@ -156,6 +160,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             24 => StyleOp.underline_off,
             5 => StyleOp.blink_on,
             25 => StyleOp.blink_off,
+            8 => StyleOp.conceal_on,
+            28 => StyleOp.conceal_off,
             7 => StyleOp.inverse_on,
             27 => StyleOp.inverse_off,
             30...37 => StyleOp{ .fg_color = @intCast(param - 30 + 1) },
@@ -262,6 +268,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .underline_off => SemanticEvent.style_underline_off,
             .blink_on => SemanticEvent.style_blink_on,
             .blink_off => SemanticEvent.style_blink_off,
+            .conceal_on => SemanticEvent.style_conceal_on,
+            .conceal_off => SemanticEvent.style_conceal_off,
             .inverse_on => SemanticEvent.style_inverse_on,
             .inverse_off => SemanticEvent.style_inverse_off,
             .fg_color => |c| SemanticEvent{ .style_fg_color = c },
@@ -508,6 +516,16 @@ test "semantic: SGR 25 blink off" {
     try std.testing.expect(sem == .style_blink_off);
 }
 
+test "semantic: SGR 8 conceal on" {
+    const sem = process(makeStyleChange('m', 8, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_conceal_on);
+}
+
+test "semantic: SGR 28 conceal off" {
+    const sem = process(makeStyleChange('m', 28, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_conceal_off);
+}
+
 test "semantic: SGR 7 inverse on" {
     const sem = process(makeStyleChange('m', 7, 0, 1)) orelse return error.NoEvent;
     try std.testing.expect(sem == .style_inverse_on);
@@ -567,6 +585,20 @@ test "semantic: multi-param SGR blink + fg + inverse preserves order" {
     try std.testing.expect(sem.style_operations.ops[0] == .blink_on);
     try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
     try std.testing.expect(sem.style_operations.ops[2] == .inverse_on);
+}
+
+test "semantic: multi-param SGR conceal + color + reveal preserves order" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 8;
+    params[1] = 31;
+    params[2] = 28;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 3), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .conceal_on);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
+    try std.testing.expect(sem.style_operations.ops[2] == .conceal_off);
 }
 
 test "semantic: SGR no params defaults to reset" {
