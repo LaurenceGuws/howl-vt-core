@@ -43,6 +43,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 - `Pipeline.clear()` drops all queued bridge events without calling `applyToScreen`; nothing is applied to `ScreenState`.
 - `Pipeline.reset()` clears the bridge queue and resets the parser (including partial escape/CSI state); bytes after reset decode as if the parser were freshly initialized.
 - Each `applyToScreen` call walks the current bridge queue exactly once, applies `semantic.process` for each event in order, then clears the bridge. A second `applyToScreen` with no intervening `feedByte` / `feedSlice` sees an empty queue and does not mutate `ScreenState`.
+- Split-CSI interruption rule: if a CSI sequence is started and then another escape sequence begins before the first CSI final byte arrives, behavior is deterministic but stream-order dependent. The interrupted bytes are not retroactively reinterpreted as a completed prior CSI; they are handled exactly as parsed in order.
 
 ## Process Mapping Policy
 
