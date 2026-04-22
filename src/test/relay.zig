@@ -734,6 +734,20 @@ test "replay: DECSTR resets visible screen state" {
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(1, 0));
 }
 
+test "replay: DEC private cursor visibility toggles mode state" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(2, 5);
+    try std.testing.expect(screen.cursor_visible);
+    feed(&pl, &screen, "\x1b[?25l");
+    try std.testing.expect(!screen.cursor_visible);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[?25h");
+    try std.testing.expect(screen.cursor_visible);
+}
+
 test "replay: existing text and cursor paths unaffected by erase additions" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);

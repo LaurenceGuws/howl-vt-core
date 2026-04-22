@@ -18,6 +18,7 @@ M1 scope is non-style core behavior: cursor motion, text and codepoint writes, c
 | `line_feed` | — | Event.control(0x0A) | Move cursor to next row |
 | `carriage_return` | — | Event.control(0x0D) | Reset cursor column to 0 |
 | `backspace` | — | Event.control(0x08) | Move cursor one column left |
+| `cursor_visible` | `bool` | CSI ?25h/l | Set cursor visibility mode |
 | `erase_display` | `u2` | CSI J | Erase screen region; mode 0=below, 1=above, 2=full |
 | `erase_line` | `u2` | CSI K | Erase line region; mode 0=right, 1=left, 2=full |
 | `reset_screen` | — | CSI ! p (DECSTR) | Reset screen state to origin and clear cells |
@@ -49,6 +50,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 | `style_change` with final J | `erase_display` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with final K | `erase_line` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with intermediate `!` and final p | `reset_screen` | DECSTR; no leader/private marker |
+| `style_change` with private `?25h/l` | `cursor_visible` | DEC cursor visibility mode |
 | `style_change` with other finals | `null` | Explicitly ignored |
 | `text` | `write_text` | Borrowed slice |
 | `codepoint` | `write_codepoint` | Value copy |
@@ -74,6 +76,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 - `cursor_position` (CUP) places cursor within bounds; out-of-range params saturate to valid grid.
 - Control sequences (CR/LF/BS) maintain row/column invariants: CR resets column, LF advances row, BS moves left; all saturate at edges.
 - Horizontal tab advances to the next default 8-column tab stop, clamped at the last column.
+- Cursor visibility starts enabled, toggles via DEC private `?25h/l`, and does not move cursor or mutate cells.
 - Text writes advance `cursor_col` after each character. Filling the last column arms pending wrap; the next text/codepoint write moves to column 0 on the next row before writing.
 - Pending wrap at the bottom row scrolls the visible cell buffer up by one row and clears the new bottom row before writing.
 - `line_feed` moves `cursor_row` down one row. At the bottom row it scrolls the visible cell buffer up by one row when cells are present. Column unchanged.
@@ -88,6 +91,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
   - Mode 1: start of screen through cursor position (inclusive).
 - Mode 2: entire screen.
 - `reset_screen` / `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
+- Reset also restores cursor visibility to enabled.
 
 ## Zero-Dimension Screen Behavior
 
@@ -106,7 +110,7 @@ The following are intentionally outside this seam:
 - Configurable tab stops
 - Wide character (multi-column) glyph handling
 - Color, style, or attribute storage
-- Mode-set sequences (SM/RM/DECSET)
+- Mode-set sequences beyond cursor visibility
 - VT control beyond the mapped M2 controls
 - Host, session, PTY, or platform coupling
 

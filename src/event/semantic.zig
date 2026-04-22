@@ -21,6 +21,7 @@ pub const SemanticEvent = union(enum) {
     carriage_return,
     backspace,
     horizontal_tab,
+    cursor_visible: bool,
     reset_screen,
     erase_display: u2,
     erase_line: u2,
@@ -38,7 +39,17 @@ pub fn process(event: Event) ?SemanticEvent {
 }
 
 fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, intermediates: [4]u8, intermediates_len: u8) ?SemanticEvent {
-    if (leader != 0 or private) return null;
+    if (private) {
+        if (leader == '?' and count >= 1 and params[0] == 25) {
+            return switch (final) {
+                'h' => SemanticEvent{ .cursor_visible = true },
+                'l' => SemanticEvent{ .cursor_visible = false },
+                else => null,
+            };
+        }
+        return null;
+    }
+    if (leader != 0) return null;
     switch (final) {
         'A' => return SemanticEvent{ .cursor_up = paramOrDefault1(params[0]) },
         'B' => return SemanticEvent{ .cursor_down = paramOrDefault1(params[0]) },
@@ -161,7 +172,7 @@ test "semantic: DECSTR maps to reset_screen" {
     try std.testing.expect(sem == .reset_screen);
 }
 
-test "semantic: private CSI does not map to screen event" {
+test "semantic: DEC private cursor show maps to cursor_visible true" {
     var params = [_]i32{0} ** 16;
     params[0] = 25;
     const ev = Event{ .style_change = .{
@@ -173,7 +184,22 @@ test "semantic: private CSI does not map to screen event" {
         .intermediates = [_]u8{0} ** 4,
         .intermediates_len = 0,
     } };
-    try std.testing.expectEqual(@as(?SemanticEvent, null), process(ev));
+    try std.testing.expect(process(ev).?.cursor_visible);
+}
+
+test "semantic: DEC private cursor hide maps to cursor_visible false" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 25;
+    const ev = Event{ .style_change = .{
+        .final = 'l',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(!process(ev).?.cursor_visible);
 }
 
 test "semantic: text event maps to write_text" {

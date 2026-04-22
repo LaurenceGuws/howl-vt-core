@@ -15,10 +15,11 @@ pub const ScreenState = struct {
     cursor_row: u16,
     cursor_col: u16,
     wrap_pending: bool,
+    cursor_visible: bool,
     cells: ?[]u21,
 
     pub fn init(rows: u16, cols: u16) ScreenState {
-        return .{ .rows = rows, .cols = cols, .cursor_row = 0, .cursor_col = 0, .wrap_pending = false, .cells = null };
+        return .{ .rows = rows, .cols = cols, .cursor_row = 0, .cursor_col = 0, .wrap_pending = false, .cursor_visible = true, .cells = null };
     }
 
     pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !ScreenState {
@@ -28,7 +29,7 @@ pub const ScreenState = struct {
             @memset(buf, 0);
             break :blk buf;
         } else null;
-        return .{ .rows = rows, .cols = cols, .cursor_row = 0, .cursor_col = 0, .wrap_pending = false, .cells = cells };
+        return .{ .rows = rows, .cols = cols, .cursor_row = 0, .cursor_col = 0, .wrap_pending = false, .cursor_visible = true, .cells = cells };
     }
 
     pub fn deinit(self: *ScreenState, allocator: std.mem.Allocator) void {
@@ -40,6 +41,7 @@ pub const ScreenState = struct {
         self.cursor_row = 0;
         self.cursor_col = 0;
         self.wrap_pending = false;
+        self.cursor_visible = true;
         if (self.cells) |c| @memset(c, 0);
     }
 
@@ -94,6 +96,7 @@ pub const ScreenState = struct {
                 self.wrap_pending = false;
                 self.horizontalTab();
             },
+            .cursor_visible => |visible| self.cursor_visible = visible,
             .reset_screen => self.reset(),
             .erase_display => |mode| {
                 self.wrap_pending = false;
@@ -192,8 +195,23 @@ test "screen: reset clears cursor wrap and cells" {
     s.reset();
     try std.testing.expectEqual(@as(u16, 0), s.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_col);
+    try std.testing.expect(s.cursor_visible);
     try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 0));
     try std.testing.expectEqual(@as(u21, 0), s.cellAt(1, 0));
+}
+
+test "screen: cursor_visible mode toggles without moving cursor" {
+    var s = ScreenState.init(2, 5);
+    s.cursor_row = 1;
+    s.cursor_col = 3;
+    s.apply(SemanticEvent{ .cursor_visible = false });
+    try std.testing.expect(!s.cursor_visible);
+    try std.testing.expectEqual(@as(u16, 1), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 3), s.cursor_col);
+    s.apply(SemanticEvent{ .cursor_visible = true });
+    try std.testing.expect(s.cursor_visible);
+    try std.testing.expectEqual(@as(u16, 1), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 3), s.cursor_col);
 }
 
 test "screen: cursor_up moves row" {
