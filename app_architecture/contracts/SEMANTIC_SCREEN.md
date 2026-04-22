@@ -58,11 +58,13 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 ## ScreenState Behavioral Guarantees
 
 - Cursor row and column are always within `[0, rows-1]` and `[0, cols-1]` respectively, enforced by saturating arithmetic on every mutation.
-- Zero-dimension screens (`rows=0` or `cols=0`) are safe: all operations are no-ops.
+- Zero-dimension screens (`rows=0` or `cols=0`) are safe: pipeline clear/reset/apply are no-ops for cell operations.
+- Cursor movement commands (`cursor_up`, `cursor_down`, `cursor_forward`, `cursor_back`) saturate at screen boundaries; repeated moves beyond edges remain clamped.
+- `cursor_position` (CUP) places cursor within bounds; out-of-range params saturate to valid grid.
 - Text writes advance `cursor_col` after each character. When `cursor_col` reaches `cols-1`, it stays there (no line wrap at this seam; no scrolling).
-- `line_feed` moves `cursor_row` down one row, clamped at `rows-1`. No scrolling.
+- `line_feed` moves `cursor_row` down one row, clamped at `rows-1`. Column unchanged. No scrolling.
 - `carriage_return` resets `cursor_col` to 0; `cursor_row` is unchanged.
-- `backspace` moves `cursor_col` left one column, saturating at 0.
+- `backspace` moves `cursor_col` left one column, saturating at 0; `cursor_row` is unchanged.
 - `erase_line` zeroes cells in the current row; cursor position is unchanged.
   - Mode 0: cursor position through end of line (inclusive).
   - Mode 1: start of line through cursor position (inclusive).
@@ -73,6 +75,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
   - Mode 2: entire screen.
 - Erase operations are no-ops when no cell buffer is present (`cells == null`).
 - Cell buffer (when present) is zero-initialized. Unwritten cells contain codepoint 0.
+- Control sequence edges (CR at column 0, LF at bottom row, BS at column 0, CUU/CUD/CUF/CUB beyond bounds) maintain deterministic saturation: movement and erase remain safe and predictable at all boundary conditions.
 
 ## Non-Goals
 

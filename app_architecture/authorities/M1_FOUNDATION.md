@@ -36,6 +36,15 @@ The `howl_terminal` module root orders the stable M1 seam first:
 
 The `Pipeline` orchestration layer is part of the M1 foundation: `clear` drops queued bridge work without screen application; `reset` clears both the queue and parser partial state; each `applyToScreen` drains the queue once and then clears it, so repeated apply without new input is a no-op on `ScreenState`. Full wording lives under “Pipeline seam” in `app_architecture/contracts/SEMANTIC_SCREEN.md`.
 
+## M1 edge determinism (cursor/control boundaries)
+
+Cursor and control behavior is deterministic at screen boundaries:
+- Cursor movement (CUU/CUD/CUF/CUB) saturates at edges; repeated moves beyond bounds remain clamped
+- Control sequences (CR/LF/BS) maintain column/row invariants: CR resets column, LF advances row, BS moves left
+- Behavior at edges is idempotent: further moves in the saturated direction do not change state
+- Zero-dimension screens (rows=0 or cols=0) are safe: pipeline operations (clear/reset/apply) handle them without corruption
+- All boundary conditions are covered by integration replay tests in `src/test/relay.zig` under “edge determinism” section
+
 ## Remaining M1 Outcomes
 
 - Reassess screen model boundaries against scope authority
