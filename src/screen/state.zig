@@ -8,12 +8,16 @@ const semantic_mod = @import("../event/semantic.zig");
 /// Semantic event alias applied by screen state.
 pub const SemanticEvent = semantic_mod.SemanticEvent;
 
+/// RGB color type alias.
+const Rgb = semantic_mod.Rgb;
+
 /// Cursor and optional cell-buffer state with deterministic clamped updates.
-const CellAttr = packed struct {
-    bold: bool,
-    fg: u8,
-    bg: u8,
-    _unused: u6 = 0,
+const CellAttr = struct {
+    bold: bool = false,
+    fg: u8 = 0,
+    bg: u8 = 0,
+    fg_rgb: ?Rgb = null,
+    bg_rgb: ?Rgb = null,
 };
 
 pub const ScreenState = struct {
@@ -26,6 +30,8 @@ pub const ScreenState = struct {
     current_bold: bool,
     current_fg: u8,
     current_bg: u8,
+    current_fg_rgb: ?Rgb = null,
+    current_bg_rgb: ?Rgb = null,
 
     pub fn init(rows: u16, cols: u16) ScreenState {
         return .{
@@ -38,6 +44,8 @@ pub const ScreenState = struct {
             .current_bold = false,
             .current_fg = 0,
             .current_bg = 0,
+            .current_fg_rgb = null,
+            .current_bg_rgb = null,
         };
     }
 
@@ -51,7 +59,7 @@ pub const ScreenState = struct {
         errdefer if (cells) |c| allocator.free(c);
         const cells_attr: ?[]CellAttr = if (size > 0) blk: {
             const buf = try allocator.alloc(CellAttr, size);
-            @memset(buf, .{ .bold = false, .fg = 0, .bg = 0, ._unused = 0 });
+            @memset(buf, .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null });
             break :blk buf;
         } else null;
         return .{
@@ -64,6 +72,8 @@ pub const ScreenState = struct {
             .current_bold = false,
             .current_fg = 0,
             .current_bg = 0,
+            .current_fg_rgb = null,
+            .current_bg_rgb = null,
         };
     }
 
@@ -105,6 +115,8 @@ pub const ScreenState = struct {
                 self.current_bold = false;
                 self.current_fg = 0;
                 self.current_bg = 0;
+                self.current_fg_rgb = null;
+                self.current_bg_rgb = null;
             },
             .style_bold_on => self.current_bold = true,
             .style_bold_off => self.current_bold = false,
@@ -112,8 +124,8 @@ pub const ScreenState = struct {
             .style_bg_color => |color| self.current_bg = color,
             .style_fg_256 => |color| self.current_fg = color,
             .style_bg_256 => |color| self.current_bg = color,
-            .style_fg_rgb => |_| {},
-            .style_bg_rgb => |_| {},
+            .style_fg_rgb => |rgb| self.current_fg_rgb = rgb,
+            .style_bg_rgb => |rgb| self.current_bg_rgb = rgb,
             .style_operations => |batch| {
                 var i: u8 = 0;
                 while (i < batch.count) : (i += 1) {
@@ -123,6 +135,8 @@ pub const ScreenState = struct {
                             self.current_bold = false;
                             self.current_fg = 0;
                             self.current_bg = 0;
+                            self.current_fg_rgb = null;
+                            self.current_bg_rgb = null;
                         },
                         .bold_on => self.current_bold = true,
                         .bold_off => self.current_bold = false,
@@ -130,8 +144,8 @@ pub const ScreenState = struct {
                         .bg_color => |color| self.current_bg = color,
                         .fg_256 => |color| self.current_fg = color,
                         .bg_256 => |color| self.current_bg = color,
-                        .fg_rgb => |_| {},
-                        .bg_rgb => |_| {},
+                        .fg_rgb => |rgb| self.current_fg_rgb = rgb,
+                        .bg_rgb => |rgb| self.current_bg_rgb = rgb,
                     }
                 }
             },
@@ -142,7 +156,7 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const cursor_pos = @as(usize, self.cursor_row) * self.cols + self.cursor_col;
-        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, ._unused = 0 };
+        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
         switch (mode) {
             0 => {
                 @memset(c[cursor_pos..], 0);
@@ -164,7 +178,7 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const row_start = @as(usize, self.cursor_row) * self.cols;
-        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, ._unused = 0 };
+        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
         switch (mode) {
             0 => {
                 @memset(c[row_start + self.cursor_col .. row_start + self.cols], 0);
@@ -193,7 +207,8 @@ pub const ScreenState = struct {
                 .bold = self.current_bold,
                 .fg = self.current_fg,
                 .bg = self.current_bg,
-                ._unused = 0,
+                .fg_rgb = self.current_fg_rgb,
+                .bg_rgb = self.current_bg_rgb,
             };
         }
         if (self.cursor_col < self.cols - 1) {
