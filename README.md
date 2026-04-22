@@ -22,4 +22,4 @@ this package.
 
 ## Current Focus
 
-See `docs/todo/ACTIVE_QUEUE.md`.
+See `docs/engineer/ACTIVE_QUEUE.md`.

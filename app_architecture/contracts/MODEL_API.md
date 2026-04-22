@@ -31,8 +31,8 @@ Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`,
 - Responsibility: selection data representation.
 - Breakage: field/type changes.
 
-**defaultCell, clampColorIndex, indexToRgb**
-- Responsibility: default cell construction and palette mapping helpers.
+**defaultCell**
+- Responsibility: default cell construction helper.
 - Breakage: function signature changes or semantic behavior changes.
 
 ### Selection (`src/model/selection.zig`)
@@ -55,8 +55,6 @@ Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`,
 - `SelectionState.start/update/finish/clear` preserve the active/selecting contract implied by method names.
 - `Metrics.beginFrame` updates frame EMA only after an initial frame timestamp exists.
 - `Metrics.recordDraw` updates draw EMA; updates input-latency metrics only when `last_input_time` is set.
-- `clampColorIndex` clamps signed values into `0..255`.
-- `indexToRgb` maps ANSI + 256-color indexes deterministically.
 
 ## Non-Goals
 
