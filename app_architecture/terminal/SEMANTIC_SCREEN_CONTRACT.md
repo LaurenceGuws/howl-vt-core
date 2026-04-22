@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-050D. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-051E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -23,6 +23,8 @@
 | `style_bold_off` | — | CSI 22m | Disable bold |
 | `style_fg_color` | `u8` (0-8) | CSI 30-37,39m | Set foreground color; 0=default, 1-8=colors 30-37 |
 | `style_bg_color` | `u8` (0-8) | CSI 40-47,49m | Set background color; 0=default, 1-8=colors 40-47 |
+| `style_fg_256` | `u8` (0-255) | CSI 38;5;<n>m | Set foreground 256-color palette index |
+| `style_bg_256` | `u8` (0-255) | CSI 48;5;<n>m | Set background 256-color palette index |
 
 ## Ownership and Lifetime
 
@@ -77,22 +79,28 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
   - Style state is independent of cell content; does not affect non-text operations.
   - Style attributes on a cell are immutable after the cell is written; style state changes do not retroactively affect written cells.
 - Cell buffer (when present) is zero-initialized. Unwritten cells contain codepoint 0 with default style (bold=false, fg=0, bg=0).
-- Style attribute storage uses u4 fields (0-15) to preserve all semantic color values (0-8) without truncation.
+- Style attribute storage uses u8 fields for fg/bg to preserve basic colors (0-8) and 256-color indices (0-255) without truncation.
 
 ## SGR (Style) Scope
 
-Implemented (minimal SGR subset):
+Implemented:
 - Reset (SGR 0)
 - Bold on/off (SGR 1, 22)
 - Foreground basic colors (SGR 30-37, 39)
 - Background basic colors (SGR 40-47, 49)
+- Foreground 256-color palette (SGR 38;5;<n>)
+- Background 256-color palette (SGR 48;5;<n>)
+- Ordered multi-parameter SGR processing (e.g., 1;38;5;196 for bold + 256-color)
+
+Malformed sequences policy:
+- Extended color forms (38, 48) without matching subparameter form (5 or 2) are ignored safely
+- Incomplete extended sequences are skipped without breaking valid neighbors
+- Unknown parameters are always skipped
 
 Deferred (future sprints):
-- 256-color palette (SGR 38/48 with 5)
 - RGB true color (SGR 38/48 with 2)
 - Underline, strikethrough, blink, inverse, dim (SGR 4, 9, 5, 7, 2)
 - Underline color (SGR 58, 59)
-- Multi-parameter SGR sequences beyond param[0]
 
 ## Non-Goals
 
