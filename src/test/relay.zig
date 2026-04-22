@@ -1204,6 +1204,427 @@ test "zero-dim: rows=10, cols=0: repeated text writes remain safe" {
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
 }
 
+// --- Runtime engine facade parity matrix ---
+
+const ParityScenario = struct {
+    name: []const u8,
+    rows: u16,
+    cols: u16,
+    with_cells: bool,
+    input: []const u8,
+    expected_row: u16,
+    expected_col: u16,
+    expected_queue_depth: usize,
+    check_cells: bool = false,
+    cell_checks: []const struct { row: u16, col: u16, codepoint: u21 } = &.{},
+};
+
+fn runParityScenario(gpa: std.mem.Allocator, scenario: ParityScenario) !void {
+    var direct_pl = try pipeline_mod.Pipeline.init(gpa);
+    defer direct_pl.deinit();
+    var direct_screen = if (scenario.with_cells)
+        try screen_mod.ScreenState.initWithCells(gpa, scenario.rows, scenario.cols)
+    else
+        screen_mod.ScreenState.init(scenario.rows, scenario.cols);
+    defer if (scenario.with_cells) direct_screen.deinit(gpa);
+
+    var runtime_engine = if (scenario.with_cells)
+        try runtime_mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    else
+        try runtime_mod.Engine.init(gpa, scenario.rows, scenario.cols);
+    defer runtime_engine.deinit();
+
+    direct_pl.feedSlice(scenario.input);
+    direct_pl.applyToScreen(&direct_screen);
+
+    runtime_engine.feedSlice(scenario.input);
+    runtime_engine.apply();
+
+    try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, runtime_engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, runtime_engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
+    try std.testing.expectEqual(scenario.expected_queue_depth, runtime_engine.queuedEventCount());
+
+    if (scenario.check_cells) {
+        for (scenario.cell_checks) |check| {
+            const direct_cell = direct_screen.cellAt(check.row, check.col);
+            const runtime_cell = runtime_engine.screen().cellAt(check.row, check.col);
+            try std.testing.expectEqual(direct_cell, check.codepoint);
+            try std.testing.expectEqual(runtime_cell, check.codepoint);
+        }
+    }
+}
+
+test "parity: CUU moves cursor up identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUU baseline",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[5A",
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CUD moves cursor down identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUD baseline",
+        .rows = 10,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[3B",
+        .expected_row = 3,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CUF moves cursor forward identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUF baseline",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[10C",
+        .expected_row = 0,
+        .expected_col = 10,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CUB moves cursor back identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUB from position",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[20C\x1b[5D",
+        .expected_row = 0,
+        .expected_col = 15,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CUP absolute position identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUP absolute",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[10;20H",
+        .expected_row = 9,
+        .expected_col = 19,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CUP alternate final 'f' identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CUP with f",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[5;10f",
+        .expected_row = 4,
+        .expected_col = 9,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CR resets column identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CR resets column",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[10C\x0D",
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: LF advances row identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "LF advances row",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x0A\x0A\x0A",
+        .expected_row = 3,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: BS moves left identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "BS moves left",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[15C\x08\x08\x08",
+        .expected_row = 0,
+        .expected_col = 12,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: CRLF sequence identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CRLF combo",
+        .rows = 24,
+        .cols = 80,
+        .with_cells = false,
+        .input = "\x1b[5C\x0D\x0A\x1b[3C",
+        .expected_row = 1,
+        .expected_col = 3,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: erase-line mode 0 (to end) identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "EL mode 0",
+        .rows = 4,
+        .cols = 20,
+        .with_cells = true,
+        .input = "hello\x1b[2D\x1b[K",
+        .expected_row = 0,
+        .expected_col = 3,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'h' },
+            .{ .row = 0, .col = 1, .codepoint = 'e' },
+            .{ .row = 0, .col = 2, .codepoint = 'l' },
+            .{ .row = 0, .col = 3, .codepoint = 0 },
+        },
+    });
+}
+
+test "parity: erase-line mode 1 (from start) identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "EL mode 1",
+        .rows = 4,
+        .cols = 20,
+        .with_cells = true,
+        .input = "hello\x1b[2D\x1b[1K",
+        .expected_row = 0,
+        .expected_col = 3,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 0 },
+            .{ .row = 0, .col = 3, .codepoint = 0 },
+            .{ .row = 0, .col = 4, .codepoint = 'o' },
+        },
+    });
+}
+
+test "parity: erase-line mode 2 (full line) identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "EL mode 2",
+        .rows = 4,
+        .cols = 20,
+        .with_cells = true,
+        .input = "test\x1b[2K",
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: erase-display mode 0 (to end) identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "ED mode 0",
+        .rows = 3,
+        .cols = 5,
+        .with_cells = true,
+        .input = "AAAAA\x0D\x0ABBBBB\x0D\x0ACCCCC\x1b[1;2H\x1b[J",
+        .expected_row = 0,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'A' },
+            .{ .row = 0, .col = 1, .codepoint = 0 },
+            .{ .row = 1, .col = 0, .codepoint = 0 },
+            .{ .row = 2, .col = 0, .codepoint = 0 },
+        },
+    });
+}
+
+test "parity: erase-display mode 2 (full) identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "ED mode 2",
+        .rows = 3,
+        .cols = 5,
+        .with_cells = true,
+        .input = "AAAAA\x0D\x0ABBBBB\x0D\x0ACCCCC\x1b[2J",
+        .expected_row = 2,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: split CSI across feeds identically" {
+    const gpa = std.testing.allocator;
+    var direct_pl = try pipeline_mod.Pipeline.init(gpa);
+    defer direct_pl.deinit();
+    var direct_screen = screen_mod.ScreenState.init(24, 80);
+
+    var runtime_engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    defer runtime_engine.deinit();
+
+    direct_pl.feedSlice("\x1b[");
+    direct_pl.feedSlice("5");
+    direct_pl.feedSlice("C");
+    direct_pl.applyToScreen(&direct_screen);
+
+    runtime_engine.feedSlice("\x1b[");
+    runtime_engine.feedSlice("5");
+    runtime_engine.feedSlice("C");
+    runtime_engine.apply();
+
+    try std.testing.expectEqual(direct_screen.cursor_col, runtime_engine.screen().cursor_col);
+}
+
+test "parity: text write with cells identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "text write",
+        .rows = 4,
+        .cols = 20,
+        .with_cells = true,
+        .input = "hello",
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'h' },
+            .{ .row = 0, .col = 1, .codepoint = 'e' },
+            .{ .row = 0, .col = 2, .codepoint = 'l' },
+            .{ .row = 0, .col = 3, .codepoint = 'l' },
+            .{ .row = 0, .col = 4, .codepoint = 'o' },
+        },
+    });
+}
+
+test "parity: UTF-8 codepoint identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "UTF-8 write",
+        .rows = 4,
+        .cols = 20,
+        .with_cells = true,
+        .input = "\xC3\xA9",
+        .expected_row = 0,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 0xE9 },
+        },
+    });
+}
+
+test "parity: zero-dim rows=0 identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "zero-dim rows=0",
+        .rows = 0,
+        .cols = 10,
+        .with_cells = false,
+        .input = "text\x1b[5C\x1b[3A",
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: zero-dim cols=0 identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "zero-dim cols=0",
+        .rows = 10,
+        .cols = 0,
+        .with_cells = false,
+        .input = "text\x1b[5B\x1b[3D",
+        .expected_row = 5,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: zero-dim rows=0 cols=0 identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "zero-dim 0×0",
+        .rows = 0,
+        .cols = 0,
+        .with_cells = false,
+        .input = "test\x1b[999A\x1b[999C\x1b[J",
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: invalid erase mode maps to 0 identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "invalid J mode->0",
+        .rows = 2,
+        .cols = 5,
+        .with_cells = true,
+        .input = "AAAAA\x0D\x0ABBBBB\x1b[9J",
+        .expected_row = 1,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: mixed sequence identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "mixed complex",
+        .rows = 5,
+        .cols = 15,
+        .with_cells = true,
+        .input = "line1\x0D\x0Aline2\x1b[2;5H",
+        .expected_row = 1,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'l' },
+            .{ .row = 1, .col = 0, .codepoint = 'l' },
+            .{ .row = 1, .col = 4, .codepoint = '2' },
+        },
+    });
+}
+
 // --- Runtime engine facade tests ---
 
 test "runtime: init and deinit lifecycle" {
@@ -1375,4 +1796,3 @@ test "runtime: complex sequence with cursor/text/erase" {
     try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
     try std.testing.expectEqual(@as(u21, 'l'), engine.screen().cellAt(1, 0));
 }
-

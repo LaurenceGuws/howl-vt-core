@@ -34,6 +34,10 @@ a cleaner async feed/apply/read API:
 - `screen()` — get const ScreenState reference
 - `queuedEventCount()` — introspection
 
+Runtime parity is validated by replay tests that run identical byte streams through
+both direct `Pipeline+ScreenState` and `runtime.Engine`, then assert identical
+end-state behavior.
+
 See `app_architecture/authorities/M1_FOUNDATION.md` for full API details.
 
 ## Current Focus

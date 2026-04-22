@@ -48,6 +48,8 @@ The `runtime.Engine` is a host-neutral convenience facade that composes `Pipelin
 
 The facade is a transparent wrapper; it does not extend VT semantics or change any M1 contracts. Behavior is identical to direct pipeline usage. Architectural benefit: hosts see only `Engine`, not parser/bridge/semantic layers.
 
+Runtime parity confidence is enforced by replay integration tests in `src/test/relay.zig` that run identical scenario streams through direct `Pipeline+ScreenState` and through `runtime.Engine`, then assert matching cursor/cell/queue outcomes across cursor, control, erase, split-feed, and zero-dimension cases.
+
 ## M1 pipeline determinism (non-style)
 
 The `Pipeline` orchestration layer is part of the M1 foundation: `clear` drops queued bridge work without screen application; `reset` clears both the queue and parser partial state; each `applyToScreen` drains the queue once and then clears it, so repeated apply without new input is a no-op on `ScreenState`. Full wording lives under “Pipeline seam” in `app_architecture/contracts/SEMANTIC_SCREEN.md`.
