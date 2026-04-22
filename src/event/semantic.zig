@@ -508,7 +508,7 @@ test "semantic: multi-param SGR with unsupported params skips them" {
     var params: [16]i32 = undefined;
     @memset(&params, 0);
     params[0] = 1;
-    params[1] = 5;
+    params[1] = 6;
     params[2] = 31;
     const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
     try std.testing.expect(sem == .style_operations);
