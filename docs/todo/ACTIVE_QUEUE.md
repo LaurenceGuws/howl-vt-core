@@ -36,6 +36,11 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-055C` | `done` | Screen apply + cell attrs for dim/strikethrough. |
 | `HT-055D` | `done` | Relay fixtures for dim/strikethrough flow. |
 | `HT-055E` | `done` | Contract/queue sync close. |
+| `HT-056A` | `done` | Scope seed: blink primitives (SGR 5/25) + reset continuity. |
+| `HT-056B` | `todo` | Semantic mapping for blink on/off in ordered SGR ops. |
+| `HT-056C` | `todo` | Screen apply + cell attrs for blink persistence/reset. |
+| `HT-056D` | `todo` | Relay fixtures for blink integration + malformed continuity. |
+| `HT-056E` | `todo` | Contract/queue close sync for blink batch. |
 
 ## Guardrails
 
