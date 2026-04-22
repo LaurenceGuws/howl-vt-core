@@ -20,6 +20,8 @@ pub const SemanticEvent = union(enum) {
     line_feed,
     carriage_return,
     backspace,
+    erase_display: u2,
+    erase_line: u2,
 };
 
 /// Convert a parser event into a semantic screen operation when supported.
@@ -44,6 +46,8 @@ fn processCsi(final: u8, params: [16]i32, count: u8) ?SemanticEvent {
             const col = paramOrDefault1(if (count >= 1) params[1] else 0);
             return SemanticEvent{ .cursor_position = .{ .row = row - 1, .col = col - 1 } };
         },
+        'J' => return SemanticEvent{ .erase_display = eraseMode(params[0]) },
+        'K' => return SemanticEvent{ .erase_line = eraseMode(params[0]) },
         else => return null,
     }
 }
@@ -54,6 +58,14 @@ fn processControl(c: u8) ?SemanticEvent {
         0x0D => SemanticEvent.carriage_return,
         0x08 => SemanticEvent.backspace,
         else => null,
+    };
+}
+
+fn eraseMode(v: i32) u2 {
+    return switch (v) {
+        1 => 1,
+        2 => 2,
+        else => 0,
     };
 }
 
@@ -142,4 +154,39 @@ test "semantic: invalid_sequence returns null" {
 
 test "semantic: title_set returns null" {
     try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .title_set = "My Title" }));
+}
+
+test "semantic: ED no param defaults to mode 0" {
+    const sem = process(makeStyleChange('J', 0, 0, 0)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 0), sem.erase_display);
+}
+
+test "semantic: ED mode 1 above" {
+    const sem = process(makeStyleChange('J', 1, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 1), sem.erase_display);
+}
+
+test "semantic: ED mode 2 full" {
+    const sem = process(makeStyleChange('J', 2, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 2), sem.erase_display);
+}
+
+test "semantic: EL mode 0 right" {
+    const sem = process(makeStyleChange('K', 0, 0, 0)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 0), sem.erase_line);
+}
+
+test "semantic: EL mode 1 left" {
+    const sem = process(makeStyleChange('K', 1, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 1), sem.erase_line);
+}
+
+test "semantic: EL mode 2 full line" {
+    const sem = process(makeStyleChange('K', 2, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 2), sem.erase_line);
+}
+
+test "semantic: EL invalid mode maps to 0" {
+    const sem = process(makeStyleChange('K', 5, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 0), sem.erase_line);
 }
