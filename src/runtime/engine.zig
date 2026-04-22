@@ -2,8 +2,6 @@
 //! Composes parser, pipeline, and screen into a single runtime interface.
 //! No behavioral changes to underlying components; this is a convenience surface.
 
-const std = @import("std");
-const parser_mod = @import("../parser/parser.zig");
 const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
 
@@ -70,12 +68,7 @@ pub const Engine = struct {
     }
 
     /// Get const reference to current screen state.
-    pub fn screenRef(self: *const Engine) *const screen_mod.ScreenState {
-        return &self.screen;
-    }
-
-    /// Get mutable reference to screen state.
-    pub fn screenMut(self: *Engine) *screen_mod.ScreenState {
+    pub fn screen(self: *const Engine) *const screen_mod.ScreenState {
         return &self.screen;
     }
 
