@@ -22,6 +22,8 @@ pub const StyleOp = union(enum) {
     strikethrough_off,
     underline_on,
     underline_off,
+    blink_on,
+    blink_off,
     inverse_on,
     inverse_off,
     fg_color: u8,
@@ -55,6 +57,8 @@ pub const SemanticEvent = union(enum) {
     style_strikethrough_off,
     style_underline_on,
     style_underline_off,
+    style_blink_on,
+    style_blink_off,
     style_inverse_on,
     style_inverse_off,
     style_fg_color: u8,
@@ -137,6 +141,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             29 => StyleOp.strikethrough_off,
             4 => StyleOp.underline_on,
             24 => StyleOp.underline_off,
+            5 => StyleOp.blink_on,
+            25 => StyleOp.blink_off,
             7 => StyleOp.inverse_on,
             27 => StyleOp.inverse_off,
             30...37 => StyleOp{ .fg_color = @intCast(param - 30 + 1) },
@@ -219,6 +225,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .strikethrough_off => SemanticEvent.style_strikethrough_off,
             .underline_on => SemanticEvent.style_underline_on,
             .underline_off => SemanticEvent.style_underline_off,
+            .blink_on => SemanticEvent.style_blink_on,
+            .blink_off => SemanticEvent.style_blink_off,
             .inverse_on => SemanticEvent.style_inverse_on,
             .inverse_off => SemanticEvent.style_inverse_off,
             .fg_color => |c| SemanticEvent{ .style_fg_color = c },
@@ -419,7 +427,7 @@ test "semantic: SGR 49 background reset" {
 }
 
 test "semantic: SGR unsupported param returns null" {
-    try std.testing.expectEqual(@as(?SemanticEvent, null), process(makeStyleChange('m', 5, 0, 1)));
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(makeStyleChange('m', 6, 0, 1)));
 }
 
 test "semantic: SGR 90 bright foreground black" {
@@ -450,6 +458,16 @@ test "semantic: SGR 4 underline on" {
 test "semantic: SGR 24 underline off" {
     const sem = process(makeStyleChange('m', 24, 0, 1)) orelse return error.NoEvent;
     try std.testing.expect(sem == .style_underline_off);
+}
+
+test "semantic: SGR 5 blink on" {
+    const sem = process(makeStyleChange('m', 5, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_blink_on);
+}
+
+test "semantic: SGR 25 blink off" {
+    const sem = process(makeStyleChange('m', 25, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_blink_off);
 }
 
 test "semantic: SGR 7 inverse on" {
@@ -497,6 +515,20 @@ test "semantic: multi-param SGR with unsupported params skips them" {
     try std.testing.expectEqual(@as(u8, 2), sem.style_operations.count);
     try std.testing.expect(sem.style_operations.ops[0] == .bold_on);
     try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
+}
+
+test "semantic: multi-param SGR blink + fg + inverse preserves order" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 5;
+    params[1] = 31;
+    params[2] = 7;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 3), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .blink_on);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
+    try std.testing.expect(sem.style_operations.ops[2] == .inverse_on);
 }
 
 test "semantic: SGR no params defaults to reset" {
