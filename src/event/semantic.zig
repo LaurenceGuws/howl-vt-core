@@ -32,6 +32,9 @@ pub const StyleOp = union(enum) {
     bg_256: u8,
     fg_rgb: Rgb,
     bg_rgb: Rgb,
+    underline_color_256: u8,
+    underline_color_rgb: Rgb,
+    underline_color_reset,
 };
 
 /// Screen-oriented semantic operations derived from parser events.
@@ -67,6 +70,9 @@ pub const SemanticEvent = union(enum) {
     style_bg_256: u8,
     style_fg_rgb: Rgb,
     style_bg_rgb: Rgb,
+    style_underline_color_256: u8,
+    style_underline_color_rgb: Rgb,
+    style_underline_color_reset,
     style_operations: struct {
         ops: [16]StyleOp,
         count: u8,
@@ -201,6 +207,30 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
                     break :blk null;
                 }
             },
+            58 => blk: {
+                if (i + 1 < param_count and params[i + 1] == 2) {
+                    if (i + 4 < param_count) {
+                        const r = if (i + 2 < count) clampRgbComponent(params[i + 2]) else 0;
+                        const g = if (i + 3 < count) clampRgbComponent(params[i + 3]) else 0;
+                        const b = if (i + 4 < count) clampRgbComponent(params[i + 4]) else 0;
+                        i += 4;
+                        break :blk StyleOp{ .underline_color_rgb = .{ .r = r, .g = g, .b = b } };
+                    }
+                    i = param_count - 1;
+                    break :blk null;
+                } else if (i + 1 < param_count and params[i + 1] == 5) {
+                    if (i + 2 < param_count) {
+                        const color_idx = if (i + 2 < count) params[i + 2] else 0;
+                        i += 2;
+                        break :blk StyleOp{ .underline_color_256 = @intCast(color_idx & 0xFF) };
+                    }
+                    i = param_count - 1;
+                    break :blk null;
+                } else {
+                    break :blk null;
+                }
+            },
+            59 => StyleOp.underline_color_reset,
             else => null,
         };
         if (op) |o| {
@@ -235,6 +265,9 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .bg_256 => |c| SemanticEvent{ .style_bg_256 = c },
             .fg_rgb => |rgb| SemanticEvent{ .style_fg_rgb = rgb },
             .bg_rgb => |rgb| SemanticEvent{ .style_bg_rgb = rgb },
+            .underline_color_256 => |c| SemanticEvent{ .style_underline_color_256 = c },
+            .underline_color_rgb => |rgb| SemanticEvent{ .style_underline_color_rgb = rgb },
+            .underline_color_reset => SemanticEvent.style_underline_color_reset,
         };
     }
     return SemanticEvent{ .style_operations = .{ .ops = ops, .count = op_count } };
@@ -614,6 +647,47 @@ test "semantic: SGR 48;2;r;g;b background RGB" {
     try std.testing.expectEqual(@as(u8, 0), sem.style_bg_rgb.b);
 }
 
+test "semantic: SGR 58;5;<n> underline 256-color" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 58;
+    params[1] = 5;
+    params[2] = 201;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_underline_color_256);
+    try std.testing.expectEqual(@as(u8, 201), sem.style_underline_color_256);
+}
+
+test "semantic: SGR 58;2;r;g;b underline RGB" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 58;
+    params[1] = 2;
+    params[2] = 12;
+    params[3] = 34;
+    params[4] = 56;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 5 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_underline_color_rgb);
+    try std.testing.expectEqual(@as(u8, 12), sem.style_underline_color_rgb.r);
+    try std.testing.expectEqual(@as(u8, 34), sem.style_underline_color_rgb.g);
+    try std.testing.expectEqual(@as(u8, 56), sem.style_underline_color_rgb.b);
+}
+
+test "semantic: SGR 59 reset underline color" {
+    const sem = process(makeStyleChange('m', 59, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_underline_color_reset);
+}
+
+test "semantic: malformed underline color sequence (58;2) ignored safely" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 58;
+    params[1] = 2;
+    params[2] = 255;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } });
+    try std.testing.expectEqual(@as(?SemanticEvent, null), sem);
+}
+
 test "semantic: RGB values clamped to 0-255" {
     var params: [16]i32 = undefined;
     @memset(&params, 0);
@@ -645,4 +719,20 @@ test "semantic: multi-param SGR 1;38;2;255;128;0 bold and fg RGB" {
     try std.testing.expectEqual(@as(u8, 255), sem.style_operations.ops[1].fg_rgb.r);
     try std.testing.expectEqual(@as(u8, 128), sem.style_operations.ops[1].fg_rgb.g);
     try std.testing.expectEqual(@as(u8, 0), sem.style_operations.ops[1].fg_rgb.b);
+}
+
+test "semantic: multi-param SGR 4;58;5;33;59 preserves order" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 4;
+    params[1] = 58;
+    params[2] = 5;
+    params[3] = 33;
+    params[4] = 59;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 5 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 3), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .underline_on);
+    try std.testing.expectEqual(@as(u8, 33), sem.style_operations.ops[1].underline_color_256);
+    try std.testing.expect(sem.style_operations.ops[2] == .underline_color_reset);
 }
