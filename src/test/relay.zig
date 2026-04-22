@@ -574,6 +574,28 @@ test "replay: VPA moves cursor to absolute row" {
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_col);
 }
 
+test "replay: VPA default param moves cursor to row zero" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(24, 80);
+    screen.cursor_row = 12;
+    screen.cursor_col = 9;
+    feed(&pl, &screen, "\x1b[d");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), screen.cursor_col);
+}
+
+test "replay: VPA clamps at last row" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(5, 20);
+    feed(&pl, &screen, "\x1b[999d");
+    try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
 test "replay: CHA default param moves cursor to column zero" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
@@ -1797,6 +1819,20 @@ test "parity: VPA moves cursor to absolute row identically" {
         .with_cells = false,
         .input = "\x1b[7d",
         .expected_row = 6,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
+test "parity: VPA clamps at last row identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "VPA clamp",
+        .rows = 5,
+        .cols = 20,
+        .with_cells = false,
+        .input = "\x1b[999d",
+        .expected_row = 4,
         .expected_col = 0,
         .expected_queue_depth = 0,
     });
@@ -3395,6 +3431,16 @@ test "runtime: VPA move via apply matches direct pipeline" {
     engine.feedSlice("\x1b[9d");
     engine.apply();
     try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+}
+
+test "runtime: VPA clamp via apply matches direct pipeline" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 5, 20);
+    defer engine.deinit();
+    engine.feedSlice("\x1b[999d");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_row);
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
