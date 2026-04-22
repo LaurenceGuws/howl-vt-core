@@ -31,11 +31,11 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-054C` | `done` | Screen apply + cell attrs for underline/inverse. |
 | `HT-054D` | `done` | Relay fixtures for underline/inverse flow. |
 | `HT-054E` | `done` | Contract/queue sync close. |
-| `HT-055A` | `ready` | Queue + contract scope: dim and strikethrough. |
-| `HT-055B` | `ready` | Semantic mapping for dim/strikethrough SGR. |
-| `HT-055C` | `ready` | Screen apply + cell attrs for dim/strikethrough. |
-| `HT-055D` | `ready` | Relay fixtures for dim/strikethrough flow. |
-| `HT-055E` | `ready` | Contract/queue sync close. |
+| `HT-055A` | `done` | Queue + contract scope: dim and strikethrough. |
+| `HT-055B` | `done` | Semantic mapping for dim/strikethrough SGR. |
+| `HT-055C` | `done` | Screen apply + cell attrs for dim/strikethrough. |
+| `HT-055D` | `done` | Relay fixtures for dim/strikethrough flow. |
+| `HT-055E` | `done` | Contract/queue sync close. |
 
 ## Guardrails
 

@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-055A. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-055E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -130,7 +130,7 @@ Malformed sequences policy:
 - Unknown parameters are always skipped
 
 Deferred (future sprints):
-- Strikethrough, blink, dim (SGR 9, 5, 2)
+- Blink (SGR 5)
 - Underline color (SGR 58, 59)
 
 ## Non-Goals
