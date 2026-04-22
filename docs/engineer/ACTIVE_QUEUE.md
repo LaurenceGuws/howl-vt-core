@@ -16,9 +16,15 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** RF-B2 (RF-201, RF-202, RF-203) completed by engineer execution.
+**Status:** RF-B3 (RF-301, RF-302, RF-303) completed by engineer execution.
 
-**Next:** Await architect-published batch for the following loop. No open engineer tickets.
+RF-301: Added 14 edge-determinism integration tests covering CUU/CUD/CUF/CUB saturation at boundaries, CR/LF/BS interaction on edges, and zero-dimension pipeline safety. Stopped at zero-dimension cursor behavior mismatch (documented in contract as no-op, but cursor moves during non-cell operations).
+
+RF-302: Updated SEMANTIC_SCREEN.md and M1_FOUNDATION.md to document cursor saturation guarantees, control sequence edge invariants, and zero-dimension screen safety.
+
+RF-303: Queue rewritten for RF-B4 wait.
+
+**Next:** Await architect decision on zero-dimension cursor behavior (contract vs runtime) and publication of next batch.
 
 ## Ticket Format (Required)
 
