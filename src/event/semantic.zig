@@ -120,6 +120,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             39 => StyleOp{ .fg_color = 0 },
             40...47 => StyleOp{ .bg_color = @intCast(param - 40 + 1) },
             49 => StyleOp{ .bg_color = 0 },
+            90...97 => StyleOp{ .fg_color = @intCast(param - 90 + 9) },
+            100...107 => StyleOp{ .bg_color = @intCast(param - 100 + 9) },
             38 => blk: {
                 if (i + 4 < param_count and params[i + 1] == 2) {
                     const r = if (i + 2 < count) clampRgbComponent(params[i + 2]) else 0;
@@ -345,6 +347,26 @@ test "semantic: SGR 49 background reset" {
 
 test "semantic: SGR unsupported param returns null" {
     try std.testing.expectEqual(@as(?SemanticEvent, null), process(makeStyleChange('m', 5, 0, 1)));
+}
+
+test "semantic: SGR 90 bright foreground black" {
+    const sem = process(makeStyleChange('m', 90, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u8, 9), sem.style_fg_color);
+}
+
+test "semantic: SGR 97 bright foreground white" {
+    const sem = process(makeStyleChange('m', 97, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u8, 16), sem.style_fg_color);
+}
+
+test "semantic: SGR 100 bright background black" {
+    const sem = process(makeStyleChange('m', 100, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u8, 9), sem.style_bg_color);
+}
+
+test "semantic: SGR 107 bright background white" {
+    const sem = process(makeStyleChange('m', 107, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u8, 16), sem.style_bg_color);
 }
 
 test "semantic: multi-param SGR 1;31 bold and red" {
