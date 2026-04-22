@@ -20,6 +20,16 @@ this package.
 - Public names should use `howl-terminal` for package/binary identity and
   `howl_terminal` only where Zig identifiers require it.
 
+## M1 Runtime Facade
+
+The M1 foundation is composed of `parser`, `pipeline`, `semantic`, and `screen` modules.
+For convenience, a `runtime.Engine` facade wraps these components into a single interface
+suitable for embedding in hosts. The facade is a transparent wrapper that does not extend
+VT semantics; it packages the deterministic parser→pipeline→semantic→screen flow into
+a cleaner async feed/apply/read API.
+
+See `app_architecture/authorities/M1_FOUNDATION.md` for API details.
+
 ## Current Focus
 
 See `docs/engineer/ACTIVE_QUEUE.md`.

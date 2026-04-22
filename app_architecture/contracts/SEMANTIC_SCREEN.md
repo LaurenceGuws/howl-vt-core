@@ -113,3 +113,9 @@ Required for any breaking-change:
 - Rationale explaining the necessity
 - Update to this document
 - Update to consumers of affected API
+
+## Runtime Facade Integration
+
+The `runtime.Engine` facade (in `src/runtime/engine.zig`) composes `Pipeline` and `ScreenState` into a single interface. The facade is a transparent wrapper that does not modify semantic behavior: it calls `Pipeline.feedByte()`, `Pipeline.applyToScreen()`, and `ScreenState` methods exactly as an external host would.
+
+The facade provides convenience for hosts that want to avoid direct parser/bridge/semantic imports. It does not change any M1 contracts or guarantees documented here; it merely packages the existing deterministic flow into a cleaner async API.

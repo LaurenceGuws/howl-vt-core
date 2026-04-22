@@ -29,8 +29,24 @@ The `howl_terminal` module root orders the stable M1 seam first:
 2. `pipeline` — parser plus bridge queue and `applyToScreen`
 3. `semantic` — `SemanticEvent` mapping from bridge `Event`
 4. `screen` — `ScreenState` and `apply`
+5. `runtime` — `Engine` facade composing parser+pipeline+screen into single interface (convenience layer for hosts)
 
 `model` remains exported for shared types used elsewhere in Howl; style and color fields there are not driven by the M1 `SemanticEvent` / `ScreenState` replay path. Behavioral authority for the non-style core is `app_architecture/contracts/SEMANTIC_SCREEN.md`.
+
+## M1 runtime facade
+
+The `runtime.Engine` is a host-neutral convenience facade that composes `Pipeline` and `ScreenState` without modifying any parser/semantic/screen behavior. Hosts can use the facade to avoid direct pipeline/semantic imports and get a simpler async feed→apply→read interface.
+
+`Engine` provides:
+- `init(allocator, rows, cols)` — screen without cell buffer
+- `initWithCells(allocator, rows, cols)` — screen with cells
+- `feedByte(byte)` / `feedSlice(bytes)` — accumulate input
+- `apply()` — drain queue and update screen
+- `clear()` / `reset()` — queue and parser management
+- `screenRef()` / `screenMut()` — screen state access
+- `queuedEventCount()` — queue introspection
+
+The facade is a transparent wrapper; it does not extend VT semantics or change any M1 contracts. Behavior is identical to direct pipeline usage. Architectural benefit: hosts see only `Engine`, not parser/bridge/semantic layers.
 
 ## M1 pipeline determinism (non-style)
 
