@@ -805,7 +805,8 @@ test "replay: mixed indexed and RGB colors with cursor movement" {
     feed(&pl, &screen, "green");
     feed(&pl, &screen, "\x1b[1;1H");
     feed(&pl, &screen, "go");
-    try std.testing.expectEqual(@as(u8, 196), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[0].fg);
+    try std.testing.expect(screen.cells_attr.?[0].fg_rgb != null);
     try std.testing.expect(screen.cells_attr.?[3].fg_rgb != null);
     try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[3].fg_rgb.?.r);
 }
