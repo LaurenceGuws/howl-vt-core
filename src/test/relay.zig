@@ -596,6 +596,40 @@ test "replay: VPA clamps at last row" {
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
 }
 
+test "replay: split VPA interrupted by DECSTR bytes remains deterministic" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 10, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "abc");
+    pl.feedSlice("\x1b[7");
+    pl.feedSlice("\x1b[!p");
+    pl.feedSlice("dx");
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), screen.cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), screen.cellAt(0, 6));
+}
+
+test "replay: split VPA after DECSTR applies from reset origin" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 10, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "abc");
+    pl.feedSlice("\x1b[!p");
+    pl.feedSlice("\x1b[7");
+    pl.feedSlice("dx");
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u16, 6), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), screen.cellAt(6, 0));
+}
+
 test "replay: CHA default param moves cursor to column zero" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
@@ -1838,6 +1872,44 @@ test "parity: VPA clamps at last row identically" {
     });
 }
 
+test "parity: split VPA interrupted by DECSTR bytes remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "split VPA interrupted by DECSTR bytes",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = true,
+        .input = "abc\x1b[7\x1b[!pdx",
+        .expected_row = 0,
+        .expected_col = 7,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 3, .codepoint = '!' },
+            .{ .row = 0, .col = 6, .codepoint = 'x' },
+        },
+    });
+}
+
+test "parity: split VPA after DECSTR remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "split VPA after DECSTR",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = true,
+        .input = "abc\x1b[!p\x1b[7dx",
+        .expected_row = 6,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 6, .col = 0, .codepoint = 'x' },
+        },
+    });
+}
+
 test "parity: CHA clamps at last column identically" {
     const gpa = std.testing.allocator;
     try runParityScenario(gpa, .{
@@ -2704,6 +2776,44 @@ test "parity-chunked: VPA split into byte fragments remains identical" {
     });
 }
 
+test "parity-chunked: split VPA interrupted by DECSTR bytes remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked VPA interrupted by DECSTR bytes",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "abc", "\x1b[7", "\x1b[!p", "dx" },
+        .expected_row = 0,
+        .expected_col = 7,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 3, .codepoint = '!' },
+            .{ .row = 0, .col = 6, .codepoint = 'x' },
+        },
+    });
+}
+
+test "parity-chunked: split VPA after DECSTR remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked VPA after DECSTR",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "abc", "\x1b[!p", "\x1b[7", "d", "x" },
+        .expected_row = 6,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 6, .col = 0, .codepoint = 'x' },
+        },
+    });
+}
+
 test "parity-chunked: split CHA interrupted by DECSTR bytes remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{
@@ -3442,6 +3552,37 @@ test "runtime: VPA clamp via apply matches direct pipeline" {
     engine.apply();
     try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_row);
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+}
+
+test "runtime: split VPA interrupted by DECSTR bytes remains deterministic" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[7");
+    engine.feedSlice("\x1b[!p");
+    engine.feedSlice("dx");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+}
+
+test "runtime: split VPA after DECSTR applies from reset origin" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[!p");
+    engine.feedSlice("\x1b[7");
+    engine.feedSlice("dx");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 6), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(6, 0));
 }
 
 test "runtime: CHA clamp via apply matches direct pipeline" {
