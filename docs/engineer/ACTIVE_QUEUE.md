@@ -16,7 +16,7 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** RF-B1 (RF-101, RF-102, RF-103) completed by engineer execution.
+**Status:** RF-B2 (RF-201, RF-202, RF-203) completed by engineer execution.
 
 **Next:** Await architect-published batch for the following loop. No open engineer tickets.
 
