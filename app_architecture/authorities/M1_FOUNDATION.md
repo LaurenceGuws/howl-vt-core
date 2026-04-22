@@ -32,6 +32,10 @@ The `howl_terminal` module root orders the stable M1 seam first:
 
 `model` remains exported for shared types used elsewhere in Howl; style and color fields there are not driven by the M1 `SemanticEvent` / `ScreenState` replay path. Behavioral authority for the non-style core is `app_architecture/contracts/SEMANTIC_SCREEN.md`.
 
+## M1 pipeline determinism (non-style)
+
+The `Pipeline` orchestration layer is part of the M1 foundation: `clear` drops queued bridge work without screen application; `reset` clears both the queue and parser partial state; each `applyToScreen` drains the queue once and then clears it, so repeated apply without new input is a no-op on `ScreenState`. Full wording lives under “Pipeline seam” in `app_architecture/contracts/SEMANTIC_SCREEN.md`.
+
 ## Remaining M1 Outcomes
 
 - Reassess screen model boundaries against scope authority

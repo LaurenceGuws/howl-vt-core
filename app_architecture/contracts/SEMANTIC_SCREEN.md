@@ -29,6 +29,14 @@ All other SemanticEvent variants are value types with no heap ownership.
 
 The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the creator. The caller who calls `initWithCells` must call `deinit` with the same allocator.
 
+## Pipeline seam (`Pipeline` apply boundary)
+
+M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. These invariants hold regardless of screen buffer presence:
+
+- `Pipeline.clear()` drops all queued bridge events without calling `applyToScreen`; nothing is applied to `ScreenState`.
+- `Pipeline.reset()` clears the bridge queue and resets the parser (including partial escape/CSI state); bytes after reset decode as if the parser were freshly initialized.
+- Each `applyToScreen` call walks the current bridge queue exactly once, applies `semantic.process` for each event in order, then clears the bridge. A second `applyToScreen` with no intervening `feedByte` / `feedSlice` sees an empty queue and does not mutate `ScreenState`.
+
 ## Process Mapping Policy
 
 | Event variant | SemanticEvent emitted | Notes |
