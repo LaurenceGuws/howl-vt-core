@@ -915,6 +915,25 @@ test "replay: DEC private cursor visibility toggles mode state" {
     try std.testing.expect(screen.cursor_visible);
 }
 
+test "replay: interrupted split private cursor mode remains deterministic" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 2, 20);
+    defer screen.deinit(gpa);
+    try std.testing.expect(screen.cursor_visible);
+    feed(&pl, &screen, "x");
+    pl.feedSlice("\x1b[?2");
+    pl.feedSlice("\x1b[!p");
+    pl.feedSlice("5l");
+    pl.applyToScreen(&screen);
+    try std.testing.expect(screen.cursor_visible);
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), screen.cellAt(0, 1));
+    try std.testing.expect(pl.isEmpty());
+}
+
 test "replay: DEC private auto-wrap mode toggles wrap behavior" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
@@ -935,6 +954,25 @@ test "replay: DEC private auto-wrap mode toggles wrap behavior" {
     try std.testing.expectEqual(@as(u16, 1), screen.cursor_col);
     try std.testing.expectEqual(@as(u21, 'h'), screen.cellAt(0, 4));
     try std.testing.expectEqual(@as(u21, 'i'), screen.cellAt(1, 0));
+}
+
+test "replay: interrupted split private auto-wrap mode remains deterministic" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 2, 20);
+    defer screen.deinit(gpa);
+    try std.testing.expect(screen.auto_wrap);
+    feed(&pl, &screen, "x");
+    pl.feedSlice("\x1b[?");
+    pl.feedSlice("\x1b[!p");
+    pl.feedSlice("7l");
+    pl.applyToScreen(&screen);
+    try std.testing.expect(screen.auto_wrap);
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), screen.cellAt(0, 1));
+    try std.testing.expect(pl.isEmpty());
 }
 
 test "replay: existing text and cursor paths unaffected by erase additions" {
@@ -3035,6 +3073,23 @@ test "runtime: interrupted split CHT stream remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
+test "runtime: interrupted split private cursor mode remains deterministic" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    try std.testing.expect(engine.screen().cursor_visible);
+    engine.feedSlice("x");
+    engine.apply();
+    engine.feedSlice("\x1b[?2");
+    engine.feedSlice("\x1b[!p");
+    engine.feedSlice("5l");
+    engine.apply();
+    try std.testing.expect(engine.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
+}
+
 test "runtime: interrupted split CBT stream remains deterministic" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
@@ -3049,6 +3104,23 @@ test "runtime: interrupted split CBT stream remains deterministic" {
     try std.testing.expectEqual(@as(u16, 19), engine.screen().cursor_col);
     try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
     try std.testing.expectEqual(@as(u21, 'y'), engine.screen().cellAt(0, 19));
+}
+
+test "runtime: interrupted split private auto-wrap mode remains deterministic" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    try std.testing.expect(engine.screen().auto_wrap);
+    engine.feedSlice("x");
+    engine.apply();
+    engine.feedSlice("\x1b[?");
+    engine.feedSlice("\x1b[!p");
+    engine.feedSlice("7l");
+    engine.apply();
+    try std.testing.expect(engine.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
 }
 
 test "runtime: text write and erase via apply" {
