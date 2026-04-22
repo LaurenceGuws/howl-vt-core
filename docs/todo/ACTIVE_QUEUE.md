@@ -23,9 +23,9 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-052E` | `done` | Queue/contract sync close. |
 | `HT-053A` | `done` | Queue + contract scope: bright ANSI. |
 | `HT-053B` | `done` | Semantic mapping for bright ANSI. |
-| `HT-053C` | `done` | Screen apply + reset invariants. |
+| `HT-053C` | `done` | Screen apply + reset invariants (verification: no code delta; bright colors apply through existing handlers). |
 | `HT-053D` | `done` | Relay fixtures for bright ANSI flow. |
-| `HT-053E` | `done` | Contract/queue sync close. |
+| `HT-053E` | `done` | Contract/queue sync close (closing: no code delta; HT-053A-D complete, scope frozen). |
 
 ## Guardrails
 
