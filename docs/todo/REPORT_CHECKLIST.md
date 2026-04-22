@@ -34,7 +34,7 @@ rg -n "HT-[0-9]+|CZH-[0-9]+|JIRA|ticket" --glob '*.zig' src build.zig
 ### No forbidden imports in parser/tests:
 
 ```bash
-rg "app_logger|session|publication|ffi|android|platform|editor|workspace" --glob '*.zig' src/terminal/parser src/terminal*_test.zig
+rg "app_logger|session|publication|ffi|android|platform|editor|workspace" --glob '*.zig' src/parser src/event src/screen src/test src/root.zig
 ```
 
 **Expected**: Zero matches or only intentional comments like "No session/app coupling".
