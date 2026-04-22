@@ -41,7 +41,8 @@ end-state behavior, including split-feed chunking and ignored-event paths
 Root-level tests also guard the exported M1 module surface and runtime facade
 method shapes.
 
-See `app_architecture/authorities/M1_FOUNDATION.md` for full API details.
+See `app_architecture/authorities/M1_FOUNDATION.md` and
+`app_architecture/contracts/RUNTIME_API.md` for full API details.
 
 ## Current Focus
 
