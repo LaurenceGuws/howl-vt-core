@@ -43,6 +43,11 @@ Freeze as-of: `HT-056E`.
 | `HT-056C` | `done` | Screen apply + cell attrs for blink persistence/reset. |
 | `HT-056D` | `done` | Relay fixtures for blink integration + malformed continuity. |
 | `HT-056E` | `done` | Contract/queue close sync for blink batch. |
+| `HT-057A` | `done` | Scope seed: underline color SGR 58/59 coverage. |
+| `HT-057B` | `todo` | Semantic mapping for underline color set/reset paths. |
+| `HT-057C` | `todo` | Screen state + cell attrs persistence for underline color. |
+| `HT-057D` | `todo` | Relay fixtures for underline color end-to-end continuity. |
+| `HT-057E` | `todo` | Contract/queue close sync for underline color batch. |
 
 ## Guardrails
 

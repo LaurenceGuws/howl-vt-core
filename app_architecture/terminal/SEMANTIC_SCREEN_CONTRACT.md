@@ -37,6 +37,9 @@
 | `style_bg_256` | `u8` (0-255) | CSI 48;5;<n>m | Set background 256-color palette index |
 | `style_fg_rgb` | `struct{r:u8,g:u8,b:u8}` | CSI 38;2;r;g;b;m | Set foreground 24-bit RGB color |
 | `style_bg_rgb` | `struct{r:u8,g:u8,b:u8}` | CSI 48;2;r;g;b;m | Set background 24-bit RGB color |
+| `style_underline_color_256` | `u8` (0-255) | CSI 58;5;<n>m | Set underline 256-color palette index |
+| `style_underline_color_rgb` | `struct{r:u8,g:u8,b:u8}` | CSI 58;2;r;g;b;m | Set underline 24-bit RGB color |
+| `style_underline_color_reset` | — | CSI 59m | Reset underline color to default |
 
 ## Ownership and Lifetime
 
@@ -117,6 +120,9 @@ Implemented:
 - Background 256-color palette (SGR 48;5;<n>)
 - Foreground 24-bit RGB true color (SGR 38;2;r;g;b)
 - Background 24-bit RGB true color (SGR 48;2;r;g;b)
+- Underline 256-color palette (SGR 58;5;<n>)
+- Underline 24-bit RGB true color (SGR 58;2;r;g;b)
+- Underline color reset (SGR 59)
 - Ordered multi-parameter SGR processing (e.g., 1;38;2;255;0;0 for bold + red truecolor)
 
 Color index mapping:
@@ -128,13 +134,13 @@ Color index mapping:
 - All indexed colors stored in u8 fg/bg fields without truncation
 
 Malformed sequences policy:
-- Extended color forms (38, 48) without matching subparameter form (5 or 2) are ignored safely
-- Incomplete extended sequences (e.g., 38;2;r;g without b) are skipped without breaking valid neighbors
+- Extended color forms (38, 48, 58) without matching subparameter form (5 or 2) are ignored safely
+- Incomplete extended sequences (e.g., 38;2;r;g without b, 58;2;r;g without b) are skipped without breaking valid neighbors
 - Invalid RGB component values (> 255) are clamped to 0-255 range
 - Unknown parameters are always skipped
 
 Deferred (future sprints):
-- Underline color (SGR 58, 59)
+- None currently scoped.
 
 ## Non-Goals
 
