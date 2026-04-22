@@ -20,6 +20,7 @@ M1 scope is non-style core behavior: cursor motion, text and codepoint writes, c
 | `backspace` | — | Event.control(0x08) | Move cursor one column left |
 | `cursor_visible` | `bool` | CSI ?25h/l | Set cursor visibility mode |
 | `auto_wrap` | `bool` | CSI ?7h/l | Set DEC auto-wrap mode |
+| `horizontal_tab_forward` | `u16` | CSI I | Advance cursor to next default tab stop N times |
 | `erase_display` | `u2` | CSI J | Erase screen region; mode 0=below, 1=above, 2=full |
 | `erase_line` | `u2` | CSI K | Erase line region; mode 0=right, 1=left, 2=full |
 | `reset_screen` | — | CSI ! p (DECSTR) | Reset screen state to origin and clear cells |
@@ -47,6 +48,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 | Event variant | SemanticEvent emitted | Notes |
 | --- | --- | --- |
 | `style_change` with final A/B/C/D | `cursor_up/down/forward/back` | Param default 1 |
+| `style_change` with final I | `horizontal_tab_forward` | Param default 1 |
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
 | `style_change` with final J | `erase_display` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with final K | `erase_line` | Param default 0; modes 0/1/2 only; other values map to 0 |
@@ -78,6 +80,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 - `cursor_position` (CUP) places cursor within bounds; out-of-range params saturate to valid grid.
 - Control sequences (CR/LF/BS) maintain row/column invariants: CR resets column, LF advances row, BS moves left; all saturate at edges.
 - Horizontal tab advances to the next default 8-column tab stop, clamped at the last column.
+- `horizontal_tab_forward` (CSI I / CHT) advances to the next default 8-column tab stop N times, clamped at the last column.
 - Cursor visibility starts enabled, toggles via DEC private `?25h/l`, and does not move cursor or mutate cells.
 - Auto-wrap starts enabled, toggles via DEC private `?7h/l`, and does not move cursor or mutate cells.
 - Text writes advance `cursor_col` after each character. Filling the last column arms pending wrap; the next text/codepoint write moves to column 0 on the next row before writing.

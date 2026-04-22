@@ -96,7 +96,11 @@ pub const ScreenState = struct {
             },
             .horizontal_tab => {
                 self.wrap_pending = false;
-                self.horizontalTab();
+                self.horizontalTabForward(1);
+            },
+            .horizontal_tab_forward => |count| {
+                self.wrap_pending = false;
+                self.horizontalTabForward(count);
             },
             .cursor_visible => |visible| self.cursor_visible = visible,
             .auto_wrap => |enabled| {
@@ -158,10 +162,10 @@ pub const ScreenState = struct {
         }
     }
 
-    fn horizontalTab(self: *ScreenState) void {
+    fn horizontalTabForward(self: *ScreenState, count: u16) void {
         if (self.cols == 0) return;
-        const next = ((self.cursor_col / 8) + 1) * 8;
-        self.cursor_col = @min(next, self.cols - 1);
+        const stop = (@as(usize, self.cursor_col / 8) + @as(usize, count)) * 8;
+        self.cursor_col = @intCast(@min(stop, @as(usize, self.cols - 1)));
     }
 
     fn lineFeed(self: *ScreenState) void {
@@ -375,6 +379,20 @@ test "screen: horizontal_tab clamps at last column" {
     var s = ScreenState.init(4, 20);
     s.cursor_col = 17;
     s.apply(SemanticEvent.horizontal_tab);
+    try std.testing.expectEqual(@as(u16, 19), s.cursor_col);
+}
+
+test "screen: horizontal_tab_forward advances by requested stop count" {
+    var s = ScreenState.init(4, 20);
+    s.cursor_col = 1;
+    s.apply(SemanticEvent{ .horizontal_tab_forward = 2 });
+    try std.testing.expectEqual(@as(u16, 16), s.cursor_col);
+}
+
+test "screen: horizontal_tab_forward clamps at last column" {
+    var s = ScreenState.init(4, 20);
+    s.cursor_col = 17;
+    s.apply(SemanticEvent{ .horizontal_tab_forward = 2 });
     try std.testing.expectEqual(@as(u16, 19), s.cursor_col);
 }
 

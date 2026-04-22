@@ -599,6 +599,18 @@ test "replay: BS moves cursor left without erasing cell" {
     try std.testing.expectEqual(@as(u21, 'c'), screen.cellAt(0, 2));
 }
 
+test "replay: CSI I advances cursor by default tab stops" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "a\x1b[2Ib");
+    try std.testing.expectEqual(@as(u16, 17), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), screen.cellAt(0, 16));
+}
+
 test "replay: UTF-8 codepoint written to cell" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
@@ -1921,6 +1933,25 @@ test "parity: horizontal tab advances to default stops identically" {
     });
 }
 
+test "parity: CHT advances cursor by requested tab stops identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CHT cursor forward tabulation",
+        .rows = 3,
+        .cols = 20,
+        .with_cells = true,
+        .input = "a\x1b[2Ib",
+        .expected_row = 0,
+        .expected_col = 17,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 16, .codepoint = 'b' },
+        },
+    });
+}
+
 test "parity: DEC private auto-wrap disable remains identical" {
     const gpa = std.testing.allocator;
     try runParityScenario(gpa, .{
@@ -2006,6 +2037,25 @@ test "parity-chunked: CSI erase split into byte fragments remains identical" {
         .cell_checks = &.{
             .{ .row = 0, .col = 0, .codepoint = 0 },
             .{ .row = 0, .col = 4, .codepoint = 0 },
+        },
+    });
+}
+
+test "parity-chunked: CHT split into byte fragments remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked CHT",
+        .rows = 3,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "a", "\x1b", "[", "2", "I", "b" },
+        .expected_row = 0,
+        .expected_col = 17,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 16, .codepoint = 'b' },
         },
     });
 }

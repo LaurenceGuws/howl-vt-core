@@ -21,6 +21,7 @@ pub const SemanticEvent = union(enum) {
     carriage_return,
     backspace,
     horizontal_tab,
+    horizontal_tab_forward: u16,
     cursor_visible: bool,
     auto_wrap: bool,
     reset_screen,
@@ -64,6 +65,7 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         'B' => return SemanticEvent{ .cursor_down = paramOrDefault1(params[0]) },
         'C' => return SemanticEvent{ .cursor_forward = paramOrDefault1(params[0]) },
         'D' => return SemanticEvent{ .cursor_back = paramOrDefault1(params[0]) },
+        'I' => return SemanticEvent{ .horizontal_tab_forward = paramOrDefault1(params[0]) },
         'H', 'f' => {
             const row = paramOrDefault1(params[0]);
             const col = paramOrDefault1(if (count >= 1) params[1] else 0);
@@ -158,6 +160,16 @@ test "semantic: CUF" {
 test "semantic: CUB" {
     const sem = process(makeStyleChange('D', 4, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u16, 4), sem.cursor_back);
+}
+
+test "semantic: CHT explicit count" {
+    const sem = process(makeStyleChange('I', 3, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 3), sem.horizontal_tab_forward);
+}
+
+test "semantic: CHT zero param defaults to 1" {
+    const sem = process(makeStyleChange('I', 0, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 1), sem.horizontal_tab_forward);
 }
 
 test "semantic: CUP explicit row and col" {
