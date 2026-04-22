@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-057E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-059D. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 

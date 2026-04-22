@@ -7,7 +7,7 @@ Execution-only queue for `howl-terminal`.
 Build `howl-terminal` into a standalone, portable VT engine with deterministic
 behavior, replayable tests, and no dependency on app/editor/platform code.
 
-Freeze as-of: `HT-057E`.
+Freeze as-of: `HT-059D`.
 
 ## Active / Next
 
@@ -49,9 +49,9 @@ Freeze as-of: `HT-057E`.
 | `HT-057D` | `done` | Relay fixtures for underline color end-to-end continuity. |
 | `HT-057E` | `done` | Contract/queue close sync for underline color batch. |
 | `HT-059A` | `done` | Scope seed: library/test-only topology, demos in howl-hosts. |
-| `HT-059B` | `todo` | Remove local executable entrypoint and run target. |
-| `HT-059C` | `todo` | Build graph cleanup after executable removal. |
-| `HT-059D` | `todo` | Validation and queue close sync. |
+| `HT-059B` | `done` | Remove local executable entrypoint and run target. |
+| `HT-059C` | `done` | Build graph cleanup after executable removal. |
+| `HT-059D` | `done` | Validation and queue close sync. |
 
 ## Guardrails
 
