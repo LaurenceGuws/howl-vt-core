@@ -21,7 +21,7 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-049B` | `done` | Semantic mapping for CSI m (SGR) operations. |
 | `HT-049C` | `done` | Apply style state in screen cell writes. |
 | `HT-049D` | `done` | Relay integration fixtures for style flow. |
-| `HT-049E` | `next` | Contract sync and queue status update for style. |
+| `HT-049E` | `done` | Contract sync and queue status update for style. |
 
 ## Guardrails
 
