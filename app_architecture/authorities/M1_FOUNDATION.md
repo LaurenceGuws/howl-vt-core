@@ -21,6 +21,17 @@ These completed outcomes remain in force:
 M1 scope is intentionally limited to parser/event/screen foundation behavior.
 Style and color expansion is outside this milestone and not part of current execution scope.
 
+## M1 package surface (host-neutral)
+
+The `howl_terminal` module root orders the stable M1 seam first:
+
+1. `parser` — byte and escape parsing into sink events
+2. `pipeline` — parser plus bridge queue and `applyToScreen`
+3. `semantic` — `SemanticEvent` mapping from bridge `Event`
+4. `screen` — `ScreenState` and `apply`
+
+`model` remains exported for shared types used elsewhere in Howl; style and color fields there are not driven by the M1 `SemanticEvent` / `ScreenState` replay path. Behavioral authority for the non-style core is `app_architecture/contracts/SEMANTIC_SCREEN.md`.
+
 ## Remaining M1 Outcomes
 
 - Reassess screen model boundaries against scope authority

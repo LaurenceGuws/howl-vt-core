@@ -1,6 +1,8 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-048E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+Authority for `SemanticEvent`, `semantic.process`, and `ScreenState` on the M1 parser-to-screen foundation seam.
+
+M1 scope is non-style core behavior: cursor motion, text and codepoint writes, carriage controls, and erase-in-display / erase-in-line. The package root exposes this seam as `parser`, `pipeline`, `semantic`, and `screen` (see `app_architecture/authorities/M1_FOUNDATION.md`). Bridge `Event.style_change` is the CSI carrier for cursor and erase sequences only at this milestone; SGR and other finals are ignored for screen mapping.
 
 ## SemanticEvent Variants
 
