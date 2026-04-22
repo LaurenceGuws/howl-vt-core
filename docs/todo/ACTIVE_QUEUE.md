@@ -7,7 +7,7 @@ Execution-only queue for `howl-terminal`.
 Build `howl-terminal` into a standalone, portable VT engine with deterministic
 behavior, replayable tests, and no dependency on app/editor/platform code.
 
-Freeze as-of: `HT-061E`.
+Freeze as-of: `HT-062E`.
 
 ## Active / Next
 
@@ -63,10 +63,10 @@ Freeze as-of: `HT-061E`.
 | `HT-061D` | `done` | Relay fixtures for conceal/reveal end-to-end continuity. |
 | `HT-061E` | `done` | Contract/queue close sync for conceal batch. |
 | `HT-062A` | `done` | Scope seed: fg/bg indexed-vs-RGB exclusivity contract. |
-| `HT-062B` | `todo` | Screen apply exclusivity for fg/bg representations. |
-| `HT-062C` | `todo` | Semantic ordered-mix consistency tests for exclusivity transitions. |
-| `HT-062D` | `todo` | Relay fixtures for fg/bg exclusivity and recovery flows. |
-| `HT-062E` | `todo` | Contract/queue close sync for exclusivity batch. |
+| `HT-062B` | `done` | Screen apply exclusivity for fg/bg representations. |
+| `HT-062C` | `done` | Semantic ordered-mix consistency tests for exclusivity transitions. |
+| `HT-062D` | `done` | Relay fixtures for fg/bg exclusivity and recovery flows. |
+| `HT-062E` | `done` | Contract/queue close sync for exclusivity batch. |
 
 ## Guardrails
 
