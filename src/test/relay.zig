@@ -2696,6 +2696,23 @@ test "runtime: resetScreen preserves split CHT and queued mode change" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
+test "runtime: resetScreen preserves partial CHT parser state with empty queue" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[2");
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    engine.resetScreen();
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    engine.feedSlice("Iw");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 17), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'w'), engine.screen().cellAt(0, 16));
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
 test "runtime: resetScreen preserves split CBT and queued cursor visibility change" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
