@@ -131,12 +131,19 @@ fn clampRgbComponent(v: i32) u8 {
     return @intCast(v);
 }
 
+fn appendStyleOp(ops: *[16]StyleOp, op_count: *u8, op: StyleOp) bool {
+    if (op_count.* >= ops.len) return false;
+    ops[op_count.*] = op;
+    op_count.* += 1;
+    return true;
+}
+
 fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
     var ops: [16]StyleOp = undefined;
     var op_count: u8 = 0;
     var i: u8 = 0;
-    const param_count = if (count == 0) @as(u8, 1) else count;
-    while (i < param_count and op_count < 16) : (i += 1) {
+    const param_count: u8 = if (count == 0) 1 else @min(count, @as(u8, params.len));
+    while (i < param_count and op_count < ops.len) : (i += 1) {
         const param = if (i < count) params[i] else 0;
         const op: ?StyleOp = switch (param) {
             0 => StyleOp.reset,
@@ -234,11 +241,9 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             else => null,
         };
         if (op) |o| {
-            ops[op_count] = o;
-            op_count += 1;
-            if (param == 22 and op_count < 16) {
-                ops[op_count] = StyleOp.dim_off;
-                op_count += 1;
+            if (!appendStyleOp(&ops, &op_count, o)) break;
+            if (param == 22) {
+                if (!appendStyleOp(&ops, &op_count, StyleOp.dim_off)) break;
             }
         }
     }
@@ -735,4 +740,47 @@ test "semantic: multi-param SGR 4;58;5;33;59 preserves order" {
     try std.testing.expect(sem.style_operations.ops[0] == .underline_on);
     try std.testing.expectEqual(@as(u8, 33), sem.style_operations.ops[1].underline_color_256);
     try std.testing.expect(sem.style_operations.ops[2] == .underline_color_reset);
+}
+
+test "semantic: SGR parameter count above internal params is truncated deterministically" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 1;
+    params[1] = 31;
+    params[2] = 4;
+    params[3] = 58;
+    params[4] = 5;
+    params[5] = 200;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 250 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 4), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .bold_on);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
+    try std.testing.expect(sem.style_operations.ops[2] == .underline_on);
+    try std.testing.expectEqual(@as(u8, 200), sem.style_operations.ops[3].underline_color_256);
+}
+
+test "semantic: repeated SGR 22 is truncated at op cap without overflow" {
+    var params: [16]i32 = undefined;
+    for (0..params.len) |idx| params[idx] = 22;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 16 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 16), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .bold_off);
+    try std.testing.expect(sem.style_operations.ops[1] == .dim_off);
+    try std.testing.expect(sem.style_operations.ops[14] == .bold_off);
+    try std.testing.expect(sem.style_operations.ops[15] == .dim_off);
+}
+
+test "semantic: extended form near op cap truncates deterministically" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    for (0..15) |idx| params[idx] = 1;
+    params[15] = 38;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 16 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 15), sem.style_operations.count);
+    for (0..15) |idx| {
+        try std.testing.expect(sem.style_operations.ops[idx] == .bold_on);
+    }
 }
