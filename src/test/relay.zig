@@ -1306,3 +1306,66 @@ test "replay: mixed ordered style batch continuity with conceal" {
     try std.testing.expectEqual(false, screen.cells_attr.?[1].conceal);
     try std.testing.expectEqual(@as(u8, 2), screen.cells_attr.?[1].fg);
 }
+
+test "replay: foreground RGB then indexed clears rgb representation" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[38;2;10;20;30m");
+    feed(&pl, &screen, "\x1b[31m");
+    feed(&pl, &screen, "x");
+    try std.testing.expectEqual(@as(u8, 2), screen.cells_attr.?[0].fg);
+    try std.testing.expect(screen.cells_attr.?[0].fg_rgb == null);
+}
+
+test "replay: foreground indexed then RGB clears indexed sentinel" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[31m");
+    feed(&pl, &screen, "\x1b[38;2;10;20;30m");
+    feed(&pl, &screen, "x");
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[0].fg);
+    try std.testing.expect(screen.cells_attr.?[0].fg_rgb != null);
+    try std.testing.expectEqual(@as(u8, 10), screen.cells_attr.?[0].fg_rgb.?.r);
+}
+
+test "replay: mixed fg and bg transitions with reset clear both representations" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[38;2;1;2;3;48;5;99m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[0m");
+    feed(&pl, &screen, "b");
+    try std.testing.expect(screen.cells_attr.?[0].fg_rgb != null);
+    try std.testing.expectEqual(@as(u8, 99), screen.cells_attr.?[0].bg);
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[1].fg);
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[1].bg);
+    try std.testing.expect(screen.cells_attr.?[1].fg_rgb == null);
+    try std.testing.expect(screen.cells_attr.?[1].bg_rgb == null);
+}
+
+test "replay: malformed extended color recovery preserves exclusivity" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[38;2;255m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[32m");
+    feed(&pl, &screen, "\x1b[38;2;7;8;9m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[0].fg);
+    try std.testing.expect(screen.cells_attr.?[0].fg_rgb == null);
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[1].fg);
+    try std.testing.expect(screen.cells_attr.?[1].fg_rgb != null);
+    try std.testing.expectEqual(@as(u8, 7), screen.cells_attr.?[1].fg_rgb.?.r);
+}
