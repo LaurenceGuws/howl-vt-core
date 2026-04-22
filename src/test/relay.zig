@@ -1127,3 +1127,79 @@ test "replay: malformed style params do not block subsequent valid blink" {
     try std.testing.expectEqual(false, screen.cells_attr.?[0].blink);
     try std.testing.expectEqual(true, screen.cells_attr.?[1].blink);
 }
+
+test "replay: underline with indexed underline color then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[4m");
+    feed(&pl, &screen, "\x1b[58;5;123m");
+    feed(&pl, &screen, "u");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].underline);
+    try std.testing.expectEqual(@as(?u8, 123), screen.cells_attr.?[0].underline_color);
+    try std.testing.expect(screen.cells_attr.?[0].underline_color_rgb == null);
+}
+
+test "replay: underline with rgb underline color then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[4m");
+    feed(&pl, &screen, "\x1b[58;2;9;8;7m");
+    feed(&pl, &screen, "u");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].underline);
+    try std.testing.expectEqual(@as(?u8, null), screen.cells_attr.?[0].underline_color);
+    try std.testing.expect(screen.cells_attr.?[0].underline_color_rgb != null);
+    try std.testing.expectEqual(@as(u8, 9), screen.cells_attr.?[0].underline_color_rgb.?.r);
+}
+
+test "replay: reset clears underline color before following text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[4;58;5;33m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[0m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(@as(?u8, 33), screen.cells_attr.?[0].underline_color);
+    try std.testing.expectEqual(@as(?u8, null), screen.cells_attr.?[1].underline_color);
+}
+
+test "replay: malformed 58 does not block subsequent valid style" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[58;2;255m");
+    feed(&pl, &screen, "x");
+    feed(&pl, &screen, "\x1b[4;58;5;77m");
+    feed(&pl, &screen, "y");
+    try std.testing.expectEqual(@as(?u8, null), screen.cells_attr.?[0].underline_color);
+    try std.testing.expectEqual(true, screen.cells_attr.?[1].underline);
+    try std.testing.expectEqual(@as(?u8, 77), screen.cells_attr.?[1].underline_color);
+}
+
+test "replay: mixed ordered underline color style batch continuity" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[4;58;5;81m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[59m");
+    feed(&pl, &screen, "b");
+    feed(&pl, &screen, "\x1b[58;2;1;2;3m");
+    feed(&pl, &screen, "c");
+    try std.testing.expectEqual(@as(?u8, 81), screen.cells_attr.?[0].underline_color);
+    try std.testing.expectEqual(@as(?u8, null), screen.cells_attr.?[1].underline_color);
+    try std.testing.expect(screen.cells_attr.?[2].underline_color_rgb != null);
+    try std.testing.expectEqual(@as(u8, 1), screen.cells_attr.?[2].underline_color_rgb.?.r);
+}
