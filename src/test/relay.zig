@@ -562,6 +562,18 @@ test "replay: CHA moves cursor to absolute column" {
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_col);
 }
 
+test "replay: VPA moves cursor to absolute row" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(24, 80);
+    screen.cursor_row = 12;
+    screen.cursor_col = 9;
+    feed(&pl, &screen, "\x1b[7d");
+    try std.testing.expectEqual(@as(u16, 6), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), screen.cursor_col);
+}
+
 test "replay: CHA default param moves cursor to column zero" {
     const gpa = std.testing.allocator;
     var pl = try pipeline_mod.Pipeline.init(gpa);
@@ -1776,6 +1788,20 @@ test "parity: CHA moves cursor to absolute column identically" {
     });
 }
 
+test "parity: VPA moves cursor to absolute row identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "VPA baseline",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = false,
+        .input = "\x1b[7d",
+        .expected_row = 6,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
 test "parity: CHA clamps at last column identically" {
     const gpa = std.testing.allocator;
     try runParityScenario(gpa, .{
@@ -2628,6 +2654,20 @@ test "parity-chunked: CHA split into byte fragments remains identical" {
     });
 }
 
+test "parity-chunked: VPA split into byte fragments remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked VPA",
+        .rows = 10,
+        .cols = 20,
+        .with_cells = false,
+        .chunks = &.{ "\x1b", "[", "7", "d" },
+        .expected_row = 6,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+    });
+}
+
 test "parity-chunked: split CHA interrupted by DECSTR bytes remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{
@@ -3346,6 +3386,16 @@ test "runtime: CHA move via apply matches direct pipeline" {
     engine.apply();
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
     try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_col);
+}
+
+test "runtime: VPA move via apply matches direct pipeline" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    defer engine.deinit();
+    engine.feedSlice("\x1b[9d");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
 test "runtime: CHA clamp via apply matches direct pipeline" {

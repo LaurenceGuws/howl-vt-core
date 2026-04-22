@@ -15,6 +15,7 @@ pub const SemanticEvent = union(enum) {
     cursor_forward: u16,
     cursor_back: u16,
     cursor_horizontal_absolute: u16,
+    cursor_vertical_absolute: u16,
     cursor_position: struct { row: u16, col: u16 },
     write_text: []const u8,
     write_codepoint: u21,
@@ -68,6 +69,7 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         'C' => return SemanticEvent{ .cursor_forward = paramOrDefault1(params[0]) },
         'D' => return SemanticEvent{ .cursor_back = paramOrDefault1(params[0]) },
         'G' => return SemanticEvent{ .cursor_horizontal_absolute = paramOrDefault1(params[0]) - 1 },
+        'd' => return SemanticEvent{ .cursor_vertical_absolute = paramOrDefault1(params[0]) - 1 },
         'I' => return SemanticEvent{ .horizontal_tab_forward = paramOrDefault1(params[0]) },
         'Z' => return SemanticEvent{ .horizontal_tab_back = paramOrDefault1(params[0]) },
         'H', 'f' => {
@@ -174,6 +176,16 @@ test "semantic: CHA explicit column" {
 test "semantic: CHA zero param defaults to column 0" {
     const sem = process(makeStyleChange('G', 0, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u16, 0), sem.cursor_horizontal_absolute);
+}
+
+test "semantic: VPA explicit row" {
+    const sem = process(makeStyleChange('d', 9, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 8), sem.cursor_vertical_absolute);
+}
+
+test "semantic: VPA zero param defaults to row 0" {
+    const sem = process(makeStyleChange('d', 0, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 0), sem.cursor_vertical_absolute);
 }
 
 test "semantic: CHT explicit count" {

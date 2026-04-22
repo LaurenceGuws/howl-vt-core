@@ -13,6 +13,7 @@ M1 scope is non-style core behavior: cursor motion, text and codepoint writes, c
 | `cursor_forward` | `u16` | CSI C | Move cursor right N cols; default 1 |
 | `cursor_back` | `u16` | CSI D | Move cursor left N cols; default 1 |
 | `cursor_horizontal_absolute` | `u16` | CSI G | Move cursor to absolute 0-based column |
+| `cursor_vertical_absolute` | `u16` | CSI d | Move cursor to absolute 0-based row |
 | `cursor_position` | `{row: u16, col: u16}` | CSI H/f | Absolute 0-based position; defaults to origin |
 | `write_text` | `[]const u8` | Event.text | Sequence of printable ASCII bytes to write at cursor |
 | `write_codepoint` | `u21` | Event.codepoint | Single Unicode scalar to write at cursor |
@@ -59,6 +60,7 @@ Interruption coverage index (`src/test/relay.zig`):
 | --- | --- | --- |
 | `style_change` with final A/B/C/D | `cursor_up/down/forward/back` | Param default 1 |
 | `style_change` with final G | `cursor_horizontal_absolute` | 1-based VT param converted to 0-based |
+| `style_change` with final d | `cursor_vertical_absolute` | 1-based VT param converted to 0-based |
 | `style_change` with final I | `horizontal_tab_forward` | Param default 1 |
 | `style_change` with final Z | `horizontal_tab_back` | Param default 1 |
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
@@ -90,6 +92,7 @@ Interruption coverage index (`src/test/relay.zig`):
 - Cursor row and column are always within `[0, rows-1]` and `[0, cols-1]` respectively, enforced by saturating arithmetic on every mutation.
 - Cursor movement commands (`cursor_up`, `cursor_down`, `cursor_forward`, `cursor_back`) saturate at screen boundaries; repeated moves beyond edges remain clamped.
 - `cursor_horizontal_absolute` (CHA) moves cursor column to an absolute position on the current row; out-of-range values saturate within bounds.
+- `cursor_vertical_absolute` (VPA) moves cursor row to an absolute position on the current column; out-of-range values saturate within bounds.
 - `cursor_position` (CUP) places cursor within bounds; out-of-range params saturate to valid grid.
 - Control sequences (CR/LF/BS) maintain row/column invariants: CR resets column, LF advances row, BS moves left; all saturate at edges.
 - Horizontal tab advances to the next default 8-column tab stop, clamped at the last column.

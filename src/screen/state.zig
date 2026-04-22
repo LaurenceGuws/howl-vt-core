@@ -75,6 +75,10 @@ pub const ScreenState = struct {
                 self.wrap_pending = false;
                 self.cursor_col = @min(col, self.cols -| 1);
             },
+            .cursor_vertical_absolute => |row| {
+                self.wrap_pending = false;
+                self.cursor_row = @min(row, self.rows -| 1);
+            },
             .cursor_position => |pos| {
                 self.wrap_pending = false;
                 self.cursor_row = @min(pos.row, self.rows -| 1);
@@ -297,6 +301,15 @@ test "screen: cursor_horizontal_absolute updates column only" {
     s.apply(SemanticEvent{ .cursor_horizontal_absolute = 7 });
     try std.testing.expectEqual(@as(u16, 12), s.cursor_row);
     try std.testing.expectEqual(@as(u16, 7), s.cursor_col);
+}
+
+test "screen: cursor_vertical_absolute updates row only" {
+    var s = ScreenState.init(24, 80);
+    s.cursor_row = 12;
+    s.cursor_col = 20;
+    s.apply(SemanticEvent{ .cursor_vertical_absolute = 7 });
+    try std.testing.expectEqual(@as(u16, 7), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 20), s.cursor_col);
 }
 
 test "screen: zero rows/cols do not panic" {
