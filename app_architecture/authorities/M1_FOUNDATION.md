@@ -43,7 +43,7 @@ The `runtime.Engine` is a host-neutral convenience facade that composes `Pipelin
 - `feedByte(byte)` / `feedSlice(bytes)` — accumulate input
 - `apply()` — drain queue and update screen
 - `clear()` / `reset()` — queue and parser management
-- `screenRef()` / `screenMut()` — screen state access
+- `screen()` — screen state access (const reference)
 - `queuedEventCount()` — queue introspection
 
 The facade is a transparent wrapper; it does not extend VT semantics or change any M1 contracts. Behavior is identical to direct pipeline usage. Architectural benefit: hosts see only `Engine`, not parser/bridge/semantic layers.

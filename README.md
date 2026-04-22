@@ -26,9 +26,15 @@ The M1 foundation is composed of `parser`, `pipeline`, `semantic`, and `screen` 
 For convenience, a `runtime.Engine` facade wraps these components into a single interface
 suitable for embedding in hosts. The facade is a transparent wrapper that does not extend
 VT semantics; it packages the deterministic parser→pipeline→semantic→screen flow into
-a cleaner async feed/apply/read API.
+a cleaner async feed/apply/read API:
 
-See `app_architecture/authorities/M1_FOUNDATION.md` for API details.
+- `init(allocator, rows, cols)` / `initWithCells(allocator, rows, cols)` / `deinit()`
+- `feedByte(byte)` / `feedSlice(bytes)` — input
+- `apply()` / `clear()` / `reset()` — control
+- `screen()` — get const ScreenState reference
+- `queuedEventCount()` — introspection
+
+See `app_architecture/authorities/M1_FOUNDATION.md` for full API details.
 
 ## Current Focus
 
