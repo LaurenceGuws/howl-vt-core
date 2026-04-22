@@ -121,7 +121,7 @@ Malformed sequences policy:
 - Unknown parameters are always skipped
 
 Deferred (future sprints):
-- Underline, strikethrough, blink, inverse, dim (SGR 4, 9, 5, 7, 2)
+- Strikethrough, blink, dim (SGR 9, 5, 2)
 - Underline color (SGR 58, 59)
 
 ## Non-Goals
