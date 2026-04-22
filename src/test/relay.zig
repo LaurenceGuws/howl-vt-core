@@ -359,6 +359,59 @@ test "pipeline: stray ESC in OSC dropped, byte appended" {
     try std.testing.expectEqualSlices(u8, "title", pl.events()[0].title_set);
 }
 
+test "replay: pipeline clear drops pending bridge events before apply" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 2, 8);
+    defer screen.deinit(gpa);
+    pl.feedSlice("dropped");
+    try std.testing.expect(pl.len() > 0);
+    pl.clear();
+    try std.testing.expect(pl.isEmpty());
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
+test "replay: pipeline reset clears queued events and partial CSI" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 12, 40);
+    defer screen.deinit(gpa);
+    screen.cursor_row = 10;
+    screen.cursor_col = 0;
+    pl.feedSlice("x\x1b[3");
+    try std.testing.expectEqual(@as(usize, 1), pl.len());
+    pl.reset();
+    try std.testing.expect(pl.isEmpty());
+    pl.feedSlice("A");
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u16, 10), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_col);
+    try std.testing.expectEqual(@as(u21, 'A'), screen.cellAt(10, 0));
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(10, 1));
+}
+
+test "replay: applyToScreen drains bridge once repeat apply is no-op" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 2, 8);
+    defer screen.deinit(gpa);
+    pl.feedSlice("\x1b[4C");
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u16, 4), screen.cursor_col);
+    try std.testing.expect(pl.isEmpty());
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u16, 4), screen.cursor_col);
+    pl.feedSlice("z");
+    pl.applyToScreen(&screen);
+    try std.testing.expectEqual(@as(u21, 'z'), screen.cellAt(0, 4));
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+}
+
 // --- End-to-end replay tests (Pipeline + ScreenState) ---
 
 fn feed(pl: *pipeline_mod.Pipeline, screen: *screen_mod.ScreenState, bytes: []const u8) void {
