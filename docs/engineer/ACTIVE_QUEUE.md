@@ -16,9 +16,9 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-No engineer execution tickets are open.
+**Status:** RF-B1 (RF-101, RF-102, RF-103) completed by engineer execution.
 
-Architect action required: publish next large reviewable ticket batch before engineer execution.
+**Next:** Await architect-published batch for the following loop. No open engineer tickets.
 
 ## Ticket Format (Required)
 
