@@ -185,7 +185,8 @@ pub const ScreenState = struct {
             },
             .style_operations => |batch| {
                 var i: u8 = 0;
-                while (i < batch.count) : (i += 1) {
+                const max_batch_count: u8 = @min(batch.count, @as(u8, batch.ops.len));
+                while (i < max_batch_count) : (i += 1) {
                     const op = batch.ops[i];
                     switch (op) {
                         .reset => {
@@ -829,4 +830,32 @@ test "screen: style_operations bold_off and dim_off clear both flags" {
     s.apply(SemanticEvent{ .write_text = "x" });
     try std.testing.expectEqual(false, s.cells_attr.?[0].bold);
     try std.testing.expectEqual(false, s.cells_attr.?[0].dim);
+}
+
+test "screen: style_operations count above internal limit applies safely" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    var ops: [16]semantic_mod.StyleOp = undefined;
+    @memset(&ops, semantic_mod.StyleOp.reset);
+    ops[0] = .bold_on;
+    ops[1] = .underline_on;
+    s.apply(SemanticEvent{ .style_operations = .{ .ops = ops, .count = 200 } });
+    s.apply(SemanticEvent{ .write_text = "x" });
+    try std.testing.expectEqual(true, s.cells_attr.?[0].bold);
+    try std.testing.expectEqual(true, s.cells_attr.?[0].underline);
+}
+
+test "screen: truncated style_operations keep deterministic final state" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    var ops: [16]semantic_mod.StyleOp = undefined;
+    @memset(&ops, semantic_mod.StyleOp.reset);
+    for (0..ops.len) |idx| {
+        ops[idx] = if ((idx % 2) == 0) semantic_mod.StyleOp.bold_on else semantic_mod.StyleOp.bold_off;
+    }
+    s.apply(SemanticEvent{ .style_operations = .{ .ops = ops, .count = 255 } });
+    s.apply(SemanticEvent{ .write_text = "x" });
+    try std.testing.expectEqual(false, s.cells_attr.?[0].bold);
 }
