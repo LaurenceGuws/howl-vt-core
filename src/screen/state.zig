@@ -137,8 +137,16 @@ pub const ScreenState = struct {
 
     fn writeCell(self: *ScreenState, cp: u21) void {
         if (self.cols == 0 or self.rows == 0) return;
+        const offset = @as(usize, self.cursor_row) * self.cols + self.cursor_col;
         if (self.cells) |c| {
-            c[@as(usize, self.cursor_row) * self.cols + self.cursor_col] = cp;
+            c[offset] = cp;
+        }
+        if (self.cells_attr) |ca| {
+            ca[offset] = .{
+                .bold = self.current_bold,
+                .fg = @intCast(self.current_fg & 0x7),
+                .bg = @intCast(self.current_bg & 0x7),
+            };
         }
         if (self.cursor_col < self.cols - 1) {
             self.cursor_col += 1;
@@ -345,4 +353,85 @@ test "screen: erase ops no-op without cell buffer" {
     s.apply(SemanticEvent{ .erase_line = 2 });
     s.apply(SemanticEvent{ .erase_display = 2 });
     try std.testing.expectEqual(@as(u16, 3), s.cursor_col);
+}
+
+test "screen: style_bold_on applies to written cell" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .write_text = "a" });
+    try std.testing.expectEqual(@as(u21, 'a'), s.cellAt(0, 0));
+    const attr = s.cells_attr.?[0];
+    try std.testing.expectEqual(true, attr.bold);
+}
+
+test "screen: style_fg_color applies to written cell" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent{ .style_fg_color = 2 });
+    s.apply(SemanticEvent{ .write_text = "x" });
+    const attr = s.cells_attr.?[0];
+    try std.testing.expectEqual(@as(u3, 2), attr.fg);
+}
+
+test "screen: style_reset clears bold and colors" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .style_fg_color = 3 });
+    s.apply(SemanticEvent{ .style_bg_color = 5 });
+    s.apply(SemanticEvent.style_reset);
+    try std.testing.expectEqual(false, s.current_bold);
+    try std.testing.expectEqual(@as(u8, 0), s.current_fg);
+    try std.testing.expectEqual(@as(u8, 0), s.current_bg);
+}
+
+test "screen: multiple writes preserve style across cells" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .style_fg_color = 4 });
+    s.apply(SemanticEvent{ .write_text = "abc" });
+    for (0..3) |i| {
+        const attr = s.cells_attr.?[i];
+        try std.testing.expectEqual(true, attr.bold);
+        try std.testing.expectEqual(@as(u3, 4), attr.fg);
+    }
+}
+
+test "screen: style_bold_off disables bold" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .write_text = "a" });
+    s.apply(SemanticEvent.style_bold_off);
+    s.apply(SemanticEvent{ .write_text = "b" });
+    try std.testing.expectEqual(true, s.cells_attr.?[0].bold);
+    try std.testing.expectEqual(false, s.cells_attr.?[1].bold);
+}
+
+test "screen: style reset with default values" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 4, 10);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent.style_reset);
+    s.apply(SemanticEvent{ .write_text = "x" });
+    const attr = s.cells_attr.?[0];
+    try std.testing.expectEqual(false, attr.bold);
+    try std.testing.expectEqual(@as(u3, 0), attr.fg);
+    try std.testing.expectEqual(@as(u3, 0), attr.bg);
+}
+
+test "screen: no cell attributes without cell buffer" {
+    var s = ScreenState.init(4, 10);
+    s.apply(SemanticEvent.style_bold_on);
+    s.apply(SemanticEvent{ .write_text = "a" });
+    try std.testing.expectEqual(@as(u16, 1), s.cursor_col);
+    try std.testing.expectEqual(true, s.current_bold);
 }
