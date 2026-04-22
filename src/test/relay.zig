@@ -1937,6 +1937,42 @@ test "parity: DEC private auto-wrap disable remains identical" {
     });
 }
 
+test "parity: DECSTR restores private mode defaults identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "DECSTR restores private defaults",
+        .rows = 2,
+        .cols = 5,
+        .with_cells = true,
+        .input = "\x1b[?25l\x1b[?7l\x1b[!p",
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = true,
+    });
+}
+
+test "parity: private mode changes after DECSTR remain effective identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "private modes after DECSTR",
+        .rows = 2,
+        .cols = 5,
+        .with_cells = true,
+        .input = "\x1b[?25l\x1b[!p\x1b[?7l",
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = false,
+    });
+}
+
 test "parity-chunked: UTF-8 split decode with CRLF remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{
@@ -2096,6 +2132,42 @@ test "parity-chunked: DEC private auto-wrap mode split across chunks remains ide
             .{ .row = 0, .col = 4, .codepoint = 'h' },
             .{ .row = 1, .col = 0, .codepoint = 'i' },
         },
+    });
+}
+
+test "parity-chunked: DECSTR restores private defaults after split private modes identically" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked DECSTR restores private defaults",
+        .rows = 2,
+        .cols = 5,
+        .with_cells = true,
+        .chunks = &.{ "\x1b[?2", "5l", "\x1b[?", "7l", "\x1b[", "!", "p" },
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = true,
+    });
+}
+
+test "parity-chunked: private modes after split DECSTR remain effective identically" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked private modes after DECSTR",
+        .rows = 2,
+        .cols = 5,
+        .with_cells = true,
+        .chunks = &.{ "\x1b[?25", "l", "\x1b[", "!", "p", "\x1b[?7", "l" },
+        .expected_row = 0,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = false,
     });
 }
 

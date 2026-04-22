@@ -95,7 +95,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
   - Mode 1: start of screen through cursor position (inclusive).
 - Mode 2: entire screen.
 - `reset_screen` / `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
-- Reset also restores cursor visibility to enabled.
+- Reset also restores mode defaults (`cursor_visible=true`, `auto_wrap=true`).
 
 ## Zero-Dimension Screen Behavior
 
