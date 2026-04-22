@@ -8,6 +8,9 @@ const bridge_mod = @import("bridge.zig");
 /// Event type alias consumed by semantic mapping.
 pub const Event = bridge_mod.Event;
 
+/// RGB color representation for 24-bit truecolor.
+pub const Rgb = struct { r: u8, g: u8, b: u8 };
+
 /// Individual SGR operation to apply in sequence.
 pub const StyleOp = union(enum) {
     reset,
@@ -17,6 +20,8 @@ pub const StyleOp = union(enum) {
     bg_color: u8,
     fg_256: u8,
     bg_256: u8,
+    fg_rgb: Rgb,
+    bg_rgb: Rgb,
 };
 
 /// Screen-oriented semantic operations derived from parser events.
@@ -40,6 +45,8 @@ pub const SemanticEvent = union(enum) {
     style_bg_color: u8,
     style_fg_256: u8,
     style_bg_256: u8,
+    style_fg_rgb: Rgb,
+    style_bg_rgb: Rgb,
     style_operations: struct {
         ops: [16]StyleOp,
         count: u8,
@@ -92,6 +99,12 @@ fn eraseMode(v: i32) u2 {
     };
 }
 
+fn clampRgbComponent(v: i32) u8 {
+    if (v <= 0) return 0;
+    if (v >= 255) return 255;
+    return @intCast(v);
+}
+
 fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
     var ops: [16]StyleOp = undefined;
     var op_count: u8 = 0;
@@ -108,7 +121,13 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             40...47 => StyleOp{ .bg_color = @intCast(param - 40 + 1) },
             49 => StyleOp{ .bg_color = 0 },
             38 => blk: {
-                if (i + 2 < param_count and params[i + 1] == 5) {
+                if (i + 4 < param_count and params[i + 1] == 2) {
+                    const r = if (i + 2 < count) clampRgbComponent(params[i + 2]) else 0;
+                    const g = if (i + 3 < count) clampRgbComponent(params[i + 3]) else 0;
+                    const b = if (i + 4 < count) clampRgbComponent(params[i + 4]) else 0;
+                    i += 4;
+                    break :blk StyleOp{ .fg_rgb = .{ .r = r, .g = g, .b = b } };
+                } else if (i + 2 < param_count and params[i + 1] == 5) {
                     const color_idx = if (i + 2 < count) params[i + 2] else 0;
                     i += 2;
                     break :blk StyleOp{ .fg_256 = @intCast(color_idx & 0xFF) };
@@ -117,7 +136,13 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
                 }
             },
             48 => blk: {
-                if (i + 2 < param_count and params[i + 1] == 5) {
+                if (i + 4 < param_count and params[i + 1] == 2) {
+                    const r = if (i + 2 < count) clampRgbComponent(params[i + 2]) else 0;
+                    const g = if (i + 3 < count) clampRgbComponent(params[i + 3]) else 0;
+                    const b = if (i + 4 < count) clampRgbComponent(params[i + 4]) else 0;
+                    i += 4;
+                    break :blk StyleOp{ .bg_rgb = .{ .r = r, .g = g, .b = b } };
+                } else if (i + 2 < param_count and params[i + 1] == 5) {
                     const color_idx = if (i + 2 < count) params[i + 2] else 0;
                     i += 2;
                     break :blk StyleOp{ .bg_256 = @intCast(color_idx & 0xFF) };
@@ -143,6 +168,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .bg_color => |c| SemanticEvent{ .style_bg_color = c },
             .fg_256 => |c| SemanticEvent{ .style_fg_256 = c },
             .bg_256 => |c| SemanticEvent{ .style_bg_256 = c },
+            .fg_rgb => |rgb| SemanticEvent{ .style_fg_rgb = rgb },
+            .bg_rgb => |rgb| SemanticEvent{ .style_bg_rgb = rgb },
         };
     }
     return SemanticEvent{ .style_operations = .{ .ops = ops, .count = op_count } };
@@ -408,4 +435,67 @@ test "semantic: malformed 256-color sequence (38;2) ignored safely" {
     params[2] = 255;
     const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } });
     try std.testing.expectEqual(@as(?SemanticEvent, null), sem);
+}
+
+test "semantic: SGR 38;2;r;g;b foreground RGB" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 38;
+    params[1] = 2;
+    params[2] = 255;
+    params[3] = 0;
+    params[4] = 0;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 5 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_fg_rgb);
+    try std.testing.expectEqual(@as(u8, 255), sem.style_fg_rgb.r);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_fg_rgb.g);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_fg_rgb.b);
+}
+
+test "semantic: SGR 48;2;r;g;b background RGB" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 48;
+    params[1] = 2;
+    params[2] = 0;
+    params[3] = 255;
+    params[4] = 0;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 5 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_bg_rgb);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_bg_rgb.r);
+    try std.testing.expectEqual(@as(u8, 255), sem.style_bg_rgb.g);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_bg_rgb.b);
+}
+
+test "semantic: RGB values clamped to 0-255" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 38;
+    params[1] = 2;
+    params[2] = 300;
+    params[3] = -5;
+    params[4] = 128;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 5 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_fg_rgb);
+    try std.testing.expectEqual(@as(u8, 255), sem.style_fg_rgb.r);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_fg_rgb.g);
+    try std.testing.expectEqual(@as(u8, 128), sem.style_fg_rgb.b);
+}
+
+test "semantic: multi-param SGR 1;38;2;255;128;0 bold and fg RGB" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 1;
+    params[1] = 38;
+    params[2] = 2;
+    params[3] = 255;
+    params[4] = 128;
+    params[5] = 0;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 6 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .bold_on);
+    try std.testing.expectEqual(@as(u8, 255), sem.style_operations.ops[1].fg_rgb.r);
+    try std.testing.expectEqual(@as(u8, 128), sem.style_operations.ops[1].fg_rgb.g);
+    try std.testing.expectEqual(@as(u8, 0), sem.style_operations.ops[1].fg_rgb.b);
 }

@@ -112,6 +112,8 @@ pub const ScreenState = struct {
             .style_bg_color => |color| self.current_bg = color,
             .style_fg_256 => |color| self.current_fg = color,
             .style_bg_256 => |color| self.current_bg = color,
+            .style_fg_rgb => |_| {},
+            .style_bg_rgb => |_| {},
             .style_operations => |batch| {
                 var i: u8 = 0;
                 while (i < batch.count) : (i += 1) {
@@ -128,6 +130,8 @@ pub const ScreenState = struct {
                         .bg_color => |color| self.current_bg = color,
                         .fg_256 => |color| self.current_fg = color,
                         .bg_256 => |color| self.current_bg = color,
+                        .fg_rgb => |_| {},
+                        .bg_rgb => |_| {},
                     }
                 }
             },
