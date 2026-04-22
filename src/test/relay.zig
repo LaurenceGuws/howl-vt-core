@@ -1983,6 +1983,44 @@ test "parity: CBT moves cursor backward by requested tab stops identically" {
     });
 }
 
+test "parity: CHT saturates at last column identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CHT clamped at last column",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "a\x1b[999Ib",
+        .expected_row = 0,
+        .expected_col = 19,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 19, .codepoint = 'b' },
+        },
+    });
+}
+
+test "parity: CBT saturates at column zero identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "CBT clamped at column zero",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "a\x1b[3I\x1b[999Zb",
+        .expected_row = 0,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'b' },
+            .{ .row = 0, .col = 1, .codepoint = 0 },
+        },
+    });
+}
+
 test "parity: DEC private auto-wrap disable remains identical" {
     const gpa = std.testing.allocator;
     try runParityScenario(gpa, .{
@@ -2129,6 +2167,44 @@ test "parity-chunked: CBT split into byte fragments remains identical" {
         .cell_checks = &.{
             .{ .row = 0, .col = 0, .codepoint = 'a' },
             .{ .row = 0, .col = 8, .codepoint = 'b' },
+        },
+    });
+}
+
+test "parity-chunked: CHT clamp split across chunks remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked CHT clamp",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "a", "\x1b[9", "99", "I", "b" },
+        .expected_row = 0,
+        .expected_col = 19,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 19, .codepoint = 'b' },
+        },
+    });
+}
+
+test "parity-chunked: CBT clamp split across chunks remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked CBT clamp",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .chunks = &.{ "a", "\x1b[3I", "\x1b[", "99", "9", "Z", "b" },
+        .expected_row = 0,
+        .expected_col = 1,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'b' },
+            .{ .row = 0, .col = 1, .codepoint = 0 },
         },
     });
 }
