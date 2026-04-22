@@ -2406,6 +2406,45 @@ test "parity: interrupted split private auto-wrap mode remains identical" {
     });
 }
 
+test "parity: interrupted split CHT stream remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "interrupted split CHT",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "abc\x1b[2\x1b[!pIx",
+        .expected_row = 0,
+        .expected_col = 7,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 3, .codepoint = '!' },
+            .{ .row = 0, .col = 6, .codepoint = 'x' },
+        },
+    });
+}
+
+test "parity: interrupted split CBT stream remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "interrupted split CBT",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "a\x1b[2I\x1b[2\x1b[!pZy",
+        .expected_row = 0,
+        .expected_col = 19,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 19, .codepoint = 'y' },
+        },
+    });
+}
+
 test "parity-chunked: UTF-8 split decode with CRLF remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{
