@@ -16,13 +16,15 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** RF-B4 (RF-401, RF-402, RF-403) completed by engineer execution.
+**Status:** RF-B5 (RF-501, RF-502, RF-503, RF-504) completed by engineer execution.
 
-RF-401: Added 7 explicit zero-dimension variant tests covering rows=0/cols>0, rows>0/cols=0, and rows=0/cols=0 cases. Verified cursor movement (saturates), text writes (no-op), erase (no-op), and control sequences (deterministic) under zero-dimension conditions. All tests pass.
+RF-501: Implemented host-neutral runtime.Engine facade composing Pipeline + ScreenState. API: init/initWithCells/deinit, feedByte/feedSlice, apply/clear/reset, screenRef/screenMut, queuedEventCount. Exported from src/root.zig. Transparent wrapper with no behavioral changes to underlying components.
 
-RF-402: Updated SEMANTIC_SCREEN.md and M1_FOUNDATION.md to clarify architect policy: text/erase are no-ops when no cell plane, cursor arithmetic continues with saturation. Removed ambiguous "all-op no-op" language; encoded explicit policy.
+RF-502: Added 18 integration tests for runtime facade covering: lifecycle safety, feed+apply parity with direct pipeline, clear/reset behavior, queue introspection, zero-dimension safety, complex sequences. All tests pass; facade verified as transparent wrapper.
 
-RF-403: Queue rewritten with RF-B4 completion; zero-dimension policy ambiguity closed.
+RF-503: Updated M1_FOUNDATION.md, SEMANTIC_SCREEN.md, and README.md to document runtime facade as host-neutral convenience layer. Clarified that facade does not extend VT semantics; it packages deterministic parser→pipeline→semantic→screen flow into simpler async API.
+
+RF-504: Queue rewritten with RF-B5 completion; M1 runtime facade complete.
 
 **Next:** Await architect-published batch for the following loop. No open engineer tickets.
 
