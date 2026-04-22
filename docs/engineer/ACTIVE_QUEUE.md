@@ -16,15 +16,16 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** M1 parser-screen foundation frozen.
+**Status:** M1 parser-screen foundation frozen; M2 tab/reset/state interruption matrix complete.
 
 Recent checkpoints:
 - RF-601: runtime parity matrix corrected and authority updated
 - RF-701: ignored-event and split-feed parity coverage added
 - RF-801: root API guard tests added
 - RF-901: runtime facade API contract added
+- M2-107..M2-130: DEC private mode state (`?25`, `?7`), CHT/CBT (`CSI I/Z`), reset/resetScreen/clear sequencing, split-feed interruption determinism, and replay/parity/runtime contract alignment completed.
 
-**Next:** Continue M2 terminal state breadth after the wrap/scroll checkpoint. Follow-up focus should be tabs or reset/state consistency.
+**Next:** Continue M2 terminal state breadth beyond the completed tab/reset interruption matrix; pick the next VT behavior frontier with the same replay/parity/runtime contract-first discipline.
 
 ## Ticket Format (Required)
 
