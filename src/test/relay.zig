@@ -821,3 +821,80 @@ test "replay: malformed RGB sequence (incomplete) ignored safely" {
     try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[0].fg);
     try std.testing.expect(screen.cells_attr.?[0].fg_rgb == null);
 }
+
+test "replay: parser CSI 90 bright foreground black then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[90m");
+    feed(&pl, &screen, "dark");
+    try std.testing.expectEqual(@as(u8, 9), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(@as(u8, 9), screen.cells_attr.?[3].fg);
+}
+
+test "replay: parser CSI 97 bright foreground white then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[97m");
+    feed(&pl, &screen, "bright");
+    try std.testing.expectEqual(@as(u8, 16), screen.cells_attr.?[0].fg);
+}
+
+test "replay: parser CSI 100 bright background black then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[100m");
+    feed(&pl, &screen, "bg");
+    try std.testing.expectEqual(@as(u8, 9), screen.cells_attr.?[0].bg);
+}
+
+test "replay: parser CSI 107 bright background white then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[107m");
+    feed(&pl, &screen, "white");
+    try std.testing.expectEqual(@as(u8, 16), screen.cells_attr.?[0].bg);
+}
+
+test "replay: mixed bright and RGB and reset" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[91m");
+    feed(&pl, &screen, "br");
+    feed(&pl, &screen, "\x1b[38;2;0;255;0m");
+    feed(&pl, &screen, "gr");
+    feed(&pl, &screen, "\x1b[0m");
+    feed(&pl, &screen, "x");
+    try std.testing.expectEqual(@as(u8, 10), screen.cells_attr.?[0].fg);
+    try std.testing.expect(screen.cells_attr.?[2].fg_rgb != null);
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[4].fg);
+    try std.testing.expect(screen.cells_attr.?[4].fg_rgb == null);
+}
+
+test "replay: malformed bright SGR does not corrupt subsequent valid style" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[99m");
+    feed(&pl, &screen, "x");
+    feed(&pl, &screen, "\x1b[92m");
+    feed(&pl, &screen, "y");
+    try std.testing.expectEqual(@as(u8, 0), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(@as(u8, 11), screen.cells_attr.?[1].fg);
+}
