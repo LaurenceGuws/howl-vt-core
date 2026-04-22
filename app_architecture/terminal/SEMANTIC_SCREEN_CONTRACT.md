@@ -1,6 +1,6 @@
 # Parser Core Semantic and Screen State Contract
 
-`PARSER_CORE_SEMANTIC_SCREEN_CONTRACT` — frozen as of HT-031. Authority for `SemanticEvent`, `ParserCoreSemanticConsumer.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — frozen as of HT-031. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -11,15 +11,15 @@
 | `cursor_forward` | `u16` | CSI C | Move cursor right N cols; default 1 |
 | `cursor_back` | `u16` | CSI D | Move cursor left N cols; default 1 |
 | `cursor_position` | `{row: u16, col: u16}` | CSI H/f | Absolute 0-based position; defaults to origin |
-| `write_text` | `[]const u8` | CoreEvent.text | Sequence of printable ASCII bytes to write at cursor |
-| `write_codepoint` | `u21` | CoreEvent.codepoint | Single Unicode scalar to write at cursor |
-| `line_feed` | — | CoreEvent.control(0x0A) | Move cursor to next row |
-| `carriage_return` | — | CoreEvent.control(0x0D) | Reset cursor column to 0 |
-| `backspace` | — | CoreEvent.control(0x08) | Move cursor one column left |
+| `write_text` | `[]const u8` | Event.text | Sequence of printable ASCII bytes to write at cursor |
+| `write_codepoint` | `u21` | Event.codepoint | Single Unicode scalar to write at cursor |
+| `line_feed` | — | Event.control(0x0A) | Move cursor to next row |
+| `carriage_return` | — | Event.control(0x0D) | Reset cursor column to 0 |
+| `backspace` | — | Event.control(0x08) | Move cursor one column left |
 
 ## Ownership and Lifetime
 
-The `write_text` slice in `SemanticEvent` is a borrowed reference into the `ParserCoreBridge` event queue. Its lifetime is bounded by the containing `applyToScreen` call: the slice is valid from when `process` returns it until `bridge.clear()` is called at the end of `applyToScreen`. Screen consumers that need to retain content must copy bytes into their own storage during `apply`.
+The `write_text` slice in `SemanticEvent` is a borrowed reference into the `Bridge` event queue. Its lifetime is bounded by the containing `applyToScreen` call: the slice is valid from when `process` returns it until `bridge.clear()` is called at the end of `applyToScreen`. Screen consumers that need to retain content must copy bytes into their own storage during `apply`.
 
 All other SemanticEvent variants are value types with no heap ownership.
 
@@ -27,7 +27,7 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
 
 ## Process Mapping Policy
 
-| CoreEvent variant | SemanticEvent emitted | Notes |
+| Event variant | SemanticEvent emitted | Notes |
 | --- | --- | --- |
 | `style_change` with final A/B/C/D | `cursor_up/down/forward/back` | Param default 1 |
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
@@ -69,7 +69,7 @@ A change is breaking if:
 
 1. A `SemanticEvent` variant is added, removed, or renamed
 2. The payload type of any variant changes
-3. The mapping policy for any `CoreEvent` variant changes (emit vs null)
+3. The mapping policy for any `Event` variant changes (emit vs null)
 4. `ScreenState` cursor boundary semantics change
 5. The ownership rule for `write_text` lifetime changes
 6. `ScreenState.init` or `initWithCells` signature changes

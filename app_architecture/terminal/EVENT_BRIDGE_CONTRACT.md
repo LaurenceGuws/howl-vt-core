@@ -1,8 +1,8 @@
 # Parser Core Event Bridge Contract
 
-`PARSER_CORE_EVENT_BRIDGE_CONTRACT` — frozen as of HT-021. Authority for `ParserCoreBridge` and `CoreEvent`.
+`EVENT_BRIDGE_CONTRACT` — frozen as of HT-021. Authority for `Bridge` and `Event`.
 
-## CoreEvent Variants
+## Event Variants
 
 | Variant | Source callback | Payload meaning |
 | --- | --- | --- |
@@ -15,13 +15,13 @@
 
 ## Ownership and Lifetime
 
-Payload slices in `text` and `title_set` are allocated by the bridge at event emission time (`allocator.dupe`). The ownership of each slice transfers to the bridge; callers must not free them. Their lifetime ends at `ParserCoreBridge.deinit`. The parser may reuse its internal buffers immediately after the callback returns; bridge events do not alias parser-internal memory.
+Payload slices in `text` and `title_set` are allocated by the bridge at event emission time (`allocator.dupe`). The ownership of each slice transfers to the bridge; callers must not free them. Their lifetime ends at `Bridge.deinit`. The parser may reuse its internal buffers immediately after the callback returns; bridge events do not alias parser-internal memory.
 
 Variants `codepoint`, `control`, `style_change`, and `invalid_sequence` carry no heap allocation.
 
 ## Callback Mapping Policy
 
-| Sink callback | CoreEvent emitted | Notes |
+| Sink callback | Event emitted | Notes |
 | --- | --- | --- |
 | `onStreamEvent(.codepoint)` | `codepoint` | Direct |
 | `onStreamEvent(.control)` | `control` | Direct |
@@ -48,7 +48,7 @@ The following are intentionally not represented at this seam:
 
 A change is breaking if:
 
-1. A `CoreEvent` variant is added, removed, or renamed
+1. A `Event` variant is added, removed, or renamed
 2. A payload field type or name changes in `style_change`
 3. Ownership semantics for `text` or `title_set` change
 4. A previously dropped callback begins emitting events
