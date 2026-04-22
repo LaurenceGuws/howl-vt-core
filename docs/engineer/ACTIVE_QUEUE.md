@@ -16,17 +16,17 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** RF-B5 (RF-501, RF-502, RF-503, RF-504) completed by engineer execution.
+**Status:** RF-B5R (RF-551, RF-552, RF-553, RF-554) completed by engineer execution.
 
-RF-501: Implemented host-neutral runtime.Engine facade composing Pipeline + ScreenState. API: init/initWithCells/deinit, feedByte/feedSlice, apply/clear/reset, screenRef/screenMut, queuedEventCount. Exported from src/root.zig. Transparent wrapper with no behavioral changes to underlying components.
+RF-551: API conformance correction: renamed internal field from 'screen' to 'state'; removed non-required screenRef/screenMut accessors; added required screen() method. Facade now exposes exactly specified API: init/initWithCells/deinit, feedByte/feedSlice, apply/clear/reset, screen, queuedEventCount.
 
-RF-502: Added 18 integration tests for runtime facade covering: lifecycle safety, feed+apply parity with direct pipeline, clear/reset behavior, queue introspection, zero-dimension safety, complex sequences. All tests pass; facade verified as transparent wrapper.
+RF-552: Updated 17 runtime tests to use screen() instead of screenRef(); removed screenMut test. All tests pass; facade verified against corrected API.
 
-RF-503: Updated M1_FOUNDATION.md, SEMANTIC_SCREEN.md, and README.md to document runtime facade as host-neutral convenience layer. Clarified that facade does not extend VT semantics; it packages deterministic parser→pipeline→semantic→screen flow into simpler async API.
+RF-553: Aligned M1_FOUNDATION.md and README.md to document corrected API: screen() replaces screenRef/screenMut; clarified screen() returns const reference.
 
-RF-504: Queue rewritten with RF-B5 completion; M1 runtime facade complete.
+RF-554: Queue rewritten with RF-B5R completion; API conformance verified.
 
-**Next:** Await architect-published batch for the following loop. No open engineer tickets.
+**Next:** Await architect acceptance and next batch. No open engineer tickets.
 
 ## Ticket Format (Required)
 
