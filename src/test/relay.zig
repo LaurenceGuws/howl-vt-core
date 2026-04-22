@@ -1210,10 +1210,10 @@ test "runtime: init and deinit lifecycle" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
-    try std.testing.expectEqual(@as(u16, 24), engine.screenRef().rows);
-    try std.testing.expectEqual(@as(u16, 80), engine.screenRef().cols);
-    try std.testing.expectEqual(@as(u16, 0), engine.screenRef().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screenRef().cursor_col);
+    try std.testing.expectEqual(@as(u16, 24), engine.screen().rows);
+    try std.testing.expectEqual(@as(u16, 80), engine.screen().cols);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
@@ -1221,10 +1221,10 @@ test "runtime: initWithCells and deinit with allocated cells" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
     defer engine.deinit();
-    try std.testing.expectEqual(@as(u16, 4), engine.screenRef().rows);
-    try std.testing.expectEqual(@as(u16, 20), engine.screenRef().cols);
-    try std.testing.expect(engine.screenRef().cells != null);
-    try std.testing.expectEqual(@as(u21, 0), engine.screenRef().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u16, 4), engine.screen().rows);
+    try std.testing.expectEqual(@as(u16, 20), engine.screen().cols);
+    try std.testing.expect(engine.screen().cells != null);
+    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
 }
 
 test "runtime: feedByte and feedSlice accumulate in queue" {
@@ -1246,9 +1246,9 @@ test "runtime: apply drains queue and updates screen" {
     try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
     engine.apply();
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u21, 'h'), engine.screenRef().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'o'), engine.screenRef().cellAt(0, 4));
-    try std.testing.expectEqual(@as(u16, 5), engine.screenRef().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'h'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'o'), engine.screen().cellAt(0, 4));
+    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
 }
 
 test "runtime: clear drops pending events" {
@@ -1259,7 +1259,7 @@ test "runtime: clear drops pending events" {
     try std.testing.expect(engine.queuedEventCount() > 0);
     engine.clear();
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u16, 0), engine.screenRef().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
 }
 
 test "runtime: reset clears queue and parser state" {
@@ -1280,8 +1280,8 @@ test "runtime: cursor move via apply matches direct pipeline" {
     defer engine.deinit();
     engine.feedSlice("\x1b[5;10H");
     engine.apply();
-    try std.testing.expectEqual(@as(u16, 4), engine.screenRef().cursor_row);
-    try std.testing.expectEqual(@as(u16, 9), engine.screenRef().cursor_col);
+    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
 test "runtime: text write and erase via apply" {
@@ -1290,11 +1290,11 @@ test "runtime: text write and erase via apply" {
     defer engine.deinit();
     engine.feedSlice("hello");
     engine.apply();
-    try std.testing.expectEqual(@as(u21, 'h'), engine.screenRef().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u16, 5), engine.screenRef().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'h'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
     engine.feedSlice("\x1b[K");
     engine.apply();
-    try std.testing.expectEqual(@as(u21, 0), engine.screenRef().cellAt(0, 5));
+    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 5));
 }
 
 test "runtime: repeated apply without feed is no-op" {
@@ -1303,11 +1303,11 @@ test "runtime: repeated apply without feed is no-op" {
     defer engine.deinit();
     engine.feedSlice("test");
     engine.apply();
-    const col1 = engine.screenRef().cursor_col;
+    const col1 = engine.screen().cursor_col;
     engine.apply();
-    try std.testing.expectEqual(col1, engine.screenRef().cursor_col);
+    try std.testing.expectEqual(col1, engine.screen().cursor_col);
     engine.apply();
-    try std.testing.expectEqual(col1, engine.screenRef().cursor_col);
+    try std.testing.expectEqual(col1, engine.screen().cursor_col);
 }
 
 test "runtime: zero-dimension init is safe" {
@@ -1316,8 +1316,8 @@ test "runtime: zero-dimension init is safe" {
     defer engine.deinit();
     engine.feedSlice("text\x1b[5A\x1b[999C\x1b[J");
     engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screenRef().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screenRef().cursor_col);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
 test "runtime: queuedEventCount after clear is zero" {
@@ -1371,17 +1371,8 @@ test "runtime: complex sequence with cursor/text/erase" {
     engine.apply();
     engine.feedSlice("line1");
     engine.apply();
-    try std.testing.expectEqual(@as(u16, 1), engine.screenRef().cursor_row);
-    try std.testing.expectEqual(@as(u16, 5), engine.screenRef().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'l'), engine.screenRef().cellAt(1, 0));
+    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'l'), engine.screen().cellAt(1, 0));
 }
 
-test "runtime: screenMut allows direct screen modification" {
-    const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.screenMut().cursor_row = 10;
-    engine.screenMut().cursor_col = 20;
-    try std.testing.expectEqual(@as(u16, 10), engine.screenRef().cursor_row);
-    try std.testing.expectEqual(@as(u16, 20), engine.screenRef().cursor_col);
-}

@@ -2,23 +2,24 @@
 //! Composes parser, pipeline, and screen into a single runtime interface.
 //! No behavioral changes to underlying components; this is a convenience surface.
 
+const std = @import("std");
 const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,
-    screen: screen_mod.ScreenState,
+    state: screen_mod.ScreenState,
 
     /// Initialize engine without cell buffer (screen cursor-only).
     pub fn init(allocator: std.mem.Allocator, rows: u16, cols: u16) !Engine {
         var pipeline = try pipeline_mod.Pipeline.init(allocator);
         errdefer pipeline.deinit();
-        const screen = screen_mod.ScreenState.init(rows, cols);
+        const state = screen_mod.ScreenState.init(rows, cols);
         return Engine{
             .allocator = allocator,
             .pipeline = pipeline,
-            .screen = screen,
+            .state = state,
         };
     }
 
@@ -26,18 +27,18 @@ pub const Engine = struct {
     pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !Engine {
         var pipeline = try pipeline_mod.Pipeline.init(allocator);
         errdefer pipeline.deinit();
-        var screen = try screen_mod.ScreenState.initWithCells(allocator, rows, cols);
-        errdefer screen.deinit(allocator);
+        var state = try screen_mod.ScreenState.initWithCells(allocator, rows, cols);
+        errdefer state.deinit(allocator);
         return Engine{
             .allocator = allocator,
             .pipeline = pipeline,
-            .screen = screen,
+            .state = state,
         };
     }
 
     /// Deinitialize engine and release all resources.
     pub fn deinit(self: *Engine) void {
-        self.screen.deinit(self.allocator);
+        self.state.deinit(self.allocator);
         self.pipeline.deinit();
     }
 
@@ -54,7 +55,7 @@ pub const Engine = struct {
     /// Apply pending bridge events to screen state.
     /// Drains the event queue and updates screen accordingly.
     pub fn apply(self: *Engine) void {
-        self.pipeline.applyToScreen(&self.screen);
+        self.pipeline.applyToScreen(&self.state);
     }
 
     /// Clear pending bridge events without applying to screen.
@@ -69,7 +70,7 @@ pub const Engine = struct {
 
     /// Get const reference to current screen state.
     pub fn screen(self: *const Engine) *const screen_mod.ScreenState {
-        return &self.screen;
+        return &self.state;
     }
 
     /// Get count of pending bridge events before apply.
