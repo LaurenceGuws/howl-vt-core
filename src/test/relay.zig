@@ -2364,6 +2364,48 @@ test "parity: tab and private modes with DECSTR remain identical" {
     });
 }
 
+test "parity: interrupted split private cursor mode remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "interrupted private cursor mode",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "x\x1b[?2\x1b[!p5l",
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_cursor_visible = true,
+        .expected_cursor_visible = true,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'x' },
+            .{ .row = 0, .col = 1, .codepoint = '!' },
+        },
+    });
+}
+
+test "parity: interrupted split private auto-wrap mode remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "interrupted private auto-wrap mode",
+        .rows = 2,
+        .cols = 20,
+        .with_cells = true,
+        .input = "x\x1b[?\x1b[!p7l",
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_auto_wrap = true,
+        .expected_auto_wrap = true,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'x' },
+            .{ .row = 0, .col = 1, .codepoint = '!' },
+        },
+    });
+}
+
 test "parity-chunked: UTF-8 split decode with CRLF remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{
