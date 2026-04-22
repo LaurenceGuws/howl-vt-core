@@ -11,21 +11,10 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 
 | ID | Status | Intent |
 | --- | --- | --- |
-| `HT-047` | `done` | Completed prior batch. |
-| `HT-048A` | `done` | Queue/doc hygiene: retire stale manifest, sync active queue. |
-| `HT-048B` | `done` | Semantic mapping for CSI J/K erase operations. |
-| `HT-048C` | `done` | Screen erase apply behavior for line and display modes. |
-| `HT-048D` | `done` | Relay integration fixtures for erase flow. |
-| `HT-048E` | `done` | Contract sync: document erase events and update queue status. |
-| `HT-049A` | `done` | Define minimal SGR semantic scope and defer advanced features. |
-| `HT-049B` | `done` | Semantic mapping for CSI m (SGR) operations. |
-| `HT-049C` | `done` | Apply style state in screen cell writes. |
-| `HT-049D` | `done` | Relay integration fixtures for style flow. |
-| `HT-049E` | `done` | Contract sync and queue status update for style. |
-| `HT-049F1` | `done` | Fix style color range storage without truncation. |
-| `HT-049F2` | `done` | Make initWithCells allocation-failure safe. |
-| `HT-049F3` | `done` | Clear cell attributes in erase operations. |
-| `HT-049F4` | `done` | Sync contract and queue after blocker fixes. |
+| `HT-050A` | `done` | Queue hygiene: reset to lean active scope. |
+| `HT-050B` | `done` | Multi-parameter SGR mapping. |
+| `HT-050C` | `done` | Screen apply for ordered style event stream. |
+| `HT-050D` | `next` | Contract + queue sync for multi-parameter SGR. |
 
 ## Guardrails
 
