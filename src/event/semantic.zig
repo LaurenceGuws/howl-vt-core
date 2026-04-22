@@ -15,6 +15,8 @@ pub const StyleOp = union(enum) {
     bold_off,
     fg_color: u8,
     bg_color: u8,
+    fg_256: u8,
+    bg_256: u8,
 };
 
 /// Screen-oriented semantic operations derived from parser events.
@@ -36,6 +38,8 @@ pub const SemanticEvent = union(enum) {
     style_bold_off,
     style_fg_color: u8,
     style_bg_color: u8,
+    style_fg_256: u8,
+    style_bg_256: u8,
     style_operations: struct {
         ops: [16]StyleOp,
         count: u8,
@@ -103,6 +107,24 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             39 => StyleOp{ .fg_color = 0 },
             40...47 => StyleOp{ .bg_color = @intCast(param - 40 + 1) },
             49 => StyleOp{ .bg_color = 0 },
+            38 => blk: {
+                if (i + 2 < param_count and params[i + 1] == 5) {
+                    const color_idx = if (i + 2 < count) params[i + 2] else 0;
+                    i += 2;
+                    break :blk StyleOp{ .fg_256 = @intCast(color_idx & 0xFF) };
+                } else {
+                    break :blk null;
+                }
+            },
+            48 => blk: {
+                if (i + 2 < param_count and params[i + 1] == 5) {
+                    const color_idx = if (i + 2 < count) params[i + 2] else 0;
+                    i += 2;
+                    break :blk StyleOp{ .bg_256 = @intCast(color_idx & 0xFF) };
+                } else {
+                    break :blk null;
+                }
+            },
             else => null,
         };
         if (op) |o| {
@@ -119,6 +141,8 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .bold_off => SemanticEvent.style_bold_off,
             .fg_color => |c| SemanticEvent{ .style_fg_color = c },
             .bg_color => |c| SemanticEvent{ .style_bg_color = c },
+            .fg_256 => |c| SemanticEvent{ .style_fg_256 = c },
+            .bg_256 => |c| SemanticEvent{ .style_bg_256 = c },
         };
     }
     return SemanticEvent{ .style_operations = .{ .ops = ops, .count = op_count } };
@@ -338,4 +362,50 @@ test "semantic: SGR no params defaults to reset" {
     @memset(&params, 0);
     const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 0 } }) orelse return error.NoEvent;
     try std.testing.expect(sem == .style_reset);
+}
+
+test "semantic: SGR 38;5;<n> foreground 256-color" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 38;
+    params[1] = 5;
+    params[2] = 196;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_fg_256);
+    try std.testing.expectEqual(@as(u8, 196), sem.style_fg_256);
+}
+
+test "semantic: SGR 48;5;<n> background 256-color" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 48;
+    params[1] = 5;
+    params[2] = 21;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_bg_256);
+    try std.testing.expectEqual(@as(u8, 21), sem.style_bg_256);
+}
+
+test "semantic: multi-param SGR 1;38;5;196 bold and fg 256" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 1;
+    params[1] = 38;
+    params[2] = 5;
+    params[3] = 196;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 4 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.count);
+    try std.testing.expect(sem.style_operations.ops[0] == .bold_on);
+    try std.testing.expectEqual(@as(u8, 196), sem.style_operations.ops[1].fg_256);
+}
+
+test "semantic: malformed 256-color sequence (38;2) ignored safely" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 38;
+    params[1] = 2;
+    params[2] = 255;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 3 } });
+    try std.testing.expectEqual(@as(?SemanticEvent, null), sem);
 }
