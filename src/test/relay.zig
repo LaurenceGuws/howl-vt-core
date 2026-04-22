@@ -979,3 +979,84 @@ test "replay: reset clears underline and inverse before next write" {
     try std.testing.expectEqual(false, screen.cells_attr.?[2].underline);
     try std.testing.expectEqual(false, screen.cells_attr.?[2].inverse);
 }
+
+test "replay: parser CSI 2 dim on then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[2m");
+    feed(&pl, &screen, "dim");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].dim);
+    try std.testing.expectEqual(true, screen.cells_attr.?[2].dim);
+}
+
+test "replay: parser CSI 22 clears bold and dim then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[1;2m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[22m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].bold);
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].dim);
+    try std.testing.expectEqual(false, screen.cells_attr.?[1].bold);
+    try std.testing.expectEqual(false, screen.cells_attr.?[1].dim);
+}
+
+test "replay: parser CSI 9 strikethrough on then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[9m");
+    feed(&pl, &screen, "strike");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].strikethrough);
+    try std.testing.expectEqual(true, screen.cells_attr.?[5].strikethrough);
+}
+
+test "replay: parser CSI 29 strikethrough off then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[9m");
+    feed(&pl, &screen, "a");
+    feed(&pl, &screen, "\x1b[29m");
+    feed(&pl, &screen, "b");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].strikethrough);
+    try std.testing.expectEqual(false, screen.cells_attr.?[1].strikethrough);
+}
+
+test "replay: mixed style batch with dim strikethrough and color" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[2;9;32m");
+    feed(&pl, &screen, "m");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].dim);
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].strikethrough);
+    try std.testing.expectEqual(@as(u8, 3), screen.cells_attr.?[0].fg);
+}
+
+test "replay: malformed dim parameter does not corrupt subsequent valid style" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[5m");
+    feed(&pl, &screen, "x");
+    feed(&pl, &screen, "\x1b[2m");
+    feed(&pl, &screen, "y");
+    try std.testing.expectEqual(false, screen.cells_attr.?[0].dim);
+    try std.testing.expectEqual(true, screen.cells_attr.?[1].dim);
+}
