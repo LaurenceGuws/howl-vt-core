@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-052E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-053E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -90,11 +90,19 @@ Implemented:
 - Bold on/off (SGR 1, 22)
 - Foreground basic colors (SGR 30-37, 39)
 - Background basic colors (SGR 40-47, 49)
+- Foreground bright ANSI colors (SGR 90-97)
+- Background bright ANSI colors (SGR 100-107)
 - Foreground 256-color palette (SGR 38;5;<n>)
 - Background 256-color palette (SGR 48;5;<n>)
 - Foreground 24-bit RGB true color (SGR 38;2;r;g;b)
 - Background 24-bit RGB true color (SGR 48;2;r;g;b)
 - Ordered multi-parameter SGR processing (e.g., 1;38;2;255;0;0 for bold + red truecolor)
+
+Color index mapping:
+- Basic colors (30-37, 40-47): indices 1-8
+- Bright ANSI colors (90-97, 100-107): indices 9-16
+- 256-color palette (38;5;<n>, 48;5;<n>): indices 0-255
+- All indexed colors stored in u8 fg/bg fields without truncation
 
 Malformed sequences policy:
 - Extended color forms (38, 48) without matching subparameter form (5 or 2) are ignored safely

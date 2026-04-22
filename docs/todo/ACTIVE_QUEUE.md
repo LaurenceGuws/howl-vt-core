@@ -21,6 +21,11 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-052C` | `done` | Screen apply for truecolor attrs. |
 | `HT-052D` | `done` | Relay fixtures for truecolor flow. |
 | `HT-052E` | `done` | Queue/contract sync close. |
+| `HT-053A` | `done` | Queue + contract scope: bright ANSI. |
+| `HT-053B` | `done` | Semantic mapping for bright ANSI. |
+| `HT-053C` | `done` | Screen apply + reset invariants. |
+| `HT-053D` | `done` | Relay fixtures for bright ANSI flow. |
+| `HT-053E` | `done` | Contract/queue sync close. |
 
 ## Guardrails
 
