@@ -2676,6 +2676,46 @@ test "runtime: resetScreen preserves queued HT/CHT application from cleared orig
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
+test "runtime: resetScreen preserves split CHT and queued mode change" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[?7l\x1b[2");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+    engine.resetScreen();
+    try std.testing.expect(engine.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    engine.feedSlice("Ixy");
+    engine.apply();
+    try std.testing.expect(!engine.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 18), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 16));
+    try std.testing.expectEqual(@as(u21, 'y'), engine.screen().cellAt(0, 17));
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
+test "runtime: resetScreen preserves split CBT and queued cursor visibility change" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("a\x1b[2I");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 16), engine.screen().cursor_col);
+    engine.feedSlice("\x1b[?25l\x1b[3");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+    engine.resetScreen();
+    try std.testing.expect(engine.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    engine.feedSlice("Zq");
+    engine.apply();
+    try std.testing.expect(!engine.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'q'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
 test "runtime: reset clears queue/parser without mutating screen modes" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 5);
@@ -2690,6 +2730,22 @@ test "runtime: reset clears queue/parser without mutating screen modes" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
     try std.testing.expect(!engine.screen().cursor_visible);
     try std.testing.expect(!engine.screen().auto_wrap);
+}
+
+test "runtime: reset clears queued mode event and split CHT parser state" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("\x1b[?7l\x1b[2");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+    engine.reset();
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expect(engine.screen().auto_wrap);
+    engine.feedSlice("Iu");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 2), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'I'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'u'), engine.screen().cellAt(0, 1));
 }
 
 test "runtime: cursor move via apply matches direct pipeline" {
