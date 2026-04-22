@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — updated at HT-056E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-057E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -88,7 +88,7 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
   - Erased cell attributes reset to defaults (bold=false, fg=0, bg=0).
 - Erase operations are no-ops when no cell buffer is present (`cells == null`); style state is unaffected.
 - Style operations update current-style state; subsequent text writes apply active style to each cell.
-  - `style_reset`: clears bold, dim, underline, blink, inverse, strikethrough, restores foreground/background to defaults.
+  - `style_reset`: clears bold, dim, underline, blink, inverse, strikethrough, restores foreground/background to defaults, and resets underline color.
   - `style_bold_on` / `style_bold_off`: toggle bold attribute (SGR 22 clears both bold and dim).
   - `style_dim_on` / `style_dim_off`: toggle dim attribute (SGR 22 clears both bold and dim).
   - `style_strikethrough_on` / `style_strikethrough_off`: toggle strikethrough attribute.
@@ -96,10 +96,11 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
   - `style_blink_on` / `style_blink_off`: toggle blink attribute.
   - `style_inverse_on` / `style_inverse_off`: toggle inverse video attribute.
 - `style_fg_color` / `style_bg_color`: set indexed color (payload 0=default, 1-8=basic colors, 9-16=bright ANSI); stored without truncation.
+  - `style_underline_color_256` / `style_underline_color_rgb` / `style_underline_color_reset`: set/reset underline color independently of fg/bg.
   - Style state is independent of cell content; does not affect non-text operations.
   - Style attributes on a cell are immutable after the cell is written; style state changes do not retroactively affect written cells.
-- Cell buffer (when present) is zero-initialized. Unwritten cells contain codepoint 0 with default style (bold=false, dim=false, underline=false, blink=false, inverse=false, strikethrough=false, fg=0, bg=0).
-- Style attribute storage uses u8 fields for fg/bg to preserve indexed colors (0-16) and 256-color indices (0-255) without truncation. Boolean flags for bold, dim, underline, blink, inverse, strikethrough stored separately.
+- Cell buffer (when present) is zero-initialized. Unwritten cells contain codepoint 0 with default style (bold=false, dim=false, underline=false, blink=false, inverse=false, strikethrough=false, fg=0, bg=0, underline_color=null).
+- Style attribute storage uses u8 fields for fg/bg to preserve indexed colors (0-16) and 256-color indices (0-255) without truncation. Boolean flags for bold, dim, underline, blink, inverse, strikethrough stored separately. Underline color is stored as nullable indexed (`?u8`) or nullable RGB (`?Rgb`) to preserve reset semantics.
 - SGR 22 (normal intensity) clears both bold and dim, matching VT100 behavior; separate semantic events emitted for each.
 
 ## SGR (Style) Scope
@@ -131,6 +132,8 @@ Color index mapping:
   - 1-8 = basic ANSI colors (SGR 30-37, 40-47)
   - 9-16 = bright ANSI colors (SGR 90-97, 100-107)
 - 256-color palette via `style_fg_256`/`style_bg_256`: payload 0-255 (SGR 38;5;<n>, 48;5;<n>)
+- Underline 256-color palette via `style_underline_color_256`: payload 0-255 (SGR 58;5;<n>)
+- Underline 24-bit RGB via `style_underline_color_rgb` (SGR 58;2;r;g;b); reset with `style_underline_color_reset` (SGR 59)
 - All indexed colors stored in u8 fg/bg fields without truncation
 
 Malformed sequences policy:
