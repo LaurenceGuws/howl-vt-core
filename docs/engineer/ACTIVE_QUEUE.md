@@ -16,17 +16,15 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** RF-B5R (RF-551, RF-552, RF-553, RF-554) completed by engineer execution.
+**Status:** M1 parser-screen foundation frozen.
 
-RF-551: API conformance correction: renamed internal field from 'screen' to 'state'; removed non-required screenRef/screenMut accessors; added required screen() method. Facade now exposes exactly specified API: init/initWithCells/deinit, feedByte/feedSlice, apply/clear/reset, screen, queuedEventCount.
+Recent checkpoints:
+- RF-601: runtime parity matrix corrected and authority updated
+- RF-701: ignored-event and split-feed parity coverage added
+- RF-801: root API guard tests added
+- RF-901: runtime facade API contract added
 
-RF-552: Updated 17 runtime tests to use screen() instead of screenRef(); removed screenMut test. All tests pass; facade verified against corrected API.
-
-RF-553: Aligned M1_FOUNDATION.md and README.md to document corrected API: screen() replaces screenRef/screenMut; clarified screen() returns const reference.
-
-RF-554: Queue rewritten with RF-B5R completion; API conformance verified.
-
-**Next:** Await architect acceptance and next batch. No open engineer tickets.
+**Next:** Begin M2 terminal state breadth. First focus should be wrap/scroll semantics with tests before implementation.
 
 ## Ticket Format (Required)
 

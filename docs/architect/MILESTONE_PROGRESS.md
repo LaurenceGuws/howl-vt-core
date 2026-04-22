@@ -5,8 +5,8 @@ This board tracks milestone state only. It does not track implementation steps.
 | Milestone | Status | Scope Anchor | Notes |
 | --- | --- | --- | --- |
 | `M0` Repo Scaffold | `done` | `app_architecture/authorities/SCOPE.md` | Build/test/docs baseline established. |
-| `M1` Parser-Screen Foundation | `in_progress` | `app_architecture/authorities/M1_FOUNDATION.md` | Foundation retained and narrowed to core parser/event/screen behavior. |
-| `M2` Terminal State Breadth | `planned` | `app_architecture/authorities/MILESTONE.md` | Starts after M1 freeze. |
+| `M1` Parser-Screen Foundation | `done` | `app_architecture/authorities/M1_FOUNDATION.md` | Parser/event/screen/runtime foundation frozen with contracts and replay coverage. |
+| `M2` Terminal State Breadth | `in_progress` | `app_architecture/authorities/MILESTONE.md` | Next focus: wrap, scroll, tabs, modes, reset/state consistency. |
 | `M3` History and Selection | `planned` | `app_architecture/authorities/MILESTONE.md` | Deferred. |
 | `M4` Input and Control Surface | `planned` | `app_architecture/authorities/MILESTONE.md` | Deferred. |
 | `M5` Runtime Interface | `planned` | `app_architecture/authorities/MILESTONE.md` | Deferred. |

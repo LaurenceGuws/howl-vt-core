@@ -79,13 +79,19 @@ M1 guarantees deterministic behavior at all boundary conditions:
 - Zero-dimension variants (rows=0×cols>0, rows>0×cols=0, rows=0×cols=0) tested in “zero-dim” section
 - All cursor/control/erase operations verified safe and deterministic
 
-## Remaining M1 Outcomes
+## M1 Freeze State
 
-- Reassess screen model boundaries against scope authority
-- Reconfirm semantic-to-screen API shape for non-style core behavior
-- Tighten replay fixtures around cursor/erase/control determinism
-- Define first stable public API subset for host-neutral consumption
-- Freeze M1 contract set once behaviors are verified and bounded
+M1 is frozen as the minimal parser-to-screen foundation. The accepted surface is:
+
+- parser/event/screen pipeline behavior documented in `SEMANTIC_SCREEN.md`
+- event bridge behavior documented in `EVENT_BRIDGE.md`
+- parser API behavior documented in `PARSER_API.md`
+- model exports documented in `MODEL_API.md`
+- runtime facade behavior documented in `RUNTIME_API.md`
+- replay tests in `src/test/relay.zig`
+- root API guard tests in `src/root.zig`
+
+Further terminal breadth belongs to M2 unless it is a bug fix against these contracts.
 
 ## Exit Criteria
 
