@@ -36,7 +36,8 @@ a cleaner async feed/apply/read API:
 
 Runtime parity is validated by replay tests that run identical byte streams through
 both direct `Pipeline+ScreenState` and `runtime.Engine`, then assert identical
-end-state behavior.
+end-state behavior, including split-feed chunking and ignored-event paths
+(OSC/APC/DCS/ESC-final and non-mapped controls).
 
 See `app_architecture/authorities/M1_FOUNDATION.md` for full API details.
 

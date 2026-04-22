@@ -55,6 +55,13 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 | `title_set` | `null` | Not a screen content event at this seam |
 | `invalid_sequence` | `null` | Explicitly ignored |
 
+## Ignored-Event Invariants
+
+- `title_set`, `invalid_sequence`, non-mapped controls, and non-mapped CSI finals do not mutate `ScreenState` cursor or cell contents at this seam.
+- APC/DCS/ESC-final parser callbacks are bridge-dropped and never enter `SemanticEvent` processing.
+- `applyToScreen` still drains the bridge queue after processing, even when every queued event is ignored by semantic mapping.
+- Split-feed chunking does not change the ignored-event rule: equivalent byte streams must yield identical screen/queue end state regardless of chunk boundaries.
+
 ## ScreenState Behavioral Guarantees
 
 - Cursor row and column are always within `[0, rows-1]` and `[0, cols-1]` respectively, enforced by saturating arithmetic on every mutation.

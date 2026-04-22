@@ -50,6 +50,9 @@ The facade is a transparent wrapper; it does not extend VT semantics or change a
 
 Runtime parity confidence is enforced by replay integration tests in `src/test/relay.zig` that run identical scenario streams through direct `Pipeline+ScreenState` and through `runtime.Engine`, then assert matching cursor/cell/queue outcomes across cursor, control, erase, split-feed, and zero-dimension cases.
 
+Parity coverage includes ignored-event determinism as a first-class invariant:
+OSC title payloads, APC payloads, DCS payloads, ESC-final passthrough events, and non-mapped controls must not mutate screen state at this seam; after apply, queue depth must still deterministically drain to zero for both direct pipeline and runtime facade flows.
+
 ## M1 pipeline determinism (non-style)
 
 The `Pipeline` orchestration layer is part of the M1 foundation: `clear` drops queued bridge work without screen application; `reset` clears both the queue and parser partial state; each `applyToScreen` drains the queue once and then clears it, so repeated apply without new input is a no-op on `ScreenState`. Full wording lives under “Pipeline seam” in `app_architecture/contracts/SEMANTIC_SCREEN.md`.

@@ -1206,6 +1206,12 @@ test "zero-dim: rows=10, cols=0: repeated text writes remain safe" {
 
 // --- Runtime engine facade parity matrix ---
 
+const CellCheck = struct {
+    row: u16,
+    col: u16,
+    codepoint: u21,
+};
+
 const ParityScenario = struct {
     name: []const u8,
     rows: u16,
@@ -1216,7 +1222,20 @@ const ParityScenario = struct {
     expected_col: u16,
     expected_queue_depth: usize,
     check_cells: bool = false,
-    cell_checks: []const struct { row: u16, col: u16, codepoint: u21 } = &.{},
+    cell_checks: []const CellCheck = &.{},
+};
+
+const ParityChunkScenario = struct {
+    name: []const u8,
+    rows: u16,
+    cols: u16,
+    with_cells: bool,
+    chunks: []const []const u8,
+    expected_row: u16,
+    expected_col: u16,
+    expected_queue_depth: usize,
+    check_cells: bool = false,
+    cell_checks: []const CellCheck = &.{},
 };
 
 fn runParityScenario(gpa: std.mem.Allocator, scenario: ParityScenario) !void {
@@ -1238,6 +1257,45 @@ fn runParityScenario(gpa: std.mem.Allocator, scenario: ParityScenario) !void {
     direct_pl.applyToScreen(&direct_screen);
 
     runtime_engine.feedSlice(scenario.input);
+    runtime_engine.apply();
+
+    try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, runtime_engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, runtime_engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
+    try std.testing.expectEqual(scenario.expected_queue_depth, runtime_engine.queuedEventCount());
+
+    if (scenario.check_cells) {
+        for (scenario.cell_checks) |check| {
+            const direct_cell = direct_screen.cellAt(check.row, check.col);
+            const runtime_cell = runtime_engine.screen().cellAt(check.row, check.col);
+            try std.testing.expectEqual(direct_cell, check.codepoint);
+            try std.testing.expectEqual(runtime_cell, check.codepoint);
+        }
+    }
+}
+
+fn runParityChunkScenario(gpa: std.mem.Allocator, scenario: ParityChunkScenario) !void {
+    var direct_pl = try pipeline_mod.Pipeline.init(gpa);
+    defer direct_pl.deinit();
+    var direct_screen = if (scenario.with_cells)
+        try screen_mod.ScreenState.initWithCells(gpa, scenario.rows, scenario.cols)
+    else
+        screen_mod.ScreenState.init(scenario.rows, scenario.cols);
+    defer if (scenario.with_cells) direct_screen.deinit(gpa);
+
+    var runtime_engine = if (scenario.with_cells)
+        try runtime_mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    else
+        try runtime_mod.Engine.init(gpa, scenario.rows, scenario.cols);
+    defer runtime_engine.deinit();
+
+    for (scenario.chunks) |chunk| {
+        direct_pl.feedSlice(chunk);
+        runtime_engine.feedSlice(chunk);
+    }
+    direct_pl.applyToScreen(&direct_screen);
     runtime_engine.apply();
 
     try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
@@ -1621,6 +1679,210 @@ test "parity: mixed sequence identically" {
             .{ .row = 0, .col = 0, .codepoint = 'l' },
             .{ .row = 1, .col = 0, .codepoint = 'l' },
             .{ .row = 1, .col = 4, .codepoint = '2' },
+        },
+    });
+}
+
+test "parity: OSC BEL title event ignored by screen state identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "OSC BEL ignored",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .input = "ab\x1b]title\x07cd",
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity: APC payload is dropped and screen remains deterministic" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "APC dropped",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .input = "ab\x1b_payload\x1b\\cd",
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity: DCS payload is dropped and screen remains deterministic" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "DCS dropped",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .input = "ab\x1bPpayload\x1b\\cd",
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity: ESC final passthrough is dropped at bridge seam" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "ESC final dropped",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .input = "ab\x1bMcd",
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity: non-mapped controls are ignored while mapped controls apply" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "control filtering",
+        .rows = 3,
+        .cols = 10,
+        .with_cells = true,
+        .input = "a\x07b\x0bc\x0A",
+        .expected_row = 1,
+        .expected_col = 3,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+        },
+    });
+}
+
+test "parity-chunked: UTF-8 split decode with CRLF remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked utf8 + CRLF",
+        .rows = 3,
+        .cols = 10,
+        .with_cells = true,
+        .chunks = &.{ "\xC3", "\xA9", "\x0D", "\x0A" },
+        .expected_row = 1,
+        .expected_col = 0,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 0xE9 },
+        },
+    });
+}
+
+test "parity-chunked: CSI erase split into byte fragments remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked CSI erase",
+        .rows = 2,
+        .cols = 6,
+        .with_cells = true,
+        .chunks = &.{ "hello", "\x1b", "[", "1", "K" },
+        .expected_row = 0,
+        .expected_col = 5,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 0 },
+            .{ .row = 0, .col = 4, .codepoint = 0 },
+        },
+    });
+}
+
+test "parity-chunked: OSC BEL split across chunks is ignored identically" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked OSC BEL ignored",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .chunks = &.{ "ab", "\x1b]", "ti", "tle", "\x07", "cd" },
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity-chunked: OSC ST split across chunks is ignored identically" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked OSC ST ignored",
+        .rows = 2,
+        .cols = 10,
+        .with_cells = true,
+        .chunks = &.{ "ab", "\x1b]title", "\x1b", "\\", "cd" },
+        .expected_row = 0,
+        .expected_col = 4,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 0, .col = 2, .codepoint = 'c' },
+            .{ .row = 0, .col = 3, .codepoint = 'd' },
+        },
+    });
+}
+
+test "parity-chunked: mixed control and cursor stream remains identical" {
+    const gpa = std.testing.allocator;
+    try runParityChunkScenario(gpa, .{
+        .name = "chunked mixed control",
+        .rows = 3,
+        .cols = 10,
+        .with_cells = true,
+        .chunks = &.{ "ab\x0D", "\x0A\x1b[2C", "cd\x08" },
+        .expected_row = 1,
+        .expected_col = 3,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 1, .codepoint = 'b' },
+            .{ .row = 1, .col = 2, .codepoint = 'c' },
+            .{ .row = 1, .col = 3, .codepoint = 'd' },
         },
     });
 }
