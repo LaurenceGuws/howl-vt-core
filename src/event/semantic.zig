@@ -174,6 +174,11 @@ test "semantic: CHT zero param defaults to 1" {
     try std.testing.expectEqual(@as(u16, 1), sem.horizontal_tab_forward);
 }
 
+test "semantic: CHT large param saturates to u16 max" {
+    const sem = process(makeStyleChange('I', 999999, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(std.math.maxInt(u16), sem.horizontal_tab_forward);
+}
+
 test "semantic: CBT explicit count" {
     const sem = process(makeStyleChange('Z', 2, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u16, 2), sem.horizontal_tab_back);
@@ -182,6 +187,11 @@ test "semantic: CBT explicit count" {
 test "semantic: CBT zero param defaults to 1" {
     const sem = process(makeStyleChange('Z', 0, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u16, 1), sem.horizontal_tab_back);
+}
+
+test "semantic: CBT large param saturates to u16 max" {
+    const sem = process(makeStyleChange('Z', 999999, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(std.math.maxInt(u16), sem.horizontal_tab_back);
 }
 
 test "semantic: CUP explicit row and col" {
