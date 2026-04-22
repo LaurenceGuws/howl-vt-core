@@ -14,6 +14,8 @@ const Rgb = semantic_mod.Rgb;
 /// Cursor and optional cell-buffer state with deterministic clamped updates.
 const CellAttr = struct {
     bold: bool = false,
+    underline: bool = false,
+    inverse: bool = false,
     fg: u8 = 0,
     bg: u8 = 0,
     fg_rgb: ?Rgb = null,
@@ -28,6 +30,8 @@ pub const ScreenState = struct {
     cells: ?[]u21,
     cells_attr: ?[]CellAttr,
     current_bold: bool,
+    current_underline: bool = false,
+    current_inverse: bool = false,
     current_fg: u8,
     current_bg: u8,
     current_fg_rgb: ?Rgb = null,
@@ -42,6 +46,8 @@ pub const ScreenState = struct {
             .cells = null,
             .cells_attr = null,
             .current_bold = false,
+            .current_underline = false,
+            .current_inverse = false,
             .current_fg = 0,
             .current_bg = 0,
             .current_fg_rgb = null,
@@ -59,7 +65,7 @@ pub const ScreenState = struct {
         errdefer if (cells) |c| allocator.free(c);
         const cells_attr: ?[]CellAttr = if (size > 0) blk: {
             const buf = try allocator.alloc(CellAttr, size);
-            @memset(buf, .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null });
+            @memset(buf, .{ .bold = false, .underline = false, .inverse = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null });
             break :blk buf;
         } else null;
         return .{
@@ -70,6 +76,8 @@ pub const ScreenState = struct {
             .cells = cells,
             .cells_attr = cells_attr,
             .current_bold = false,
+            .current_underline = false,
+            .current_inverse = false,
             .current_fg = 0,
             .current_bg = 0,
             .current_fg_rgb = null,
@@ -113,6 +121,8 @@ pub const ScreenState = struct {
             .erase_line => |mode| self.eraseLine(mode),
             .style_reset => {
                 self.current_bold = false;
+                self.current_underline = false;
+                self.current_inverse = false;
                 self.current_fg = 0;
                 self.current_bg = 0;
                 self.current_fg_rgb = null;
@@ -120,10 +130,10 @@ pub const ScreenState = struct {
             },
             .style_bold_on => self.current_bold = true,
             .style_bold_off => self.current_bold = false,
-            .style_underline_on => {},
-            .style_underline_off => {},
-            .style_inverse_on => {},
-            .style_inverse_off => {},
+            .style_underline_on => self.current_underline = true,
+            .style_underline_off => self.current_underline = false,
+            .style_inverse_on => self.current_inverse = true,
+            .style_inverse_off => self.current_inverse = false,
             .style_fg_color => |color| self.current_fg = color,
             .style_bg_color => |color| self.current_bg = color,
             .style_fg_256 => |color| self.current_fg = color,
@@ -144,10 +154,10 @@ pub const ScreenState = struct {
                         },
                         .bold_on => self.current_bold = true,
                         .bold_off => self.current_bold = false,
-                        .underline_on => {},
-                        .underline_off => {},
-                        .inverse_on => {},
-                        .inverse_off => {},
+                        .underline_on => self.current_underline = true,
+                        .underline_off => self.current_underline = false,
+                        .inverse_on => self.current_inverse = true,
+                        .inverse_off => self.current_inverse = false,
                         .fg_color => |color| self.current_fg = color,
                         .bg_color => |color| self.current_bg = color,
                         .fg_256 => |color| self.current_fg = color,
@@ -164,7 +174,7 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const cursor_pos = @as(usize, self.cursor_row) * self.cols + self.cursor_col;
-        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
+        const default_attr: CellAttr = .{ .bold = false, .underline = false, .inverse = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
         switch (mode) {
             0 => {
                 @memset(c[cursor_pos..], 0);
@@ -186,7 +196,7 @@ pub const ScreenState = struct {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const row_start = @as(usize, self.cursor_row) * self.cols;
-        const default_attr: CellAttr = .{ .bold = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
+        const default_attr: CellAttr = .{ .bold = false, .underline = false, .inverse = false, .fg = 0, .bg = 0, .fg_rgb = null, .bg_rgb = null };
         switch (mode) {
             0 => {
                 @memset(c[row_start + self.cursor_col .. row_start + self.cols], 0);
@@ -213,6 +223,8 @@ pub const ScreenState = struct {
         if (self.cells_attr) |ca| {
             ca[offset] = .{
                 .bold = self.current_bold,
+                .underline = self.current_underline,
+                .inverse = self.current_inverse,
                 .fg = self.current_fg,
                 .bg = self.current_bg,
                 .fg_rgb = self.current_fg_rgb,
