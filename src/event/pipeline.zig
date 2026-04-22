@@ -8,8 +8,10 @@ const bridge_mod = @import("bridge.zig");
 const semantic_mod = @import("semantic.zig");
 const screen_mod = @import("../screen/state.zig");
 
+/// Event type alias exposed by the pipeline surface.
 pub const Event = bridge_mod.Event;
 
+/// Parser + bridge orchestrator for incremental feed and screen application.
 pub const Pipeline = struct {
     allocator: std.mem.Allocator,
     bridge: *bridge_mod.Bridge,

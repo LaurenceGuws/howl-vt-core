@@ -2,9 +2,12 @@
 //! Ownership: parser CSI primitive.
 //! Reason: keep CSI tokenization stable and reusable across parser states.
 
+/// Maximum CSI parameter slots retained by `CsiParser`.
 pub const max_params: usize = 16;
+/// Maximum CSI intermediate bytes retained by `CsiParser`.
 pub const max_intermediates: usize = 4;
 
+/// Completed CSI action payload emitted on final-byte receipt.
 pub const CsiAction = struct {
     final: u8,
     params: [max_params]i32,
@@ -15,6 +18,7 @@ pub const CsiAction = struct {
     intermediates_len: u8,
 };
 
+/// Stateful CSI parser for params/intermediates/final-byte extraction.
 pub const CsiParser = struct {
     params: [max_params]i32 = [_]i32{0} ** max_params,
     count: u8 = 0,

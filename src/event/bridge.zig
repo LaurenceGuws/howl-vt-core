@@ -7,6 +7,7 @@ const parser_mod = @import("../parser/parser.zig");
 const stream_mod = @import("../parser/stream.zig");
 const csi_mod = @import("../parser/csi.zig");
 
+/// Parser-facing event record emitted by the bridge queue.
 pub const Event = union(enum) {
     text: []const u8,
     codepoint: u21,
@@ -20,6 +21,7 @@ pub const Event = union(enum) {
     invalid_sequence,
 };
 
+/// Owns queued parser events and exposes a parser `Sink` implementation.
 pub const Bridge = struct {
     allocator: std.mem.Allocator,
     events: std.ArrayList(Event),

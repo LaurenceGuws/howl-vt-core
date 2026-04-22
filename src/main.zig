@@ -5,6 +5,7 @@
 const std = @import("std");
 const terminal = @import("terminal");
 
+/// Local smoke entrypoint used to validate package wiring.
 pub fn main() !void {
     std.debug.print("Howl Terminal primitives loaded.\n", .{});
     _ = terminal;

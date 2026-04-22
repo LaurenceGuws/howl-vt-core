@@ -6,6 +6,7 @@ const std = @import("std");
 const stream_mod = @import("stream.zig");
 const csi_mod = @import("csi.zig");
 
+/// Top-level parser control states outside OSC/APC/DCS substates.
 pub const EscState = enum {
     ground,
     esc,
@@ -13,39 +14,46 @@ pub const EscState = enum {
     charset,
 };
 
+/// OSC parser substate used while accumulating OSC payload bytes.
 pub const OscState = enum {
     idle,
     osc,
     osc_esc,
 };
 
+/// APC parser substate used while accumulating APC payload bytes.
 pub const ApcState = enum {
     idle,
     apc,
     apc_esc,
 };
 
+/// DCS parser substate used while accumulating DCS payload bytes.
 pub const DcsState = enum {
     idle,
     dcs,
     dcs_esc,
 };
 
+/// Terminator variant used when emitting completed OSC payloads.
 pub const OscTerminator = enum {
     bel,
     st,
 };
 
+/// Supported designated character set identity for GL mapping.
 pub const Charset = enum {
     ascii,
     dec_special,
 };
 
+/// Active charset designation target used by ESC '(' and ')'.
 pub const CharsetTarget = enum {
     g0,
     g1,
 };
 
+/// Callback sink interface receiving parser-decoded events.
 pub const Sink = struct {
     ptr: *anyopaque,
     onStreamEventFn: *const fn (*anyopaque, stream_mod.StreamEvent) void,
@@ -92,6 +100,7 @@ pub const Sink = struct {
     }
 };
 
+/// Stateful terminal parser handling ESC/CSI/OSC/APC/DCS byte streams.
 pub const Parser = struct {
     allocator: std.mem.Allocator,
     sink: Sink,

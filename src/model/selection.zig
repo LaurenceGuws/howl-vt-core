@@ -2,11 +2,13 @@
 //! Ownership: terminal model selection primitive.
 //! Reason: keep selection behavior explicit and independent from UI/runtime layers.
 
+/// Row/column position used by selection endpoints.
 pub const SelectionPos = struct {
     row: usize,
     col: usize,
 };
 
+/// Active selection bounds and lifecycle flags.
 pub const TerminalSelection = struct {
     active: bool,
     selecting: bool,
@@ -14,6 +16,7 @@ pub const TerminalSelection = struct {
     end: SelectionPos,
 };
 
+/// Selection lifecycle operations for begin/update/finish/clear flows.
 pub const SelectionState = struct {
     selection: TerminalSelection,
 

@@ -4,6 +4,7 @@
 
 const std = @import("std");
 
+/// Lightweight runtime metrics with EMA tracking for frame/draw/input timings.
 pub const Metrics = struct {
     frames: u64,
     redraws: u64,

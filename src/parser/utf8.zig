@@ -4,12 +4,14 @@
 
 const std = @import("std");
 
+/// Result of feeding one byte into the UTF-8 decoder state machine.
 pub const Utf8Result = union(enum) {
     codepoint: u21,
     incomplete,
     invalid,
 };
 
+/// Stateful UTF-8 decoder used by parser stream classification.
 pub const Utf8Decoder = struct {
     buf: [4]u8 = undefined,
     len: u8 = 0,

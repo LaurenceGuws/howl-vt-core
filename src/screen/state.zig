@@ -5,8 +5,10 @@
 const std = @import("std");
 const semantic_mod = @import("../event/semantic.zig");
 
+/// Semantic event alias applied by screen state.
 pub const SemanticEvent = semantic_mod.SemanticEvent;
 
+/// Cursor and optional cell-buffer state with deterministic clamped updates.
 pub const ScreenState = struct {
     rows: u16,
     cols: u16,

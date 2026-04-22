@@ -2,29 +2,36 @@
 //! Ownership: terminal model core type definitions.
 //! Reason: provide a single source of truth for parser/runtime shared data shapes.
 
+/// Cursor row/column position in model space.
 pub const CursorPos = struct {
     row: usize,
     col: usize,
 };
 
+/// Visual cursor shape variants.
 pub const CursorShape = enum {
     block,
     underline,
     bar,
 };
 
+/// Cursor appearance style (shape + blink policy).
 pub const CursorStyle = struct {
     shape: CursorShape,
     blink: bool,
 };
 
+/// Default cursor style used when no explicit style is configured.
 pub const default_cursor_style = CursorStyle{ .shape = .block, .blink = true };
 
 const selection_mod = @import("selection.zig");
 
+/// Selection position re-export from selection module.
 pub const SelectionPos = selection_mod.SelectionPos;
+/// Selection struct re-export from selection module.
 pub const TerminalSelection = selection_mod.TerminalSelection;
 
+/// Terminal cell value including codepoint, composition, geometry, and attrs.
 pub const Cell = struct {
     codepoint: u32,
     combining_len: u8 = 0,
@@ -46,6 +53,7 @@ pub fn isMultiRowCellRoot(cell: Cell) bool {
     return cell.height > 1 and cell.x == 0 and cell.y == 0;
 }
 
+/// Cell styling and hyperlink metadata.
 pub const CellAttrs = struct {
     fg: Color,
     bg: Color,
@@ -58,6 +66,7 @@ pub const CellAttrs = struct {
     link_id: u32,
 };
 
+/// RGBA color value.
 pub const Color = struct {
     r: u8,
     g: u8,

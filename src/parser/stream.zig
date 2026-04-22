@@ -5,12 +5,14 @@
 const std = @import("std");
 const utf8 = @import("utf8.zig");
 
+/// Stream-level decoded output emitted per consumed byte sequence.
 pub const StreamEvent = union(enum) {
     codepoint: u21,
     control: u8,
     invalid,
 };
 
+/// Byte classifier that emits control/codepoint/invalid stream events.
 pub const Stream = struct {
     decoder: utf8.Utf8Decoder = .{},
 
