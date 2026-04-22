@@ -83,6 +83,10 @@ pub const ScreenState = struct {
                 self.wrap_pending = false;
                 self.cursor_col = self.cursor_col -| 1;
             },
+            .horizontal_tab => {
+                self.wrap_pending = false;
+                self.horizontalTab();
+            },
             .erase_display => |mode| {
                 self.wrap_pending = false;
                 self.eraseDisplay(mode);
@@ -135,6 +139,12 @@ pub const ScreenState = struct {
         } else {
             self.wrap_pending = true;
         }
+    }
+
+    fn horizontalTab(self: *ScreenState) void {
+        if (self.cols == 0) return;
+        const next = ((self.cursor_col / 8) + 1) * 8;
+        self.cursor_col = @min(next, self.cols - 1);
     }
 
     fn lineFeed(self: *ScreenState) void {
@@ -277,6 +287,22 @@ test "screen: backspace moves col left" {
     s.cursor_col = 5;
     s.apply(SemanticEvent.backspace);
     try std.testing.expectEqual(@as(u16, 4), s.cursor_col);
+}
+
+test "screen: horizontal_tab advances to next default tab stop" {
+    var s = ScreenState.init(4, 20);
+    s.cursor_col = 3;
+    s.apply(SemanticEvent.horizontal_tab);
+    try std.testing.expectEqual(@as(u16, 8), s.cursor_col);
+    s.apply(SemanticEvent.horizontal_tab);
+    try std.testing.expectEqual(@as(u16, 16), s.cursor_col);
+}
+
+test "screen: horizontal_tab clamps at last column" {
+    var s = ScreenState.init(4, 20);
+    s.cursor_col = 17;
+    s.apply(SemanticEvent.horizontal_tab);
+    try std.testing.expectEqual(@as(u16, 19), s.cursor_col);
 }
 
 test "screen: cellAt out of bounds returns 0" {

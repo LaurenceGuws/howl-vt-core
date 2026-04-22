@@ -1808,6 +1808,25 @@ test "parity: non-mapped controls are ignored while mapped controls apply" {
     });
 }
 
+test "parity: horizontal tab advances to default stops identically" {
+    const gpa = std.testing.allocator;
+    try runParityScenario(gpa, .{
+        .name = "horizontal tab",
+        .rows = 3,
+        .cols = 20,
+        .with_cells = true,
+        .input = "a\x09b",
+        .expected_row = 0,
+        .expected_col = 9,
+        .expected_queue_depth = 0,
+        .check_cells = true,
+        .cell_checks = &.{
+            .{ .row = 0, .col = 0, .codepoint = 'a' },
+            .{ .row = 0, .col = 8, .codepoint = 'b' },
+        },
+    });
+}
+
 test "parity-chunked: UTF-8 split decode with CRLF remains identical" {
     const gpa = std.testing.allocator;
     try runParityChunkScenario(gpa, .{

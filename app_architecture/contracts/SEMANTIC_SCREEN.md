@@ -51,6 +51,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 | `control` 0x0A | `line_feed` | — |
 | `control` 0x0D | `carriage_return` | — |
 | `control` 0x08 | `backspace` | — |
+| `control` 0x09 | `horizontal_tab` | Default tab stops every 8 columns |
 | `control` other | `null` | Explicitly ignored |
 | `title_set` | `null` | Not a screen content event at this seam |
 | `invalid_sequence` | `null` | Explicitly ignored |
@@ -68,6 +69,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 - Cursor movement commands (`cursor_up`, `cursor_down`, `cursor_forward`, `cursor_back`) saturate at screen boundaries; repeated moves beyond edges remain clamped.
 - `cursor_position` (CUP) places cursor within bounds; out-of-range params saturate to valid grid.
 - Control sequences (CR/LF/BS) maintain row/column invariants: CR resets column, LF advances row, BS moves left; all saturate at edges.
+- Horizontal tab advances to the next default 8-column tab stop, clamped at the last column.
 - Text writes advance `cursor_col` after each character. Filling the last column arms pending wrap; the next text/codepoint write moves to column 0 on the next row before writing.
 - Pending wrap at the bottom row scrolls the visible cell buffer up by one row and clears the new bottom row before writing.
 - `line_feed` moves `cursor_row` down one row. At the bottom row it scrolls the visible cell buffer up by one row when cells are present. Column unchanged.
@@ -96,6 +98,7 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 The following are intentionally outside this seam:
 
 - Scrollback/history
+- Configurable tab stops
 - Wide character (multi-column) glyph handling
 - Color, style, or attribute storage
 - Mode-set sequences (SM/RM/DECSET)

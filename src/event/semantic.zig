@@ -20,6 +20,7 @@ pub const SemanticEvent = union(enum) {
     line_feed,
     carriage_return,
     backspace,
+    horizontal_tab,
     erase_display: u2,
     erase_line: u2,
 };
@@ -57,6 +58,7 @@ fn processControl(c: u8) ?SemanticEvent {
         0x0A => SemanticEvent.line_feed,
         0x0D => SemanticEvent.carriage_return,
         0x08 => SemanticEvent.backspace,
+        0x09 => SemanticEvent.horizontal_tab,
         else => null,
     };
 }
@@ -146,6 +148,11 @@ test "semantic: CR maps to carriage_return" {
 test "semantic: BS maps to backspace" {
     const sem = process(Event{ .control = 0x08 }) orelse return error.NoEvent;
     try std.testing.expect(sem == .backspace);
+}
+
+test "semantic: HT maps to horizontal_tab" {
+    const sem = process(Event{ .control = 0x09 }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .horizontal_tab);
 }
 
 test "semantic: invalid_sequence returns null" {
