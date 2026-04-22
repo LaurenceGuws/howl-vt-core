@@ -6,5 +6,6 @@ Terminal rules:
 3. We need to completely let go of the past ideologies. We are not part of zide or an IDE. We are part of howl but we are a loosely coupled module, we will write terminal only hosts like on android for other terminal and give this repo the respect and honor it deserves. howl terminal is loved deeply, and code should be developed and maintained with the utmost care and consideration. We want to be the best, so lest go out there, lets put in the effort, with great care and compassion we will become the best embedded terminal this world is yet to see.
 4. Treat stale/compounding docs like thread.sleep in the core hot paths, it cannot be tolerated.
 5. '///' and '//!' comments are only allowed to be touched by human and architect. Engineer changes are strictly forbidden in these lines when not explicitly asked to do so by an authorized party.
+6. checkins dir is read only access to everyone besides the user, this is a useful reference to understand the overall goals of the planned archtecture.
 ## END HUMAN RULES: NOT to BE TOUCHED by AGENTS!
 
