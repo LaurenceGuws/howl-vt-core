@@ -16,6 +16,10 @@ pub const StyleOp = union(enum) {
     reset,
     bold_on,
     bold_off,
+    underline_on,
+    underline_off,
+    inverse_on,
+    inverse_off,
     fg_color: u8,
     bg_color: u8,
     fg_256: u8,
@@ -41,6 +45,10 @@ pub const SemanticEvent = union(enum) {
     style_reset,
     style_bold_on,
     style_bold_off,
+    style_underline_on,
+    style_underline_off,
+    style_inverse_on,
+    style_inverse_off,
     style_fg_color: u8,
     style_bg_color: u8,
     style_fg_256: u8,
@@ -116,6 +124,10 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             0 => StyleOp.reset,
             1 => StyleOp.bold_on,
             22 => StyleOp.bold_off,
+            4 => StyleOp.underline_on,
+            24 => StyleOp.underline_off,
+            7 => StyleOp.inverse_on,
+            27 => StyleOp.inverse_off,
             30...37 => StyleOp{ .fg_color = @intCast(param - 30 + 1) },
             39 => StyleOp{ .fg_color = 0 },
             40...47 => StyleOp{ .bg_color = @intCast(param - 40 + 1) },
@@ -166,6 +178,10 @@ fn processSgr(params: [16]i32, count: u8) ?SemanticEvent {
             .reset => SemanticEvent.style_reset,
             .bold_on => SemanticEvent.style_bold_on,
             .bold_off => SemanticEvent.style_bold_off,
+            .underline_on => SemanticEvent.style_underline_on,
+            .underline_off => SemanticEvent.style_underline_off,
+            .inverse_on => SemanticEvent.style_inverse_on,
+            .inverse_off => SemanticEvent.style_inverse_off,
             .fg_color => |c| SemanticEvent{ .style_fg_color = c },
             .bg_color => |c| SemanticEvent{ .style_bg_color = c },
             .fg_256 => |c| SemanticEvent{ .style_fg_256 = c },
@@ -367,6 +383,26 @@ test "semantic: SGR 100 bright background black" {
 test "semantic: SGR 107 bright background white" {
     const sem = process(makeStyleChange('m', 107, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u8, 16), sem.style_bg_color);
+}
+
+test "semantic: SGR 4 underline on" {
+    const sem = process(makeStyleChange('m', 4, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_underline_on);
+}
+
+test "semantic: SGR 24 underline off" {
+    const sem = process(makeStyleChange('m', 24, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_underline_off);
+}
+
+test "semantic: SGR 7 inverse on" {
+    const sem = process(makeStyleChange('m', 7, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_inverse_on);
+}
+
+test "semantic: SGR 27 inverse off" {
+    const sem = process(makeStyleChange('m', 27, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_inverse_off);
 }
 
 test "semantic: multi-param SGR 1;31 bold and red" {
