@@ -658,3 +658,68 @@ test "replay: existing text and cursor paths unaffected by erase additions" {
     try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
 }
+
+test "replay: text then CSI m bold then text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "plain");
+    feed(&pl, &screen, "\x1b[1m");
+    feed(&pl, &screen, "bold");
+    try std.testing.expectEqual(false, screen.cells_attr.?[0].bold);
+    try std.testing.expectEqual(false, screen.cells_attr.?[4].bold);
+    try std.testing.expectEqual(true, screen.cells_attr.?[5].bold);
+    try std.testing.expectEqual(true, screen.cells_attr.?[8].bold);
+}
+
+test "replay: text with fg color changes" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "red");
+    feed(&pl, &screen, "\x1b[31m");
+    feed(&pl, &screen, "green");
+    feed(&pl, &screen, "\x1b[39m");
+    feed(&pl, &screen, "none");
+    try std.testing.expectEqual(@as(u3, 0), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(@as(u3, 2), screen.cells_attr.?[3].fg);
+    try std.testing.expectEqual(@as(u3, 0), screen.cells_attr.?[8].fg);
+}
+
+test "replay: style reset clears attributes" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[1m");
+    feed(&pl, &screen, "\x1b[31m");
+    feed(&pl, &screen, "styled");
+    feed(&pl, &screen, "\x1b[0m");
+    feed(&pl, &screen, "reset");
+    try std.testing.expectEqual(true, screen.cells_attr.?[0].bold);
+    try std.testing.expectEqual(@as(u3, 2), screen.cells_attr.?[0].fg);
+    try std.testing.expectEqual(false, screen.cells_attr.?[6].bold);
+    try std.testing.expectEqual(@as(u3, 0), screen.cells_attr.?[6].fg);
+}
+
+test "replay: mixed cursor move and style and text" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try screen_mod.ScreenState.initWithCells(gpa, 4, 20);
+    defer screen.deinit(gpa);
+    feed(&pl, &screen, "\x1b[1m");
+    feed(&pl, &screen, "\x1b[31m");
+    feed(&pl, &screen, "row0");
+    feed(&pl, &screen, "\x1b[2;1H");
+    feed(&pl, &screen, "row1");
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 4), screen.cursor_col);
+    try std.testing.expectEqual(true, screen.cells_attr.?[20].bold);
+    try std.testing.expectEqual(@as(u3, 2), screen.cells_attr.?[20].fg);
+}
