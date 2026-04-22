@@ -16,7 +16,7 @@ behavior, replayable tests, and no dependency on app/editor/platform code.
 | `HT-048B` | `done` | Semantic mapping for CSI J/K erase operations. |
 | `HT-048C` | `done` | Screen erase apply behavior for line and display modes. |
 | `HT-048D` | `done` | Relay integration fixtures for erase flow. |
-| `HT-048E` | `next` | Contract sync: document erase events and update queue status. |
+| `HT-048E` | `done` | Contract sync: document erase events and update queue status. |
 
 ## Guardrails
 

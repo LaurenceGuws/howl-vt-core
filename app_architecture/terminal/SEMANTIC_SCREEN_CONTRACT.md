@@ -1,6 +1,6 @@
 # Semantic Screen Contract
 
-`SEMANTIC_SCREEN_CONTRACT` — frozen as of HT-031. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
+`SEMANTIC_SCREEN_CONTRACT` — updated at HT-048E. Authority for `SemanticEvent`, `semantic.process`, and `ScreenState`.
 
 ## SemanticEvent Variants
 
@@ -16,6 +16,8 @@
 | `line_feed` | — | Event.control(0x0A) | Move cursor to next row |
 | `carriage_return` | — | Event.control(0x0D) | Reset cursor column to 0 |
 | `backspace` | — | Event.control(0x08) | Move cursor one column left |
+| `erase_display` | `u2` | CSI J | Erase screen region; mode 0=below, 1=above, 2=full |
+| `erase_line` | `u2` | CSI K | Erase line region; mode 0=right, 1=left, 2=full |
 
 ## Ownership and Lifetime
 
@@ -31,6 +33,8 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
 | --- | --- | --- |
 | `style_change` with final A/B/C/D | `cursor_up/down/forward/back` | Param default 1 |
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
+| `style_change` with final J | `erase_display` | Param default 0; modes 0/1/2 only; other values map to 0 |
+| `style_change` with final K | `erase_line` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with other finals | `null` | Explicitly ignored |
 | `text` | `write_text` | Borrowed slice |
 | `codepoint` | `write_codepoint` | Value copy |
@@ -49,6 +53,15 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
 - `line_feed` moves `cursor_row` down one row, clamped at `rows-1`. No scrolling.
 - `carriage_return` resets `cursor_col` to 0; `cursor_row` is unchanged.
 - `backspace` moves `cursor_col` left one column, saturating at 0.
+- `erase_line` zeroes cells in the current row; cursor position is unchanged.
+  - Mode 0: cursor position through end of line (inclusive).
+  - Mode 1: start of line through cursor position (inclusive).
+  - Mode 2: entire line.
+- `erase_display` zeroes cells across rows; cursor position is unchanged.
+  - Mode 0: cursor position through end of screen (inclusive).
+  - Mode 1: start of screen through cursor position (inclusive).
+  - Mode 2: entire screen.
+- Erase operations are no-ops when no cell buffer is present (`cells == null`).
 - Cell buffer (when present) is zero-initialized. Unwritten cells contain codepoint 0.
 
 ## Non-Goals
@@ -58,7 +71,6 @@ The following are intentionally outside this seam:
 - Line wrapping or scrollback
 - Wide character (multi-column) glyph handling
 - Color, style, or attribute storage
-- Erase operations (ED, EL)
 - Mode-set sequences (SM/RM/DECSET)
 - Tab stops or HT/VT control
 - Host, session, PTY, or platform coupling
