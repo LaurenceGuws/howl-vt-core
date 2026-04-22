@@ -1047,3 +1047,158 @@ test "edge: zero-dimension pipeline clear and reset are safe" {
     try std.testing.expect(pl.isEmpty());
     pl.applyToScreen(&screen);
 }
+
+// --- Zero-dimension variant tests (rows=0, cols>0 | rows>0, cols=0 | rows=0, cols=0) ---
+
+test "zero-dim: rows=0, cols=8: cursor moves saturate, text/erase are safe no-ops" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(0, 8);
+    feed(&pl, &screen, "\x1b[5C");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[3D");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
+    feed(&pl, &screen, "hello");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[K");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
+}
+
+test "zero-dim: rows=8, cols=0: cursor moves saturate, text/erase are safe no-ops" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(8, 0);
+    feed(&pl, &screen, "\x1b[3B");
+    try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[2A");
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "text");
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[J");
+    try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
+test "zero-dim: rows=0, cols=0: all cursor moves saturate at origin, text/erase safe" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(0, 0);
+    feed(&pl, &screen, "\x1b[999A");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[999B");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[999C");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[999D");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "xyz");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[2J");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
+test "zero-dim: rows=0, cols=8: CR/LF/BS control sequence determinism" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(0, 8);
+    screen.cursor_col = 5;
+    feed(&pl, &screen, "\x0D");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x0A");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[3C");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 3), screen.cursor_col);
+    feed(&pl, &screen, "\x08");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
+}
+
+test "zero-dim: rows=8, cols=0: CR/LF/BS control sequence determinism" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(8, 0);
+    screen.cursor_row = 3;
+    feed(&pl, &screen, "\x0A");
+    try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[2A");
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x0D");
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x08");
+    try std.testing.expectEqual(@as(u16, 2), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
+test "zero-dim: rows=0, cols=0: CUP absolute position saturates at origin" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(0, 0);
+    feed(&pl, &screen, "\x1b[999;999H");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[H");
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
+
+test "zero-dim: rows=0, cols=10: repeated erase operations remain safe" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(0, 10);
+    screen.cursor_col = 5;
+    feed(&pl, &screen, "\x1b[K");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[1K");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[2K");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[J");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[1J");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+    feed(&pl, &screen, "\x1b[2J");
+    try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
+}
+
+test "zero-dim: rows=10, cols=0: repeated text writes remain safe" {
+    const gpa = std.testing.allocator;
+    var pl = try pipeline_mod.Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = screen_mod.ScreenState.init(10, 0);
+    screen.cursor_row = 3;
+    feed(&pl, &screen, "test");
+    try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "\xC3\xA9");
+    try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+    feed(&pl, &screen, "more");
+    try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
+}
