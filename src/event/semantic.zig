@@ -744,7 +744,7 @@ test "semantic: multi-param SGR 4;58;5;33;59 preserves order" {
 
 test "semantic: SGR parameter count above internal params is truncated deterministically" {
     var params: [16]i32 = undefined;
-    @memset(&params, 0);
+    @memset(&params, 6);
     params[0] = 1;
     params[1] = 31;
     params[2] = 4;

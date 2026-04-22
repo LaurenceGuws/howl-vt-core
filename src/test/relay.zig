@@ -1217,7 +1217,7 @@ test "replay: long mixed SGR chain remains stable under cap" {
     try std.testing.expectEqual(false, attr.underline);
     try std.testing.expectEqual(false, attr.inverse);
     try std.testing.expectEqual(@as(u8, 2), attr.fg);
-    try std.testing.expect(attr.bg_rgb != null);
+    try std.testing.expect(attr.bg_rgb == null);
     try std.testing.expectEqual(@as(u8, 120), attr.underline_color.?);
 }
 

@@ -837,7 +837,7 @@ test "screen: style_operations count above internal limit applies safely" {
     var s = try ScreenState.initWithCells(gpa, 4, 10);
     defer s.deinit(gpa);
     var ops: [16]semantic_mod.StyleOp = undefined;
-    @memset(&ops, semantic_mod.StyleOp.reset);
+    @memset(&ops, semantic_mod.StyleOp.bold_on);
     ops[0] = .bold_on;
     ops[1] = .underline_on;
     s.apply(SemanticEvent{ .style_operations = .{ .ops = ops, .count = 200 } });
