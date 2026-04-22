@@ -2537,6 +2537,31 @@ test "runtime: cursor move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
+test "runtime: CHT and CBT tab navigation via apply" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("a\x1b[2I\x1b[Zb");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), engine.screen().cellAt(0, 8));
+}
+
+test "runtime: DECSTR restores mode defaults before tab navigation" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    defer engine.deinit();
+    engine.feedSlice("\x1b[?7l\x1b[?25l\x1b[!p\x1b[2Ic");
+    engine.apply();
+    try std.testing.expect(engine.screen().cursor_visible);
+    try std.testing.expect(engine.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 17), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'c'), engine.screen().cellAt(0, 16));
+}
+
 test "runtime: text write and erase via apply" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
