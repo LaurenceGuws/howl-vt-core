@@ -52,6 +52,11 @@ Freeze as-of: `HT-059D`.
 | `HT-059B` | `done` | Remove local executable entrypoint and run target. |
 | `HT-059C` | `done` | Build graph cleanup after executable removal. |
 | `HT-059D` | `done` | Validation and queue close sync. |
+| `HT-060A` | `done` | Scope seed: deterministic SGR overflow/truncation contract. |
+| `HT-060B` | `todo` | Semantic hardening for oversized SGR payloads and op cap safety. |
+| `HT-060C` | `todo` | Screen apply invariants for truncated style batches. |
+| `HT-060D` | `todo` | Relay robustness fixtures for overflow/recovery chains. |
+| `HT-060E` | `todo` | Contract and queue close sync for overflow hardening batch. |
 
 ## Guardrails
 

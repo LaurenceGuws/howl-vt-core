@@ -57,7 +57,7 @@ The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the
 | `style_change` with final H/f | `cursor_position` | 1-based VT params converted to 0-based |
 | `style_change` with final J | `erase_display` | Param default 0; modes 0/1/2 only; other values map to 0 |
 | `style_change` with final K | `erase_line` | Param default 0; modes 0/1/2 only; other values map to 0 |
-| `style_change` with final m | `style_*` variants or `style_operations` | Ordered multi-parameter SGR processing; single param returns single variant; multiple params return batch; unsupported params skipped |
+| `style_change` with final m | `style_*` variants or `style_operations` | Ordered multi-parameter SGR processing; single param returns single variant; multiple params return batch; unsupported params skipped; params and ops are deterministically truncated at internal capacity |
 | `style_change` with other finals | `null` | Explicitly ignored |
 | `text` | `write_text` | Borrowed slice |
 | `codepoint` | `write_codepoint` | Value copy |
@@ -141,6 +141,8 @@ Malformed sequences policy:
 - Incomplete extended sequences (e.g., 38;2;r;g without b, 58;2;r;g without b) are skipped without breaking valid neighbors
 - Invalid RGB component values (> 255) are clamped to 0-255 range
 - Unknown parameters are always skipped
+- SGR parameter evaluation is bounded to the first 16 parameters; additional parameters are ignored deterministically
+- Style operation batches are capped at 16 operations; additional derived operations are truncated deterministically
 
 Deferred (future sprints):
 - None currently scoped.
