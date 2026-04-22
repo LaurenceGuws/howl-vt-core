@@ -45,6 +45,7 @@ The `runtime.Engine` is a host-neutral convenience facade that composes `Pipelin
 - `feedByte(byte)` / `feedSlice(bytes)` — accumulate input
 - `apply()` — drain queue and update screen
 - `clear()` / `reset()` — queue and parser management
+- `resetScreen()` — screen state reset without parser/queue reset
 - `screen()` — screen state access (const reference)
 - `queuedEventCount()` — queue introspection
 

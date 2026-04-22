@@ -47,6 +47,10 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Clears queued events and resets parser state.
 - Breakage: preserving partial parser state or mutating screen state.
 
+**resetScreen(self)**
+- Resets owned screen state to origin and clears owned cells without changing parser state or queued events.
+- Breakage: clearing parser state, dropping queued events, or preserving visible cells/cursor state.
+
 **screen(self) -> *const ScreenState**
 - Returns read-only access to current screen state.
 - Breakage: returning mutable state, changing lifetime, or returning another state representation.
@@ -62,6 +66,7 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Split-feed chunking does not change final behavior relative to feeding the same bytes as one slice.
 - Ignored-event paths do not mutate screen state through `Engine`.
 - Zero-dimension behavior matches `ScreenState` and `Pipeline` contracts.
+- `reset()` and `resetScreen()` are intentionally separate: parser/queue reset does not clear screen, and screen reset does not clear parser/queue state.
 - `screen()` returns a const reference; M1 does not expose mutable screen access through the runtime facade.
 
 ## Non-Goals
@@ -79,7 +84,7 @@ A change is breaking if:
 3. Any stable method is removed, renamed, or changes parameters/return type.
 4. Runtime behavior diverges from direct `Pipeline+ScreenState` behavior for the same byte stream.
 5. `screen()` exposes mutable state.
-6. `clear`, `reset`, or `apply` queue semantics change.
+6. `clear`, `reset`, `resetScreen`, or `apply` queue/screen semantics change.
 
 ## Breaking Change Approval
 

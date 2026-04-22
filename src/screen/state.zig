@@ -36,6 +36,13 @@ pub const ScreenState = struct {
         self.cells = null;
     }
 
+    pub fn reset(self: *ScreenState) void {
+        self.cursor_row = 0;
+        self.cursor_col = 0;
+        self.wrap_pending = false;
+        if (self.cells) |c| @memset(c, 0);
+    }
+
     pub fn cellAt(self: *const ScreenState, row: u16, col: u16) u21 {
         const c = self.cells orelse return 0;
         if (row >= self.rows or col >= self.cols) return 0;
@@ -173,6 +180,19 @@ test "screen: initial cursor at origin" {
     const s = ScreenState.init(24, 80);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_col);
+}
+
+test "screen: reset clears cursor wrap and cells" {
+    const gpa = std.testing.allocator;
+    var s = try ScreenState.initWithCells(gpa, 2, 5);
+    defer s.deinit(gpa);
+    s.apply(SemanticEvent{ .write_text = "abcdef" });
+    try std.testing.expectEqual(@as(u21, 'a'), s.cellAt(0, 0));
+    s.reset();
+    try std.testing.expectEqual(@as(u16, 0), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), s.cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(1, 0));
 }
 
 test "screen: cursor_up moves row" {

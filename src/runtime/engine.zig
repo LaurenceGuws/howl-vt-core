@@ -68,6 +68,11 @@ pub const Engine = struct {
         self.pipeline.reset();
     }
 
+    /// Reset screen state without changing parser state.
+    pub fn resetScreen(self: *Engine) void {
+        self.state.reset();
+    }
+
     /// Get const reference to current screen state.
     pub fn screen(self: *const Engine) *const screen_mod.ScreenState {
         return &self.state;

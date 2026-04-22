@@ -30,7 +30,7 @@ a cleaner async feed/apply/read API:
 
 - `init(allocator, rows, cols)` / `initWithCells(allocator, rows, cols)` / `deinit()`
 - `feedByte(byte)` / `feedSlice(bytes)` — input
-- `apply()` / `clear()` / `reset()` — control
+- `apply()` / `clear()` / `reset()` / `resetScreen()` — control
 - `screen()` — get const ScreenState reference
 - `queuedEventCount()` — introspection
 

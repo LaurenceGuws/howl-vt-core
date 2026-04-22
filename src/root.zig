@@ -40,6 +40,7 @@ test "root: runtime Engine exposes frozen M1 facade methods" {
     try std.testing.expect(@hasDecl(Engine, "apply"));
     try std.testing.expect(@hasDecl(Engine, "clear"));
     try std.testing.expect(@hasDecl(Engine, "reset"));
+    try std.testing.expect(@hasDecl(Engine, "resetScreen"));
     try std.testing.expect(@hasDecl(Engine, "screen"));
     try std.testing.expect(@hasDecl(Engine, "queuedEventCount"));
 }
@@ -56,7 +57,8 @@ test "root: runtime Engine method signatures remain host-facing" {
     const apply_fn: fn (*Engine) void = Engine.apply;
     const clear_fn: fn (*Engine) void = Engine.clear;
     const reset_fn: fn (*Engine) void = Engine.reset;
+    const reset_screen_fn: fn (*Engine) void = Engine.resetScreen;
     const screen_fn: fn (*const Engine) *const ScreenState = Engine.screen;
     const queue_fn: fn (*const Engine) usize = Engine.queuedEventCount;
-    _ = .{ init_fn, init_cells_fn, deinit_fn, feed_byte_fn, feed_slice_fn, apply_fn, clear_fn, reset_fn, screen_fn, queue_fn };
+    _ = .{ init_fn, init_cells_fn, deinit_fn, feed_byte_fn, feed_slice_fn, apply_fn, clear_fn, reset_fn, reset_screen_fn, screen_fn, queue_fn };
 }

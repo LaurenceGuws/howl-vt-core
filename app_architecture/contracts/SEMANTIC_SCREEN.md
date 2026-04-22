@@ -29,6 +29,8 @@ All other SemanticEvent variants are value types with no heap ownership.
 
 The `ScreenState.cells` buffer (when present) is heap-allocated and owned by the creator. The caller who calls `initWithCells` must call `deinit` with the same allocator.
 
+`ScreenState.reset()` resets cursor position to origin, clears pending wrap state, and zeroes the owned cell buffer when present. It preserves dimensions and allocation ownership.
+
 ## Pipeline seam (`Pipeline` apply boundary)
 
 M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. These invariants hold regardless of screen buffer presence:
@@ -82,7 +84,8 @@ M1 deterministic host feeding uses `event.Pipeline` over the parser and bridge. 
 - `erase_display` zeroes cells across rows; cursor position is unchanged.
   - Mode 0: cursor position through end of screen (inclusive).
   - Mode 1: start of screen through cursor position (inclusive).
-  - Mode 2: entire screen.
+- Mode 2: entire screen.
+- `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
 
 ## Zero-Dimension Screen Behavior
 
@@ -102,7 +105,7 @@ The following are intentionally outside this seam:
 - Wide character (multi-column) glyph handling
 - Color, style, or attribute storage
 - Mode-set sequences (SM/RM/DECSET)
-- Tab stops or HT/VT control
+- VT control beyond the mapped M2 controls
 - Host, session, PTY, or platform coupling
 
 ## Breaking Change Rule
@@ -114,7 +117,7 @@ A change is breaking if:
 3. The mapping policy for any `Event` variant changes (emit vs null)
 4. `ScreenState` cursor boundary semantics change
 5. The ownership rule for `write_text` lifetime changes
-6. `ScreenState.init` or `initWithCells` signature changes
+6. `ScreenState.init`, `initWithCells`, or `reset` signature/semantics change
 
 ## Breaking Change Approval
 

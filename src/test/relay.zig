@@ -1997,6 +1997,25 @@ test "runtime: reset clears queue and parser state" {
     try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
 }
 
+test "runtime: resetScreen clears screen without clearing queued parser events" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 5);
+    defer engine.deinit();
+    engine.feedSlice("abcde");
+    engine.apply();
+    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
+    engine.feedSlice("z");
+    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
+    engine.resetScreen();
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
+    engine.apply();
+    try std.testing.expectEqual(@as(u21, 'z'), engine.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
 test "runtime: cursor move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 24, 80);
