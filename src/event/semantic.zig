@@ -758,6 +758,38 @@ test "semantic: multi-param SGR 1;38;2;255;128;0 bold and fg RGB" {
     try std.testing.expectEqual(@as(u8, 0), sem.style_operations.ops[1].fg_rgb.b);
 }
 
+test "semantic: multi-param SGR 38;2;.. then 31 keeps ordered exclusivity intent" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 38;
+    params[1] = 2;
+    params[2] = 10;
+    params[3] = 20;
+    params[4] = 30;
+    params[5] = 31;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 6 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.count);
+    try std.testing.expectEqual(@as(u8, 10), sem.style_operations.ops[0].fg_rgb.r);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[1].fg_color);
+}
+
+test "semantic: multi-param SGR 31 then 38;2;.. keeps ordered exclusivity intent" {
+    var params: [16]i32 = undefined;
+    @memset(&params, 0);
+    params[0] = 31;
+    params[1] = 38;
+    params[2] = 2;
+    params[3] = 10;
+    params[4] = 20;
+    params[5] = 30;
+    const sem = process(Event{ .style_change = .{ .final = 'm', .params = params, .param_count = 6 } }) orelse return error.NoEvent;
+    try std.testing.expect(sem == .style_operations);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.count);
+    try std.testing.expectEqual(@as(u8, 2), sem.style_operations.ops[0].fg_color);
+    try std.testing.expectEqual(@as(u8, 10), sem.style_operations.ops[1].fg_rgb.r);
+}
+
 test "semantic: multi-param SGR 4;58;5;33;59 preserves order" {
     var params: [16]i32 = undefined;
     @memset(&params, 0);
