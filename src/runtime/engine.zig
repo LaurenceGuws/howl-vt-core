@@ -72,8 +72,15 @@ pub const Engine = struct {
 
     /// Apply pending bridge events to screen state.
     /// Drains the event queue and updates screen accordingly.
+    /// Invalidates selection if a history row it references was evicted (M3+).
     pub fn apply(self: *Engine) void {
         self.pipeline.applyToScreen(&self.state);
+        if (self.selection.selection.active) {
+            if (self.state.shouldInvalidateSelectionEndpoint(self.selection.selection.start.row) or
+                self.state.shouldInvalidateSelectionEndpoint(self.selection.selection.end.row)) {
+                self.selection.clear();
+            }
+        }
     }
 
     /// Clear pending bridge events without applying to screen.

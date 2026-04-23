@@ -132,6 +132,16 @@ pub const ScreenState = struct {
         return self.history_capacity;
     }
 
+    pub fn shouldInvalidateSelectionEndpoint(self: *const ScreenState, endpoint_row: i32) bool {
+        if (self.history == null or self.history_count < self.history_capacity) {
+            return false;
+        }
+        if (endpoint_row < -@as(i32, self.history_capacity)) {
+            return true;
+        }
+        return false;
+    }
+
     pub fn apply(self: *ScreenState, event: SemanticEvent) void {
         switch (event) {
             .cursor_up => |n| {

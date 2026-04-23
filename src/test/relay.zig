@@ -4566,3 +4566,20 @@ test "runtime: selection clear deactivates through engine" {
     engine.selectionClear();
     try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
 }
+
+test "runtime: selection cleared when referencing out-of-bounds history index" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
+    defer engine.deinit();
+
+    engine.feedSlice("1\x0A2\x0A3\x0A");
+    engine.apply();
+
+    engine.selectionStart(-3, 0);
+    try std.testing.expect(engine.selectionState() != null);
+
+    engine.feedSlice("x");
+    engine.apply();
+
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
+}
