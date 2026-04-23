@@ -70,6 +70,7 @@ pub const ScreenState = struct {
             @memset(buf, 0);
             break :blk buf;
         } else null;
+        errdefer if (cells) |c| allocator.free(c);
         const history: ?[]u21 = if (cells != null and history_capacity > 0) blk: {
             const hist_size = @as(usize, history_capacity) * @as(usize, cols);
             const buf = try allocator.alloc(u21, hist_size);
