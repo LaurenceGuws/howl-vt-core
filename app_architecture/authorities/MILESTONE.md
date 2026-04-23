@@ -21,7 +21,7 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M5`, with `M1-M4` retained as frozen baselines.
+Current milestone target is `M6`, with `M1-M5` retained as frozen baselines.
 
 ## M2 Checklist
 
@@ -89,13 +89,29 @@ and parity-tested for real host-loop usage patterns.
   - M5-B1 (docstrings): all stable methods documented with behavior and mutation/read boundaries
   - M5-B2 (parity tests): 5 mixed host-loop tests proving runtime facade transparency
 - `[x]` M5-C: Runtime parity matrix: mixed host-loop operation sequences are covered by replay/parity/runtime tests (M5-B2 completed).
-- `[ ]` M5-D: Freeze evidence: M5 authority/progress/queue are finalized and M6 handoff is published.
+- `[x]` M5-D: Freeze evidence: M5 authority/progress/queue are finalized and M6 handoff is published.
 
 ### M5 Closeout Sequence
 
 1. Publish/update `app_architecture/authorities/M5_FOUNDATION.md` with bounded start/end and stop conditions.
 2. Execute M5-A through M5-D in order with contract-first validation.
 3. Mark `M5` done and repoint active queue to M6 planning scope.
+
+## M6 Checklist
+
+M6 is complete only when snapshot/replay behavior is explicit, host-neutral, and
+proven deterministic through runtime/direct parity evidence.
+
+- `[ ]` M6-A: Snapshot/replay contract closure: payload boundaries, replay framing, and invariants are unambiguous.
+- `[ ]` M6-B: Snapshot surface: runtime/model const read APIs align to contract without mutable escapes.
+- `[ ]` M6-C: Replay evidence matrix: snapshot/replay invariants are test-backed across direct and runtime flows.
+- `[ ]` M6-D: Freeze evidence: M6 authority/progress/queue are finalized and M7 handoff is published.
+
+### M6 Closeout Sequence
+
+1. Publish/update `app_architecture/authorities/M6_FOUNDATION.md` with bounded start/end, gates, and stop conditions.
+2. Execute M6-A through M6-D in order with contract-first validation.
+3. Mark `M6` done and repoint active queue to M7 planning scope.
 
 ## Authority Rules
 

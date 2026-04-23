@@ -11,68 +11,86 @@ Execution-only queue for the current engineer loop.
 ## Scope Anchor
 
 - Milestone authority: `app_architecture/authorities/MILESTONE.md`
+- M6 authority: `app_architecture/authorities/M6_FOUNDATION.md`
 - Runtime contract: `app_architecture/contracts/RUNTIME_API.md`
-- Snapshot/Replay authority: `app_architecture/authorities/M6_FOUNDATION.md` (to be published)
+- Model contract: `app_architecture/contracts/MODEL_API.md`
 - Architect workflow: `docs/architect/WORKFLOW.md`
 
 ## Current Loop
 
-**Status:** M5 complete. M6 planning phase active.
+**Status:** M5 frozen. Execute M6-A.
 
 M1-M5 are frozen. Do not reopen parser/screen/history/selection/input/runtime
-behavior unless an M6 test exposes a direct regression.
+semantics unless an M6 test exposes a direct regression.
 
-## M6 Planning Phase
+## M6-A Execution Order (Do Not Reorder)
 
-Before M6 execution queue is published, architect must:
+### M6-A1: Snapshot/Replay Contract Authority
 
-1. **Scope M6 boundaries**
-   - Define what "snapshot and replay contracts" means in howl-terminal context
-   - Clarify whether M6 covers checkpoint/restore semantics, deterministic replay for testing, or both
-   - Decide which M6 outputs (snapshot format, replay validation, metadata) are in scope
+- Target files:
+  - `app_architecture/contracts/SNAPSHOT_REPLAY.md` (new)
+  - `app_architecture/contracts/RUNTIME_API.md`
+  - `app_architecture/contracts/MODEL_API.md`
+- Allowed change type: contract clarification only (no code changes).
+- Required output:
+  - define snapshot payload scope and deterministic invariants.
+  - define replay stream framing (feed/apply boundaries, split-feed behavior).
+  - define explicit non-goals and breakage rules.
+- Non-goals:
+  - no runtime/model API signature changes in this ticket.
+  - no test/code updates.
+- Stop conditions:
+  - if contract closure requires changing frozen M1-M5 semantics, stop and report exact conflict.
 
-2. **Identify M6 dependencies**
-   - Snapshot format: does it require encoding history buffer and selection state?
-   - Replay validation: does it require comparing direct vs. runtime pipeline outputs?
-   - Coverage: which M1-M5 contracts need snapshot/replay evidence?
+### M6-A2: Snapshot Surface Baseline (Code + Tests)
 
-3. **Draft M6_FOUNDATION.md**
-   - Start point: M1-M5 frozen behavior
-   - End point: snapshot/replay contracts frozen and test-backed
-   - Execution gates: M6-A through M6-D (tentative)
-   - Stop conditions: where snapshot/replay logic conflicts with frozen behavior
+- Target files:
+  - `src/model.zig`
+  - `src/model/types.zig` and/or `src/model/snapshot.zig` (new if needed)
+  - `src/runtime/engine.zig`
+  - `src/test/relay.zig`
+- Allowed change type: additive snapshot read surface and tests only.
+- Required output:
+  - implement minimal const/read-only snapshot API aligned to M6-A1 contract.
+  - include deterministic snapshot parity tests for direct vs runtime flows.
+  - include at least one split-feed replay equivalence snapshot test.
+- Non-goals:
+  - no snapshot restore/mutation API.
+  - no persistence/file format code.
+  - no host/platform integration code.
+- Stop conditions:
+  - if snapshot API requires mutable escape hatch or semantic mutation of frozen behavior, stop and report.
 
-4. **Publish M6 execution queue**
-   - Once M6_FOUNDATION is reviewed, post M6-A Batch 1 tickets to ACTIVE_QUEUE.md
+### M6-A3: M6-A Closeout + Queue Advance
 
-## Gatekeeping: M5-D Final Checklist
+- Target files:
+  - `docs/architect/MILESTONE_PROGRESS.md`
+  - `docs/engineer/ACTIVE_QUEUE.md`
+  - `app_architecture/authorities/MILESTONE.md` (M6-A checklist mark only)
+- Allowed change type: status and queue handoff update only.
+- Required output:
+  - mark M6-A complete in progress notes.
+  - mark `M6-A` checklist item as done.
+  - replace queue with M6-B starter tickets.
+- Non-goals:
+  - no code/contract changes.
 
-Before M6 execution:
+## Engineer Report Format
 
-- [ ] M5 contracts (RUNTIME_API.md + M5_FOUNDATION.md) reviewed and frozen
-- [ ] M5 tests (M5-A conformance + M5-B parity) pass validation
-- [ ] M5 checklist updated (M5-A/B/C marked [x], M5-D pending)
-- [ ] Working tree clean; all M5 commits on main
-- [ ] M6_FOUNDATION.md drafted and ready for review
+- `#DONE` ticket IDs
+- `#OUTSTANDING` ticket IDs
+- commit hash + subject
+- validation results
+- files changed
 
-## Non-Execution Guidance
+## Mandatory Validation Per Ticket
 
-### Current State
+- `zig build`
+- `zig build test`
+- `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
 
-- M1-M4 frozen with contracts and replay coverage.
-- M5 runtime interface complete: contract closure + interface hardening + parity matrix.
-- No M6 scope or execution authority yet published.
+## Guardrails
 
-### Next Steps for Architect
-
-1. Review M5 deliverables (RUNTIME_API.md contract matrix, docstrings, parity tests).
-2. Decide M6 scope and boundaries (snapshot/replay semantics, coverage).
-3. Draft M6_FOUNDATION.md authority document.
-4. Publish M6-A batch and replace this queue with M6 execution tickets.
-
-## Guardrails (M5 Complete)
-
-- No compatibility/fallback/workaround/shim paths in M5 code.
-- No host/platform/renderer imports in runtime/model/event/screen lanes.
-- No code changes except in M5-A/B execution.
-- Engineer does not plan M6; architect owns scope definition.
+- No compatibility/fallback/workaround/shim paths.
+- No host/platform/renderer lifecycle imports in runtime/model/event/screen lanes.
+- No scope expansion into M6-B/M6-C/M6-D during M6-A execution.
