@@ -241,3 +241,4 @@ Execution spec status:
   (`M7-BL-002`) with gate outcomes.
 - `F2` queue-growth spec published: `docs/architect/M7_F2_SPEC.md`
 - `F2` queue-envelope baseline captured in `M7-BL-003`.
+- `F2` policy phase accepted in `docs/architect/M7_F2_REVIEW.md`.
