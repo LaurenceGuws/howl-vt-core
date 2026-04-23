@@ -34,7 +34,7 @@ Each measured change must run against one or more workload families:
 
 Canonical fixture definitions are in:
 
-- `docs/architect/M7_FIXTURES.md`
+- `docs/review/m7/M7_FIXTURES.md`
 
 ## Measurement Modes
 

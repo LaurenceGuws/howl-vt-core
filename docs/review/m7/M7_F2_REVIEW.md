@@ -4,8 +4,8 @@ Review ID: `M7-F2-REVIEW-001`
 
 Scope reviewed:
 
-- `docs/architect/M7_F2_SPEC.md`
-- `docs/architect/M7_BASELINE.md` (`M7-BL-003`)
+- `docs/review/m7/M7_F2_SPEC.md`
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-003`)
 - `tools/m7_baseline.zig` queue-envelope metrics
 
 ## Outcome

@@ -14,7 +14,7 @@ contract and seam-audit mode for first-host integration.
 - `app_architecture/authorities/M8_FOUNDATION.md`
 - `app_architecture/authorities/MILESTONE.md`
 - `docs/architect/MILESTONE_PROGRESS.md`
-- `docs/architect/M7_FREEZE_REVIEW.md`
+- `docs/review/m7/M7_FREEZE_REVIEW.md`
 
 ## Guardrail
 

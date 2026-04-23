@@ -103,7 +103,7 @@ Any future `M7` implementation slice must tie back to one or more of these:
 Measurement procedure, workload definitions, and reporting format are defined
 in:
 
-- `docs/architect/M7_MEASUREMENT_PROTOCOL.md`
+- `docs/review/m7/M7_MEASUREMENT_PROTOCOL.md`
 
 ## Evidence Standard
 

@@ -5,7 +5,7 @@ Review ID: `M7-F1-REVIEW-001`
 Scope reviewed:
 
 - `src/event/bridge.zig`
-- `docs/architect/M7_BASELINE.md` (`M7-BL-002`)
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-002`)
 - `M7-F1-SPEC-001` gate outcomes
 
 ## Outcome

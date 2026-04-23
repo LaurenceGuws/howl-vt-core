@@ -11,7 +11,7 @@ frozen semantics and using `M7-BL-004` as upstream queue-stabilized baseline.
 
 Comparison baseline for this spec:
 
-- `docs/architect/M7_BASELINE.md` (`M7-BL-004`)
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-004`)
 
 Required harness command:
 
@@ -42,7 +42,7 @@ Primary files:
   internal scroll representation changes)
 - `src/test/relay.zig`
 - `tools/m7_baseline.zig`
-- `docs/architect/M7_BASELINE.md`
+- `docs/review/m7/M7_BASELINE.md`
 
 Secondary contract files (only if wording clarification is needed):
 

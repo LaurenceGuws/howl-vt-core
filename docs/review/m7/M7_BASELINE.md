@@ -14,8 +14,8 @@ This document records the first protocol-aligned `M7` baseline run.
 
 ## Protocol and Fixture Anchors
 
-- Protocol: `docs/architect/M7_MEASUREMENT_PROTOCOL.md`
-- Fixtures: `docs/architect/M7_FIXTURES.md`
+- Protocol: `docs/review/m7/M7_MEASUREMENT_PROTOCOL.md`
+- Fixtures: `docs/review/m7/M7_FIXTURES.md`
 - Mode: runtime mode (`runtime.Engine`)
 - Config: `rows=40`, `cols=120`, `runs=10`
 

@@ -236,14 +236,14 @@ Doctrine decisions corresponding to findings are now recorded in:
 
 Execution spec status:
 
-- `F1` implementation spec published: `docs/architect/M7_F1_SPEC.md`
-- `F1` first execution completed; evidence in `docs/architect/M7_BASELINE.md`
+- `F1` implementation spec published: `docs/review/m7/M7_F1_SPEC.md`
+- `F1` first execution completed; evidence in `docs/review/m7/M7_BASELINE.md`
   (`M7-BL-002`) with gate outcomes.
-- `F2` queue-growth spec published: `docs/architect/M7_F2_SPEC.md`
+- `F2` queue-growth spec published: `docs/review/m7/M7_F2_SPEC.md`
 - `F2` queue-envelope baseline captured in `M7-BL-003`.
-- `F2` policy phase accepted in `docs/architect/M7_F2_REVIEW.md`.
-- `F2B` implementation slice accepted in `docs/architect/M7_F2B_REVIEW.md`
+- `F2` policy phase accepted in `docs/review/m7/M7_F2_REVIEW.md`.
+- `F2B` implementation slice accepted in `docs/review/m7/M7_F2B_REVIEW.md`
   with evidence baseline `M7-BL-004`.
-- `F3` scroll-path implementation spec published: `docs/architect/M7_F3_SPEC.md`.
-- `F3` implementation slice accepted in `docs/architect/M7_F3_REVIEW.md`
+- `F3` scroll-path implementation spec published: `docs/review/m7/M7_F3_SPEC.md`.
+- `F3` implementation slice accepted in `docs/review/m7/M7_F3_REVIEW.md`
   with evidence baseline `M7-BL-005`.

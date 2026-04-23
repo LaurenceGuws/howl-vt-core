@@ -7,7 +7,7 @@ Scope reviewed:
 - `src/screen/state.zig`
 - `src/model/snapshot.zig`
 - `src/test/relay.zig`
-- `docs/architect/M7_BASELINE.md` (`M7-BL-005`)
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-005`)
 - `M7-F3-SPEC-001` gates
 
 ## Outcome

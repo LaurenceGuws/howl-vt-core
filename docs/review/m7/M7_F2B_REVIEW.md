@@ -5,7 +5,7 @@ Review ID: `M7-F2B-REVIEW-001`
 Scope reviewed:
 
 - `src/event/bridge.zig`
-- `docs/architect/M7_BASELINE.md` (`M7-BL-004`)
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-004`)
 - `M7-F2-SPEC-001` outcome-B gates
 
 ## Outcome

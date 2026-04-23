@@ -11,7 +11,7 @@ preserving frozen `M1-M6` behavior and two-phase `feed* -> apply` semantics.
 
 All acceptance comparisons for this spec use baseline `M7-BL-001`:
 
-- `docs/architect/M7_BASELINE.md`
+- `docs/review/m7/M7_BASELINE.md`
 
 Required harness command:
 
@@ -35,7 +35,7 @@ Primary allowed files:
 - `src/parser/parser.zig` (only if required for ownership-safe handoff)
 - `src/test/relay.zig`
 - `tools/m7_baseline.zig`
-- `docs/architect/M7_BASELINE.md`
+- `docs/review/m7/M7_BASELINE.md`
 
 Secondary allowed files (only if required for contract documentation alignment):
 

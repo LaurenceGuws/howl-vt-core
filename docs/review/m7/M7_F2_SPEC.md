@@ -11,7 +11,7 @@ Goal: make queue-growth behavior explicit, measurable, and reviewable under
 
 Primary baseline for this spec:
 
-- `docs/architect/M7_BASELINE.md` (`M7-BL-003`)
+- `docs/review/m7/M7_BASELINE.md` (`M7-BL-003`)
 
 Required harness command:
 
@@ -34,13 +34,13 @@ Primary files:
 - `src/runtime/engine.zig` (read-only metrics/reporting additions only)
 - `tools/m7_baseline.zig`
 - `src/test/relay.zig`
-- `docs/architect/M7_BASELINE.md`
+- `docs/review/m7/M7_BASELINE.md`
 
 Policy/authority alignment files:
 
 - `app_architecture/authorities/M7_FOUNDATION.md`
-- `docs/architect/M7_MEASUREMENT_PROTOCOL.md`
-- `docs/architect/M7_AUDIT.md`
+- `docs/review/m7/M7_MEASUREMENT_PROTOCOL.md`
+- `docs/review/m7/M7_AUDIT.md`
 
 ## Explicit Non-Goals
 
