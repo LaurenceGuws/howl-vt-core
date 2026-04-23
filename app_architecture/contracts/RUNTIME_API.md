@@ -1,5 +1,7 @@
 # Runtime API Contract
 
+`RUNTIME_API_CONTRACT` — frozen as of M3 milestone completion.
+
 Authority for `src/runtime/engine.zig` and the root `runtime` export.
 
 ## Stable Exported Symbols

@@ -1,5 +1,7 @@
 # History and Selection Contract
 
+`M3_HISTORY_SELECTION_CONTRACT` — frozen as of M3 milestone completion.
+
 Authority for history storage, selection state, and coordinate model for M3 History and Selection milestone.
 
 Defines the shared coordinate space, history capacity policy, and selection lifecycle across viewport and retained rows.
