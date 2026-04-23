@@ -21,8 +21,8 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M3`, with `M1` foundation and `M2` terminal
-state breadth retained as frozen baselines.
+Current milestone target is `M4`, with `M1` foundation, `M2` terminal state
+breadth, and `M3` history/selection retained as frozen baselines.
 
 ## M2 Checklist
 
@@ -46,19 +46,36 @@ validated by replay/parity/runtime evidence.
 M3 is complete only when history and selection behavior are portable,
 host-neutral, and covered by replay/parity/runtime evidence.
 
-- `[ ]` Scope boundary: scrollback/history and selection are model/runtime behavior; host UI gestures, clipboard, renderer policy, and platform integration stay out of scope.
-- `[ ]` Coordinate model: viewport coordinates, history coordinates, and selection endpoints are explicit and deterministic across scroll.
-- `[ ]` History storage: bottom scrolling captures visible rows into bounded history without changing frozen M2 visible-screen semantics.
-- `[ ]` Reset/clear policy: `clear`, `reset`, `resetScreen`, DECSTR, zero-dimension screens, and history truncation have documented, tested behavior.
-- `[ ]` Selection lifecycle: selection start/update/finish/clear works across viewport and history coordinates with deterministic invalidation rules.
-- `[ ]` Runtime API: hosts can read history/selection through minimal const, host-neutral accessors; no mutable screen/history escape hatch is introduced.
-- `[ ]` Replay evidence: direct pipeline, runtime facade, and chunked-feed parity tests cover history-producing streams and selection state transitions.
+- `[x]` Scope boundary: scrollback/history and selection are model/runtime behavior; host UI gestures, clipboard, renderer policy, and platform integration stay out of scope.
+- `[x]` Coordinate model: viewport coordinates, history coordinates, and selection endpoints are explicit and deterministic across scroll.
+- `[x]` History storage: bottom scrolling captures visible rows into bounded history without changing frozen M2 visible-screen semantics.
+- `[x]` Reset/clear policy: `clear`, `reset`, `resetScreen`, DECSTR, zero-dimension screens, and history truncation have documented, tested behavior.
+- `[x]` Selection lifecycle: selection start/update/finish/clear works across viewport and history coordinates with deterministic invalidation rules.
+- `[x]` Runtime API: hosts can read history/selection through minimal const, host-neutral accessors; no mutable screen/history escape hatch is introduced.
+- `[x]` Replay evidence: direct pipeline, runtime facade, and chunked-feed parity tests cover history-producing streams and selection state transitions.
 
 ### M3 Closeout Sequence
 
 1. Freeze M3 history/selection contracts and update the model/runtime API contracts.
 2. Run the full M3 replay/parity/runtime validation matrix.
 3. Mark `M3` done in milestone progress and replace the active queue with the next milestone handoff.
+
+## M4 Checklist
+
+M4 is complete only when input/control behavior is contract-defined, host-neutral,
+and replay-tested through runtime surfaces.
+
+- `[ ]` Input contract: supported key/modifier/mouse/control event model is explicit and separate from host/platform event types.
+- `[ ]` Encoding contract: deterministic input-to-byte encoding rules are documented and test-backed for supported modes.
+- `[ ]` Runtime input surface: engine exposes host-neutral input encode/feed entry points without parser/pipeline leakage.
+- `[ ]` Mode interactions: input behavior with active modes is explicit and deterministic.
+- `[ ]` Replay evidence: direct and runtime parity tests cover control output for representative key/control sequences.
+
+### M4 Closeout Sequence
+
+1. Freeze input/control contracts and runtime API additions.
+2. Run full M4 input parity/replay validation.
+3. Mark `M4` done and publish next milestone handoff.
 
 ## Authority Rules
 
