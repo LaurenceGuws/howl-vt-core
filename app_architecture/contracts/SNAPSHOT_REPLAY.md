@@ -18,7 +18,7 @@ file layout, or cross-version compatibility.
 A snapshot captures the following observable engine state:
 
 - **Screen cells**: visible cell buffer (same as `Engine.screen()` cell contents).
-- **Cursor position**: (row, col) in viewport coordinates (same as `Engine.screen().cursor`).
+- **Cursor position**: (row, col) in viewport coordinates (same as `Engine.screen().cursor_row` and `Engine.screen().cursor_col`).
 - **Cursor visibility**: `cursor_visible` mode state.
 - **Auto-wrap mode**: `auto_wrap` mode state.
 - **History buffer**: all retained history rows in recency order (most recent first, matching `historyRowAt(0)` semantics).
@@ -104,9 +104,9 @@ When history is enabled:
 
 - Replaying the same byte sequence via Engine produces identical history buffer
   contents (same row count and cell values in recency order).
-- Selection state captured in the snapshot is identical whether produced by direct
-  pipeline or runtime engine (when selection span is within valid viewport/history
-  bounds).
+- Selection state parity is validated where selection inputs are explicitly driven
+  through equivalent harness actions; direct parser/pipeline byte replay alone does
+  not imply selection lifecycle parity.
 
 **Chunked Replay Parity:**
 
@@ -132,8 +132,8 @@ After a reset sequence (clear → reset → resetScreen), the resulting snapshot
 - Clean parser state (no pending parse operations)
 - Clean queue (no queued events)
 - Preserved history (reset operations do not truncate history)
-- Preserved selection (selection state not invalidated by reset; endpoints may be
-  out-of-bounds if history was evicted after selection was created)
+- Preserved selection across reset operations; selection is invalidated to inactive
+  state when history eviction removes referenced rows (per M3 contract).
 
 ## Coordinate Semantics in Snapshots
 
