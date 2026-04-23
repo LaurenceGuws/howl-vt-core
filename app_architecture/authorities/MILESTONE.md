@@ -21,7 +21,8 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M10`, with `M1-M9` retained as frozen baselines.
+Current milestone target is sustained `M10` freeze-cadence maintenance, with
+`M1-M10` retained as frozen baselines.
 
 ## M2 Checklist
 
@@ -171,7 +172,7 @@ sustained without reopening frozen contracts.
 - `[x]` M10-A: Quality doctrine closure.
 - `[x]` M10-B: Evidence expansion protocol publication.
 - `[x]` M10-C: Bounded execution queue publication and gate closure.
-- `[ ]` M10-D: Continuous freeze cadence publication.
+- `[x]` M10-D: Continuous freeze cadence publication.
 
 ### M10 Closeout Sequence
 

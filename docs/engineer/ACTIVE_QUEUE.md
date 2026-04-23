@@ -1,103 +1,24 @@
 # Howl Terminal Active Queue
 
-Mode: dual-engineer execution.
+No engineer execution queue is published.
 
-Milestone lane: `M10` Best-in-Class Embedded Engine.
+## Current State
 
-This queue is execution-only. No planning/scoping reprioritization.
+`M10` is complete and frozen.
 
-## Read Order
+Repository is in architect-owned rolling freeze-cadence maintenance mode.
 
-1. `app_architecture/authorities/M10_FOUNDATION.md`
-2. `app_architecture/contracts/QUALITY_DOCTRINE.md`
-3. `docs/review/m10/M10_B_EVIDENCE_PROTOCOL.md`
-4. `docs/review/m10/M10_STRESS_FIXTURES.md`
-5. `app_architecture/contracts/HOST_CONFORMANCE.md`
-6. `app_architecture/contracts/RUNTIME_API.md`
+## Read Before Any New Queue Exists
 
-## Ticket M10-E1: Stress/Soak Evidence Matrix Tests
-
-Status: `ready`
-
-Target files:
-
-- `src/test/relay.zig`
-
-Allowed change type:
-
-- add test helper(s) and tests only.
-- implement bounded stress/soak loops aligned to `M10-FX-001..006` classes.
-
-Required coverage:
-
-- deterministic stress loops for feed/apply and reset boundaries.
-- soak-style repeated checkpoint assertions (stable invariants over many iterations).
-- explicit evidence-class tags in test names (`E1`, `E2`).
-
-Explicit non-goals:
-
-- no production code changes.
-- no API signature changes.
-- no host/platform policy logic.
-
-Validation commands:
-
-- `zig build`
-- `zig build test`
-- `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
-
-Stop conditions:
-
-- evidence run requires runtime/model API expansion.
-- stress/soak loop cannot be made deterministic with frozen contracts.
-
-## Ticket M10-E2: Drift Detection Regression Tests
-
-Status: `ready`
-
-Target files:
-
-- `src/test/relay.zig`
-
-Allowed change type:
-
-- add integration tests only for drift checkpoints (`E3` class).
-
-Required coverage:
-
-- repeated checkpoint capture over mixed operations with strict invariants.
-- drift checks across selection/history/mode/encode interleavings.
-- mismatch assertions map to contract-visible fields only.
-
-Explicit non-goals:
-
-- no production code changes.
-- no new runtime semantics.
-- no contract rewrites.
-
-Validation commands:
-
-- `zig build`
-- `zig build test`
-- `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
-
-Stop conditions:
-
-- drift proof requires hidden/non-contract state.
-- mismatch indicates unresolved contract ambiguity requiring architect decision.
-
-## Reporting Contract
-
-Each response must include:
-
-- `#DONE`
-- `#OUTSTANDING`
-- commits (hash + subject)
-- validation results
-- files changed (`git show --name-status`)
+- `app_architecture/authorities/M10_FOUNDATION.md`
+- `app_architecture/authorities/MILESTONE.md`
+- `docs/architect/MILESTONE_PROGRESS.md`
+- `docs/review/m10/M10_FREEZE_CADENCE.md`
+- `docs/review/m10/M10_FREEZE_REVIEW.md`
 
 ## Guardrail
 
-Do not execute M10 freeze-cadence or milestone handoff work from this queue.
+Do not start new implementation work from this file.
 
-`M10-D` remains architect-owned.
+A new engineer queue may be published only after explicit architect authority
+update for a new bounded scope.

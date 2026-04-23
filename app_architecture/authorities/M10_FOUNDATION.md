@@ -99,3 +99,8 @@ M10-C closure status:
 ### M10-D: Continuous Freeze Cadence (Architect)
 
 - establish rolling freeze criteria and publish next strategic handoff.
+
+M10-D closure status:
+
+- cadence authority published in `docs/review/m10/M10_FREEZE_CADENCE.md`.
+- M10 freeze acceptance published in `docs/review/m10/M10_FREEZE_REVIEW.md`.
