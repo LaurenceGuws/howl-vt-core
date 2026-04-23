@@ -41,36 +41,65 @@ pub const MouseEventKind = types.MouseEventKind;
 pub const MouseEvent = types.MouseEvent;
 /// Modifier constants re-export.
 pub const VTERM_MOD_NONE = types.VTERM_MOD_NONE;
+/// Shift modifier bit re-export.
 pub const VTERM_MOD_SHIFT = types.VTERM_MOD_SHIFT;
+/// Alt modifier bit re-export.
 pub const VTERM_MOD_ALT = types.VTERM_MOD_ALT;
+/// Ctrl modifier bit re-export.
 pub const VTERM_MOD_CTRL = types.VTERM_MOD_CTRL;
 /// Key constants re-export.
 pub const VTERM_KEY_NONE = types.VTERM_KEY_NONE;
+/// Enter key identifier re-export.
 pub const VTERM_KEY_ENTER = types.VTERM_KEY_ENTER;
+/// Tab key identifier re-export.
 pub const VTERM_KEY_TAB = types.VTERM_KEY_TAB;
+/// Backspace key identifier re-export.
 pub const VTERM_KEY_BACKSPACE = types.VTERM_KEY_BACKSPACE;
+/// Escape key identifier re-export.
 pub const VTERM_KEY_ESCAPE = types.VTERM_KEY_ESCAPE;
+/// Up-arrow key identifier re-export.
 pub const VTERM_KEY_UP = types.VTERM_KEY_UP;
+/// Down-arrow key identifier re-export.
 pub const VTERM_KEY_DOWN = types.VTERM_KEY_DOWN;
+/// Left-arrow key identifier re-export.
 pub const VTERM_KEY_LEFT = types.VTERM_KEY_LEFT;
+/// Right-arrow key identifier re-export.
 pub const VTERM_KEY_RIGHT = types.VTERM_KEY_RIGHT;
+/// Insert key identifier re-export.
 pub const VTERM_KEY_INS = types.VTERM_KEY_INS;
+/// Delete key identifier re-export.
 pub const VTERM_KEY_DEL = types.VTERM_KEY_DEL;
+/// Home key identifier re-export.
 pub const VTERM_KEY_HOME = types.VTERM_KEY_HOME;
+/// End key identifier re-export.
 pub const VTERM_KEY_END = types.VTERM_KEY_END;
+/// Page-up key identifier re-export.
 pub const VTERM_KEY_PAGEUP = types.VTERM_KEY_PAGEUP;
+/// Page-down key identifier re-export.
 pub const VTERM_KEY_PAGEDOWN = types.VTERM_KEY_PAGEDOWN;
+/// Function key F1 identifier re-export.
 pub const VTERM_KEY_F1 = types.VTERM_KEY_F1;
+/// Function key F2 identifier re-export.
 pub const VTERM_KEY_F2 = types.VTERM_KEY_F2;
+/// Function key F3 identifier re-export.
 pub const VTERM_KEY_F3 = types.VTERM_KEY_F3;
+/// Function key F4 identifier re-export.
 pub const VTERM_KEY_F4 = types.VTERM_KEY_F4;
+/// Function key F5 identifier re-export.
 pub const VTERM_KEY_F5 = types.VTERM_KEY_F5;
+/// Function key F6 identifier re-export.
 pub const VTERM_KEY_F6 = types.VTERM_KEY_F6;
+/// Function key F7 identifier re-export.
 pub const VTERM_KEY_F7 = types.VTERM_KEY_F7;
+/// Function key F8 identifier re-export.
 pub const VTERM_KEY_F8 = types.VTERM_KEY_F8;
+/// Function key F9 identifier re-export.
 pub const VTERM_KEY_F9 = types.VTERM_KEY_F9;
+/// Function key F10 identifier re-export.
 pub const VTERM_KEY_F10 = types.VTERM_KEY_F10;
+/// Function key F11 identifier re-export.
 pub const VTERM_KEY_F11 = types.VTERM_KEY_F11;
+/// Function key F12 identifier re-export.
 pub const VTERM_KEY_F12 = types.VTERM_KEY_F12;
 
 /// Selection state API re-export.

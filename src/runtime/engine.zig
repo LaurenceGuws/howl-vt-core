@@ -7,6 +7,7 @@ const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
 const model_mod = @import("../model.zig");
 
+/// Host-neutral runtime facade that composes pipeline, screen state, and selection.
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,

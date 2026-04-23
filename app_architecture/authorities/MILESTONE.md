@@ -21,8 +21,7 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M4`, with `M1` foundation, `M2` terminal state
-breadth, and `M3` history/selection retained as frozen baselines.
+Current milestone target is `M5`, with `M1-M4` retained as frozen baselines.
 
 ## M2 Checklist
 
@@ -77,7 +76,24 @@ and replay-tested through runtime surfaces.
 
 1. Freeze input/control contracts and runtime API additions.
 2. Run full M4 input parity/replay validation.
-3. Mark `M4` done and publish next milestone handoff.
+3. Publish/update `app_architecture/authorities/M4_FOUNDATION.md`.
+4. Mark `M4` done and publish next milestone handoff.
+
+## M5 Checklist
+
+M5 is complete only when runtime interface behavior is explicit, host-neutral,
+and parity-tested for real host-loop usage patterns.
+
+- `[ ]` M5-A: Runtime contract closure: lifecycle, mutation boundaries, and reset/clear interactions are unambiguous in authority docs.
+- `[ ]` M5-B: Runtime interface hardening: `Engine` API aligns to contract without host/platform leakage or mutable escapes.
+- `[ ]` M5-C: Runtime parity matrix: mixed host-loop operation sequences are covered by replay/parity/runtime tests.
+- `[ ]` M5-D: Freeze evidence: M5 authority/progress/queue are finalized and M6 handoff is published.
+
+### M5 Closeout Sequence
+
+1. Publish/update `app_architecture/authorities/M5_FOUNDATION.md` with bounded start/end and stop conditions.
+2. Execute M5-A through M5-D in order with contract-first validation.
+3. Mark `M5` done and repoint active queue to M6 planning scope.
 
 ## Authority Rules
 

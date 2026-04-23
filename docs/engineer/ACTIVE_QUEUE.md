@@ -6,60 +6,42 @@ Execution-only queue for the current engineer loop.
 
 - Architect writes and replaces this file every loop.
 - Engineer executes only listed tickets.
-- Engineer does not plan, redesign, or expand scope.
+- Engineer does not redesign scope during execution.
 
 ## Scope Anchor
 
-- Scope authority: `app_architecture/authorities/SCOPE.md`
 - Milestone authority: `app_architecture/authorities/MILESTONE.md`
+- M5 authority: `app_architecture/authorities/M5_FOUNDATION.md`
+- Runtime contract: `app_architecture/contracts/RUNTIME_API.md`
 - Architect workflow: `docs/architect/WORKFLOW.md`
 
 ## Current Loop
 
-**Status:** M4 complete and frozen. Entering post-M4 validation loop.
+**Status:** M4 frozen. M5 active.
 
-M1/M2/M3/M4 are frozen. Do not reopen parser/screen/history/selection/input behavior unless a regression test exposes a direct bug.
+M1-M4 are frozen. Do not reopen parser/screen/history/selection/input behavior
+unless an M5 parity test exposes a direct runtime-related regression.
 
-## Post-M4 Validation Checklist
+## M5 Execution Order (Do Not Reorder)
 
-### M4 Freeze Evidence
+1. **M5-A: Contract Closure**
+   - Align runtime lifecycle + mutation-boundary language across authorities/contracts.
+   - Exit check: no ambiguity in reset/clear/resetScreen/apply behavior.
 
-Before proceeding to M5 planning, validate:
+2. **M5-B: Interface Hardening**
+   - Align `src/runtime/engine.zig` public API to contract text.
+   - Exit check: host-neutral, deterministic surface; no mutable escapes.
 
-1. **Build and Test Baseline**
-   - `zig build` completes without warnings
-   - `zig build test` passes all tests
-   - `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src` returns clean
-   - Working tree is clean (no uncommitted changes)
+3. **M5-C: Runtime Parity Matrix**
+   - Add mixed host-loop parity/runtime tests.
+   - Exit check: direct pipeline/screen and runtime facade behavior match.
 
-2. **M4 Contract Alignment**
-   - INPUT_CONTROL.md: documents all implemented keyboard encoding (printable, special, cursor, extended, function keys) and modifier support
-   - MODEL_API.md: documents Key/Modifier constants including F1-F12
-   - RUNTIME_API.md: encodeKey and encodeMouse signatures and guarantees documented
-   - Closeout tests exist in src/test/relay.zig demonstrating representative M4 coverage
-
-3. **Milestone State**
-   - MILESTONE.md: M4 checklist fully marked [x]
-   - MILESTONE_PROGRESS.md: M4 marked `done` with descriptive scope summary
-   - Commit history: M4-A, M4-B1, M4-B2, M4-B3, M4-B4 commits clean and tagged
-
-4. **No Overclaims**
-   - Mouse event reporting: explicitly documented as future (not implemented)
-   - Mode-dependent behaviors (paste mode, application keypad): explicitly out of M4 scope
-   - Function key compatibility matrix: explicitly documented as post-M4
-   - Host integration: documented as M5+ scope
-
-## Next Phase Handoff
-
-After M4 freeze validation passes, architect reviews:
-
-1. Whether M5 (Runtime Interface) scope is clear from MILESTONE.md and ready to queue
-2. Whether any M1-M4 contracts need refresh before opening M5
-3. Whether infrastructure/test patterns established in M4 are sufficient for M5 expansion
+4. **M5-D: Freeze Handoff**
+   - Update authority/progress docs and repoint queue to M6 planning.
+   - Exit check: M5 marked done with closeout evidence.
 
 ## Guardrails
 
-- No compatibility/fallback/workaround paths.
-- No app/editor/platform/session/publication imports in parser/event/screen/model/runtime lanes.
-- No enhancements, optimizations, or refactors outside the milestone queue.
-- Engineer does not plan or propose tickets; architect controls queue content.
+- No compatibility/fallback/workaround/shim paths.
+- No host/platform/renderer lifecycle imports in runtime/model/event/screen lanes.
+- No scope expansion into M6+ during M5 execution.

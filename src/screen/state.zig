@@ -23,6 +23,7 @@ pub const ScreenState = struct {
     history_count: u16,
     history_write_idx: u16,
 
+    /// Initialize cursor-only state with no owned cell/history buffers.
     pub fn init(rows: u16, cols: u16) ScreenState {
         return .{
             .rows = rows,
@@ -40,6 +41,7 @@ pub const ScreenState = struct {
         };
     }
 
+    /// Initialize state with owned cell storage and no history storage.
     pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !ScreenState {
         const size = @as(usize, rows) * @as(usize, cols);
         const cells: ?[]u21 = if (size > 0) blk: {
@@ -63,6 +65,7 @@ pub const ScreenState = struct {
         };
     }
 
+    /// Initialize state with owned cell storage and bounded history storage.
     pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !ScreenState {
         const size = @as(usize, rows) * @as(usize, cols);
         const cells: ?[]u21 = if (size > 0) blk: {
@@ -93,6 +96,7 @@ pub const ScreenState = struct {
         };
     }
 
+    /// Release owned cell/history buffers.
     pub fn deinit(self: *ScreenState, allocator: std.mem.Allocator) void {
         if (self.cells) |c| allocator.free(c);
         self.cells = null;
@@ -100,6 +104,7 @@ pub const ScreenState = struct {
         self.history = null;
     }
 
+    /// Reset cursor, wrap, and mode defaults; clear visible cells when present.
     pub fn reset(self: *ScreenState) void {
         self.cursor_row = 0;
         self.cursor_col = 0;
@@ -109,12 +114,15 @@ pub const ScreenState = struct {
         if (self.cells) |c| @memset(c, 0);
     }
 
+    /// Return the visible cell codepoint at `row`/`col`, or 0 when unavailable.
     pub fn cellAt(self: *const ScreenState, row: u16, col: u16) u21 {
         const c = self.cells orelse return 0;
         if (row >= self.rows or col >= self.cols) return 0;
         return c[@as(usize, row) * self.cols + col];
     }
 
+    /// Return history cell codepoint by recency index, or 0 when unavailable.
+    /// `history_idx=0` addresses the most recent history row.
     pub fn historyRowAt(self: *const ScreenState, history_idx: u16, col: u16) u21 {
         const h = self.history orelse return 0;
         if (history_idx >= self.history_count or col >= self.cols) return 0;
@@ -124,14 +132,17 @@ pub const ScreenState = struct {
         return h[logical_slot * @as(usize, self.cols) + @as(usize, col)];
     }
 
+    /// Return currently retained history row count.
     pub fn historyCount(self: *const ScreenState) u16 {
         return self.history_count;
     }
 
+    /// Return configured history capacity (rows).
     pub fn historyCapacity(self: *const ScreenState) u16 {
         return self.history_capacity;
     }
 
+    /// Return true when a selection endpoint row references evicted history.
     pub fn shouldInvalidateSelectionEndpoint(self: *const ScreenState, endpoint_row: i32) bool {
         if (self.history == null or self.history_count < self.history_capacity) {
             return false;
@@ -142,6 +153,7 @@ pub const ScreenState = struct {
         return false;
     }
 
+    /// Apply one semantic event to screen state deterministically.
     pub fn apply(self: *ScreenState, event: SemanticEvent) void {
         switch (event) {
             .cursor_up => |n| {
