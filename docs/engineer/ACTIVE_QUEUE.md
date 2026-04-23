@@ -12,6 +12,7 @@ audit mode for performance and memory discipline.
 ## Read Before Any New Queue Exists
 
 - `app_architecture/authorities/M7_FOUNDATION.md`
+- `docs/architect/M7_AUDIT.md`
 - `app_architecture/authorities/MILESTONE.md`
 - `docs/architect/MILESTONE_PROGRESS.md`
 
