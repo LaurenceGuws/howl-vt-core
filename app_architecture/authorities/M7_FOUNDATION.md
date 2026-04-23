@@ -1,92 +1,197 @@
 # M7 Performance and Memory Discipline Foundation
 
-`M7_FOUNDATION` — active authority for M7 execution.
+`M7_FOUNDATION` is architect-owned authority for `M7`.
 
-This document bounds M7 scope so performance and memory work stays measurable,
-contract-safe, and reviewable.
+`M7` is not an engineer execution lane yet. It is the doctrine phase for
+deciding what "fast", "smooth", and "bounded" mean for `howl-terminal`, how
+they will be measured, and which tradeoffs are acceptable before any
+optimization campaign starts.
 
 ## Start Point (Locked Baseline)
 
-M7 starts from frozen M1-M6 behavior:
+`M7` starts from frozen `M1-M6` behavior:
 
-- M1-M3 parser/pipeline/screen/history/selection semantics are frozen.
-- M4 input/control encoding contracts are frozen.
-- M5 runtime lifecycle boundaries are frozen.
-- M6 snapshot/replay contracts and evidence are frozen.
+- parser, event, screen, history, selection, input, runtime, and snapshot
+  contracts are frozen.
+- replay/parity evidence through `M6` is the correctness floor.
+- current code is allowed to be suboptimal, but not ambiguous about behavior.
 
-Known planning gap at M7 start:
+Current gap:
 
-- no single authority defines performance budget targets, allocation discipline,
-  and execution gates for optimization work.
+- the repo has no performance doctrine defining primary metrics, bounded memory
+  rules, measurement protocol, or optimization review bar.
 
 ## End Point (M7 Done)
 
-M7 is done only when all are true:
+`M7` is done only when all are true:
 
-- performance/memory scope is frozen in authority and contract text.
-- hot paths are identified with baseline measurements and acceptance targets.
-- allocation ownership and bounds are explicit for runtime-critical surfaces.
-- optimization changes are test-backed and do not reopen frozen M1-M6 semantics.
+- performance goals are explicit and ranked.
+- bounded allocation rules are explicit for hot paths and long-lived surfaces.
+- measurement protocol is reproducible and trusted.
+- implementation changes are justified by doctrine and evidence, not intuition.
+- performance work lands without reopening frozen `M1-M6` semantics.
 
-## Execution Gates (Ordered)
+## Product Doctrine
 
-### M7-A: Scope and Budget Closure
+### Primary Goal Order
 
-- define baseline performance and memory metrics to track.
-- define bounded-allocation policy for runtime/model/parser/event/screen lanes.
-- define measurement protocol (inputs, runs, and reporting format).
+Optimization priority for `howl-terminal` is:
 
-Exit check:
+1. user-perceived responsiveness
+2. deterministic smoothness under continuous updates
+3. bounded memory and allocation discipline
+4. sustained throughput under realistic terminal streams
+5. CPU efficiency as a constraint, not an excuse for sluggish interaction
 
-- M7 scope, targets, and non-goals are unambiguous.
+If two goals conflict, earlier items win unless `M7` authority explicitly says
+otherwise.
 
-### M7-B: Hot-Path Audit and Allocation Inventory
+### What "Fast" Means Here
 
-- inventory top hot paths and allocation sites in core runtime flow.
-- classify allocations by ownership, lifetime, and maximum bound.
-- identify unsafe or unbounded paths requiring correction.
+`M7` does not optimize abstract benchmark scores in isolation.
 
-Exit check:
+The engine is considered fast only if it improves one or more of:
 
-- audited queue exists with ranked, bounded implementation tickets.
+- feed-to-apply latency for interactive input-sized updates
+- stability of frame-to-frame work under scroll/update pressure
+- throughput for representative terminal byte streams
+- allocation count and allocation volume on runtime-critical paths
+- steady-state memory bounds for configured screen/history sizes
 
-### M7-C: Bounded Allocation and Throughput Hardening
+### What "Bounded" Means Here
 
-- implement highest-impact bounded-allocation fixes from M7-B queue.
-- preserve external behavior and frozen contract semantics.
-- add targeted tests/bench evidence for changed hot paths.
+`howl-terminal` is an embedded-style engine, not a "grow first, rationalize
+later" runtime.
 
-Exit check:
+For `M7`, bounded means:
 
-- bounded-allocation guarantees are enforced for covered surfaces.
+- ownership is explicit
+- lifetime is explicit
+- maximum retained memory is explainable from configuration
+- hot paths avoid allocator traffic unless contractually justified
+- no hidden queues, caches, or growth surfaces are introduced without authority
 
-### M7-D: Freeze and Handoff
+## Scope (Architect-Only)
 
-- freeze M7 authority/progress and queue state.
-- publish next milestone handoff scope.
+`M7` currently includes:
 
-Exit check:
+- defining optimization philosophy and tradeoff order
+- defining reproducible measurement protocol
+- identifying hot paths and allocation surfaces worth caring about
+- defining acceptance gates for future implementation work
+- deciding which evidence is required before any engineer execution queue exists
 
-- M7 marked done with evidence links and clean queue transition.
+`M7` currently excludes:
 
-## Non-Goals (M7)
+- implementation work delegated to engineers
+- opportunistic micro-optimizations
+- benchmark-only churn
+- host-specific render loop policy
+- speculative concurrency or buffering changes
 
-- no semantic expansion of VT behavior.
-- no host/platform integration work.
-- no compatibility/fallback/shim layers.
-- no benchmark theater: changes must link to bounded contract outcomes.
+## Required Measurement Surfaces
+
+Any future `M7` implementation slice must tie back to one or more of these:
+
+- parser throughput for representative ASCII, UTF-8 text, and CSI-heavy streams
+- runtime `feed* -> apply` latency for small interactive updates
+- scroll/update stability under history-producing streams
+- snapshot overhead, including allocation and copy cost
+- allocation count and bytes allocated along hot runtime paths
+- configured memory footprint for screen, history, snapshot, and selection state
+
+## Evidence Standard
+
+No optimization work is accepted on style or intuition alone.
+
+Every future `M7` implementation proposal must state:
+
+- which measurement surface it targets
+- what the current cost is
+- what the expected gain is
+- what semantic surfaces must remain unchanged
+- what new bound, if any, becomes stronger after the change
+
+Evidence must be reproducible on local developer machines with repo-local tools
+or simple documented commands. If evidence cannot be rerun, it is not authority.
+
+## Non-Goals
+
+`M7` is not:
+
+- a renderer benchmark contest
+- a host GUI latency project
+- a justification for semantic shortcuts
+- a place to add fallback code paths, compatibility branches, or hidden caches
+- a permission slip for "temporary" allocation-heavy designs
 
 ## Stop Conditions
 
 Stop and escalate if any occur:
 
-- proposed M7 optimization requires changing frozen M1-M6 behavior.
-- bounded-allocation requirement conflicts with existing contract guarantees.
-- measurement evidence is non-reproducible under defined protocol.
+- a proposed optimization changes frozen `M1-M6` behavior instead of preserving
+  it
+- the only way to improve a metric is to blur an existing contract boundary
+- a benchmark result cannot be tied to a real product measurement surface
+- measurement protocol depends on ad hoc local setup that others cannot repeat
+
+## M7 Phases
+
+### M7-A: Architect Doctrine Closure
+
+- finalize success metric ordering
+- define memory discipline vocabulary and rules
+- define trusted benchmark and profiling protocol
+- define what future engineer slices are allowed to touch
+
+Exit check:
+
+- one architect can hand the doctrine to another without oral context
+
+### M7-B: Architect Audit
+
+- inspect hot paths and allocation sites across parser, event, screen, runtime,
+  and snapshot surfaces
+- classify each as acceptable, suspicious, or must-fix
+- rank work by user impact first, implementation neatness second
+
+Exit check:
+
+- audited findings exist with a reviewable shortlist of real targets
+
+### M7-C: Implementation Queue Publication
+
+- only after `M7-A` and `M7-B` are complete
+- publish narrowly-scoped implementation tickets with explicit files, non-goals,
+  validation, and stop conditions
+
+Exit check:
+
+- engineer work, if any, is bounded by doctrine and audit rather than discovery
+
+### M7-D: Freeze
+
+- freeze doctrine, findings, and accepted implementation evidence
+- update milestone state for the next milestone handoff
+
+Exit check:
+
+- `M7` can be cited as stable authority for future host-readiness work
+
+## Review Bar
+
+`M7` review is stricter than normal feature review.
+
+Changes under `M7` must be judged on:
+
+- correctness preservation
+- measurable effect on a declared target
+- whether the new memory/ownership story is simpler, not merely faster
+- whether the result makes the engine easier to reason about under load
 
 ## Validation Baseline
 
-Every M7 execution slice must pass:
+Every `M7` slice, including doctrine-only updates, must still pass:
 
 - `zig build`
 - `zig build test`

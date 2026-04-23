@@ -21,7 +21,7 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M6`, with `M1-M5` retained as frozen baselines.
+Current milestone target is `M7`, with `M1-M6` retained as frozen baselines.
 
 ## M2 Checklist
 
@@ -112,6 +112,24 @@ proven deterministic through runtime/direct parity evidence.
 1. Publish/update `app_architecture/authorities/M6_FOUNDATION.md` with bounded start/end, gates, and stop conditions.
 2. Execute M6-A through M6-D in order with contract-first validation.
 3. Mark `M6` done and repoint active queue to M7 planning scope.
+
+## M7 Checklist
+
+M7 is complete only when performance and memory discipline are defined by
+explicit doctrine, audited against the real codebase, and backed by reproducible
+evidence rather than intuition.
+
+- `[ ]` M7-A: Performance doctrine closure: metric priority order, tradeoff rules, and "bounded" vocabulary are explicit.
+- `[ ]` M7-B: Measurement protocol: trusted local benchmark/profiling method is documented and reproducible.
+- `[ ]` M7-C: Hot-path audit: parser/event/screen/runtime/snapshot hot paths and allocation sites are classified and ranked.
+- `[ ]` M7-D: Implementation gates: future optimization tickets are bounded by exact targets, evidence expectations, and stop conditions.
+- `[ ]` M7-E: Freeze evidence: doctrine, audit findings, accepted optimizations, and resulting bounds are frozen for M8.
+
+### M7 Closeout Sequence
+
+1. Complete architect-only doctrine and audit work before publishing any engineer execution queue.
+2. Land only optimization slices that tie to declared measurement surfaces and preserve frozen `M1-M6` semantics.
+3. Mark `M7` done only when the memory/performance story is explicit enough to support host-readiness work without guesswork.
 
 ## Authority Rules
 
