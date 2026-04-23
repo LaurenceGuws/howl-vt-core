@@ -21,7 +21,24 @@ It is intentionally non-implementation-detailed.
 
 ## Current Direction
 
-Current milestone target is `M1`, with `M0` baseline retained.
+Current milestone target is `M2`, with `M1` baseline retained.
+
+## M2 Checklist
+
+M2 is complete only when each checklist item is explicitly satisfied and
+validated by replay/parity/runtime evidence.
+
+- `[x]` Wrap semantics: line wrap and bottom-row scroll behavior are deterministic.
+- `[x]` Tab semantics: HT/CHT/CBT behavior, clamping, split-feed handling, and interruption determinism are locked.
+- `[x]` Mode semantics: DEC private mode state (`?25`, `?7`) is deterministic and reset-consistent.
+- `[x]` Reset/state consistency: `clear`, `reset`, `resetScreen`, and DECSTR behavior are contract-aligned and parity-covered.
+- `[ ]` Remaining core screen-state breadth audit and closure pass for M2 (identify any unmapped in-scope cursor/control semantics and either implement or explicitly defer with authority rationale).
+
+### M2 Closeout Sequence
+
+1. Run a final M2 breadth-gap audit against current contracts and replay surface.
+2. Implement or explicitly defer each in-scope gap with tests and authority updates.
+3. Perform one M2 freeze pass (contracts, milestone progress, active queue) and mark `M2` done.
 
 ## Authority Rules
 
