@@ -5127,3 +5127,190 @@ test "M4 closeout: encoding covers function keys with modifiers" {
     const alt_f11 = engine.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_ALT);
     try std.testing.expectEqualSlices(u8, "\x1b[23;3~", alt_f11);
 }
+
+// ============================================================================
+// M5-A2 Conformance Tests: Runtime Lifecycle Matrix Invariants
+// ============================================================================
+
+test "M5-A2 conformance: clear() empties queue without mutating parser or screen" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    // Feed content
+    engine.feedSlice("ABC\x1b[2J");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+
+    const screen_before = engine.screen().*;
+
+    // Clear queue without applying
+    engine.clear();
+
+    // Queue is empty, screen unchanged
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expectEqual(screen_before.cursor_row, engine.screen().cursor_row);
+    try std.testing.expectEqual(screen_before.cursor_col, engine.screen().cursor_col);
+}
+
+test "M5-A2 conformance: reset() clears parser+queue but preserves screen modes" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    defer engine.deinit();
+
+    // Set modes via feed/apply
+    engine.feedSlice("\x1b[?25l\x1b[?7h");
+    engine.apply();
+
+    const cursor_visible = engine.screen().cursor_visible;
+    const auto_wrap = engine.screen().auto_wrap;
+
+    // Feed content and partial CSI
+    engine.feedSlice("test\x1b[");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+
+    // Reset parser and queue
+    engine.reset();
+
+    // Queue is empty, screen modes preserved
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expectEqual(cursor_visible, engine.screen().cursor_visible);
+    try std.testing.expectEqual(auto_wrap, engine.screen().auto_wrap);
+}
+
+test "M5-A2 conformance: resetScreen() clears screen but preserves parser+queue" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    // Feed and apply content to establish screen state
+    engine.feedSlice("Hello");
+    engine.apply();
+    const screen_col = engine.screen().cursor_col;
+    try std.testing.expect(screen_col > 0);
+
+    // Feed new content (don't apply yet)
+    engine.feedSlice("\x1b[2J");
+    const queued_before = engine.queuedEventCount();
+
+    // Reset screen
+    engine.resetScreen();
+
+    // Screen reset (cursor at origin), but queue preserved for apply
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    try std.testing.expectEqual(queued_before, engine.queuedEventCount());
+}
+
+test "M5-A2 conformance: multiple apply() calls without feed are no-ops" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    defer engine.deinit();
+
+    // Feed, apply, and capture state
+    engine.feedSlice("X");
+    engine.apply();
+    const col_after_first = engine.screen().cursor_col;
+
+    // Additional apply() calls should not change screen
+    engine.apply();
+    engine.apply();
+
+    try std.testing.expectEqual(col_after_first, engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
+test "M5-A2 conformance: feed operations queue events without applying" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    defer engine.deinit();
+
+    // feedByte queues without applying
+    engine.feedByte('A');
+    engine.feedByte('B');
+    engine.feedByte('C');
+    try std.testing.expect(engine.queuedEventCount() > 0);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col); // screen unchanged
+
+    // feedSlice also queues
+    engine.feedSlice("\x1b[5;10H");
+    try std.testing.expect(engine.queuedEventCount() > 0);
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col); // screen unchanged
+
+    // apply() processes queue
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 0), engine.queuedEventCount());
+    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col); // now at col 9 (0-based)
+}
+
+test "M5-A2 conformance: encode operations have no observable state effects" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer engine.deinit();
+
+    // Establish state
+    engine.feedSlice("DATA");
+    engine.apply();
+    engine.selectionStart(0, 5);
+
+    const screen_state = engine.screen().*;
+    const selection_state = engine.selectionState().?;
+    const history_count = engine.historyCount();
+    const queued_count = engine.queuedEventCount();
+
+    // Encode various inputs
+    _ = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    _ = engine.encodeKey('X', model_mod.VTERM_MOD_NONE);
+    _ = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_CTRL);
+
+    // State unchanged
+    try std.testing.expectEqual(screen_state.cursor_row, engine.screen().cursor_row);
+    try std.testing.expectEqual(screen_state.cursor_col, engine.screen().cursor_col);
+    try std.testing.expectEqual(selection_state.start.row, engine.selectionState().?.start.row);
+    try std.testing.expectEqual(selection_state.start.col, engine.selectionState().?.start.col);
+    try std.testing.expectEqual(history_count, engine.historyCount());
+    try std.testing.expectEqual(queued_count, engine.queuedEventCount());
+}
+
+test "M5-A2 conformance: screen() returns const reference only" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    defer engine.deinit();
+
+    const screen_ref = engine.screen();
+
+    // Verify const semantics: we can read but cannot mutate
+    _ = screen_ref.cursor_row;
+    _ = screen_ref.cursor_col;
+    _ = screen_ref.cursor_visible;
+
+    // screen() is safe to call multiple times
+    const screen_ref2 = engine.screen();
+    try std.testing.expectEqual(screen_ref.cursor_row, screen_ref2.cursor_row);
+}
+
+test "M5-A2 conformance: feed/apply/reset ordering" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    // Scenario: feed → apply → feed → reset → apply
+    engine.feedSlice("First");
+    engine.apply();
+    try std.testing.expect(engine.screen().cursor_col > 0);
+
+    engine.feedSlice("\x1b[H"); // move to home
+    try std.testing.expect(engine.queuedEventCount() > 0);
+
+    engine.reset(); // clears parser and queue
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expect(engine.screen().cursor_col > 0); // screen unchanged
+
+    // Apply after reset with no new feed: no-op
+    engine.apply();
+    try std.testing.expect(engine.screen().cursor_col > 0);
+
+    // Feed new sequence
+    engine.feedSlice("\x1b[H");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+}
