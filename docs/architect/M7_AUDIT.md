@@ -233,3 +233,7 @@ Doctrine decisions corresponding to findings are now recorded in:
 - `D1` queue growth policy: `M7_FOUNDATION.md`
 - `D2` bridge ownership priority: `M7_FOUNDATION.md`
 - `D3` snapshot opt-in cost policy: `M7_FOUNDATION.md`
+
+Execution spec status:
+
+- `F1` implementation spec published: `docs/architect/M7_F1_SPEC.md`
