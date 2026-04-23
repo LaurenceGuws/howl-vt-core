@@ -116,6 +116,71 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Deterministic: same event + mode always produces same bytes.
 - Breakage: changing mouse report output for covered mode combinations, returning mutable slice, mutating state.
 
+## Runtime Lifecycle Matrix (M5+)
+
+Unambiguous mutation/read boundaries for all engine method families and interaction invariants.
+
+### Method Groups and State Mutations
+
+| Method Family | Mutates | Reads | Effect on Other Calls |
+| --- | --- | --- | --- |
+| **Input Feed** | parser, pipeline queue | bytes in | queues events; does not apply to screen |
+| `feedByte(byte)` | parser state, bridge queue | single byte | advances parser state, appends event if complete |
+| `feedSlice(bytes)` | parser state, bridge queue | byte slice | processes all bytes in sequence, may append multiple events |
+| **Queue Management** | pipeline queue | current queue | allows selective event handling |
+| `clear()` | bridge queue (empties) | — | drops pending events; screen and parser unchanged |
+| **Parser Reset** | parser, pipeline queue | — | clears parser state and bridge queue; screen unchanged |
+| `reset()` | parser state, bridge queue | screen modes | resets parser to initial state; preserves screen visible state and modes (cursor_visible, auto_wrap) |
+| **Screen Reset** | screen state (cells, cursor, wrap) | screen dimensions, history | clears visible cells and resets cursor to origin; parser and queue unchanged; does not truncate history |
+| `resetScreen()` | cell buffer, cursor, wrap state | allocator (owner), history storage | restores screen defaults (cursor_visible=true, auto_wrap=true, origin cursor) |
+| **Screen Read** | — | screen state snapshot | const reference; does not change anything |
+| `screen()` | — | current ScreenState | returns *const ScreenState for safe inspection |
+| **History Reads** | — | history buffer, dimensions | read-only accessors; deterministic and repeatable |
+| `historyRowAt(idx, col)` | — | history buffer | returns codepoint or 0; does not mutate |
+| `historyCount()` | — | history metadata | returns current rows in buffer (0 to capacity) |
+| `historyCapacity()` | — | history metadata | returns max capacity (0 if no history) |
+| **Selection Writes** | selection state | input coordinates, screen state | mutates SelectionState.active and endpoints |
+| `selectionStart(row, col)` | selection.active, selection.start/end | input (row, col) | begins new selection; marks active=true |
+| `selectionUpdate(row, col)` | selection.end | input (row, col) | updates end when active; no-op if inactive |
+| `selectionFinish()` | selection.finished | selection.active | marks selection complete; remains accessible until clear() |
+| `selectionClear()` | selection.active, selection.finished | — | marks selection inactive; clears start/end |
+| **Selection Read** | — | selection state | const snapshot; does not change anything |
+| `selectionState()` | — | SelectionState | returns ?TerminalSelection (null if inactive) |
+| **Encode (Keyboard)** | encode_buf (internal) | key, mod, internal buffer | produces control byte sequence; does not mutate screen/parser/history |
+| `encodeKey(key, mod)` | internal encode_buf | input key and modifier | returns slice; valid until next encode call |
+| **Encode (Mouse)** | encode_buf (internal) | event, mouse mode, internal buffer | produces control byte sequence; reads mode as read-only |
+| `encodeMouse(event)` | internal encode_buf | input event, current mouse mode | returns slice; deterministic per mode |
+
+### Interaction Invariants
+
+**Feed → Apply Cycle**
+- `feedByte`/`feedSlice` queues events; `apply()` processes queue exactly once and drains it.
+- Multiple `apply()` calls without intervening feed see empty queue and do not mutate screen.
+- Split-feed chunking is transparent: same bytes fed in chunks or as one slice produce identical end state.
+
+**Clear vs Reset**
+- `clear()`: queued events discarded, parser and screen unchanged.
+- `reset()`: parser reset to initial state, queued events discarded, screen modes preserved.
+- `resetScreen()`: screen state cleared (cells, cursor), parser and queue unchanged.
+- Call order: `clear()` + `reset()` + `resetScreen()` produces clean engine (empty parser, empty queue, empty screen).
+
+**Reset Stability for Encode**
+- `encodeKey()` and `encodeMouse()` output is independent of `reset()` or `resetScreen()`.
+- Encoding before and after reset produces identical output for identical input.
+
+**Selection and History**
+- `apply()` may invalidate selection if history rows it references were evicted (M3+ bounded history).
+- Selection reads are always const; no mutable selection escape hatch.
+- History reads are const; mutations only by `apply()` events during feed/apply cycle.
+
+**State Isolation**
+- Input encode functions (`encodeKey`, `encodeMouse`) do not:
+  - read or mutate screen/parser/history/selection state
+  - call `reset()`, `resetScreen()`, `clear()`, or `apply()`
+  - affect subsequent feed/apply/clear operations
+- Selection operations do not affect feed/apply/reset cycles.
+- History read does not affect selection or feed/apply state.
+
 ## Behavioral Guarantees
 
 - `Engine` is a transparent facade over `Pipeline` plus `ScreenState`.
