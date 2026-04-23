@@ -11,6 +11,7 @@ const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
 const runtime_mod = @import("../runtime/engine.zig");
 const model_mod = @import("../model.zig");
+const model = @import("../model.zig");
 
 const Event = union(enum) {
     stream_codepoint: u21,
@@ -5735,5 +5736,298 @@ test "M6-C replay evidence: snapshot wraparound history indices after eviction" 
         while (col < snap.cols) : (col += 1) {
             try std.testing.expectEqual(engine.historyRowAt(row, col), snap.historyRowAt(row, col));
         }
+    }
+}
+
+test "M8-E2: feed/apply/reset interleavings preserve frozen boundaries" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("ABC");
+    engine.apply();
+    var snap1 = try engine.snapshot();
+    defer snap1.deinit();
+
+    engine.feedSlice("DEF");
+    engine.feedSlice("GHI");
+    var snap2 = try engine.snapshot();
+    defer snap2.deinit();
+    try std.testing.expectEqual(snap1.cursor_col, snap2.cursor_col);
+
+    engine.apply();
+    var snap3 = try engine.snapshot();
+    defer snap3.deinit();
+
+    engine.reset();
+    var snap4 = try engine.snapshot();
+    defer snap4.deinit();
+
+    try std.testing.expectEqual(snap3.cursor_row, snap4.cursor_row);
+    try std.testing.expectEqual(snap3.cursor_col, snap4.cursor_col);
+}
+
+test "M8-E2: resetScreen clears cells without disrupting subsequent feed/apply" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("BEFORE");
+    engine.apply();
+    var snap_before = try engine.snapshot();
+    defer snap_before.deinit();
+    try std.testing.expectEqual(@as(u16, 6), snap_before.cursor_col);
+
+    engine.resetScreen();
+    var snap_cleared = try engine.snapshot();
+    defer snap_cleared.deinit();
+    try std.testing.expectEqual(@as(u16, 0), snap_cleared.cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), snap_cleared.cursor_col);
+
+    engine.feedSlice("AFTER");
+    engine.apply();
+    var snap_after = try engine.snapshot();
+    defer snap_after.deinit();
+    try std.testing.expectEqual(@as(u16, 5), snap_after.cursor_col);
+}
+
+test "M8-E2: selection remains stable across feed/apply/reset cycles" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("0123456789");
+    engine.apply();
+
+    engine.selectionStart(0, 1);
+    engine.selectionUpdate(0, 5);
+    engine.selectionFinish();
+
+    var snap_sel = try engine.snapshot();
+    defer snap_sel.deinit();
+    try std.testing.expect(snap_sel.selection != null);
+    if (snap_sel.selection) |sel| {
+        try std.testing.expectEqual(@as(u16, 1), sel.start.col);
+        try std.testing.expectEqual(@as(u16, 5), sel.end.col);
+    }
+
+    engine.feedSlice("\x1b[H");
+    var snap_queued = try engine.snapshot();
+    defer snap_queued.deinit();
+    try std.testing.expectEqual(snap_sel.selection, snap_queued.selection);
+
+    engine.apply();
+    var snap_applied = try engine.snapshot();
+    defer snap_applied.deinit();
+    try std.testing.expectEqual(snap_sel.selection, snap_applied.selection);
+
+    engine.reset();
+    var snap_reset = try engine.snapshot();
+    defer snap_reset.deinit();
+    try std.testing.expectEqual(snap_sel.selection, snap_reset.selection);
+}
+
+test "M8-E2: history preserved across clear/reset cycles" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("A\r\nB\r\nC\r\nD");
+    engine.apply();
+    const hist_before = engine.historyCount();
+    var snap_before = try engine.snapshot();
+    defer snap_before.deinit();
+
+    engine.feedSlice("\x1b[H");
+    engine.clear();
+    var snap_after_clear = try engine.snapshot();
+    defer snap_after_clear.deinit();
+    try std.testing.expectEqual(hist_before, snap_after_clear.history_count);
+
+    engine.feedSlice("\x1b[m");
+    engine.reset();
+    var snap_after_reset = try engine.snapshot();
+    defer snap_after_reset.deinit();
+    try std.testing.expectEqual(hist_before, snap_after_reset.history_count);
+
+    engine.resetScreen();
+    var snap_after_screen_reset = try engine.snapshot();
+    defer snap_after_screen_reset.deinit();
+    try std.testing.expectEqual(hist_before, snap_after_screen_reset.history_count);
+}
+
+test "M8-E2: encodeKey does not affect screen or queued events" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("TEST");
+    engine.apply();
+    var snap_before = try engine.snapshot();
+    defer snap_before.deinit();
+
+    _ = engine.encodeKey('A', 0);
+    _ = engine.encodeKey('B', 1);
+    _ = engine.encodeKey('C', 2);
+
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+
+    var snap_after = try engine.snapshot();
+    defer snap_after.deinit();
+    try std.testing.expectEqual(snap_before.cursor_row, snap_after.cursor_row);
+    try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
+}
+
+test "M8-E2: encodeMouse interleaved with mutations shows zero side effects" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer engine.deinit();
+
+    engine.feedSlice("INITIAL\r\nLINE2");
+    engine.apply();
+    var snap1 = try engine.snapshot();
+    defer snap1.deinit();
+
+    const mouse_move = model.MouseEvent{
+        .kind = .move,
+        .button = .none,
+        .row = 2,
+        .col = 5,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 0,
+    };
+    _ = engine.encodeMouse(mouse_move);
+
+    engine.feedSlice("X");
+    engine.apply();
+    var snap2 = try engine.snapshot();
+    defer snap2.deinit();
+
+    const mouse_click = model.MouseEvent{
+        .kind = .press,
+        .button = .left,
+        .row = 2,
+        .col = 5,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 1,
+    };
+    _ = engine.encodeMouse(mouse_click);
+
+    engine.selectionStart(0, 1);
+    engine.selectionUpdate(0, 5);
+    var snap3 = try engine.snapshot();
+    defer snap3.deinit();
+
+    _ = engine.encodeMouse(mouse_click);
+
+    engine.selectionFinish();
+    var snap4 = try engine.snapshot();
+    defer snap4.deinit();
+
+    try std.testing.expectEqual(snap3.selection != null, snap4.selection != null);
+}
+
+test "M8-E2: queuedEventCount reflects only feed phase, not encode calls" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("A");
+    const queue_count_1 = engine.queuedEventCount();
+    try std.testing.expect(queue_count_1 > 0);
+
+    _ = engine.encodeKey('X', 0);
+    const queue_count_2 = engine.queuedEventCount();
+    try std.testing.expectEqual(queue_count_1, queue_count_2);
+
+    const mouse_event = model.MouseEvent{
+        .kind = .move,
+        .button = .none,
+        .row = 0,
+        .col = 0,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 0,
+    };
+    _ = engine.encodeMouse(mouse_event);
+    const queue_count_3 = engine.queuedEventCount();
+    try std.testing.expectEqual(queue_count_1, queue_count_3);
+
+    engine.apply();
+    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+}
+
+test "M8-E2: history read seam stable across concurrent selection operations" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("AAAAA\r\nBBBBB\r\nCCCCC\r\nDDDDD");
+    engine.apply();
+
+    const hist_cap = engine.historyCapacity();
+    const hist_count_before = engine.historyCount();
+
+    engine.selectionStart(-1, 0);
+    engine.selectionUpdate(-1, 4);
+    const hist_count_during = engine.historyCount();
+    try std.testing.expectEqual(hist_count_before, hist_count_during);
+
+    const cell_val = engine.historyRowAt(0, 2);
+    _ = cell_val;
+    const hist_count_after_read = engine.historyCount();
+    try std.testing.expectEqual(hist_count_before, hist_count_after_read);
+
+    engine.selectionFinish();
+    try std.testing.expectEqual(hist_count_before, engine.historyCount());
+    try std.testing.expectEqual(hist_cap, engine.historyCapacity());
+}
+
+test "M8-E2: snapshot stable across mixed feed/encode/selection operations" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
+    defer engine.deinit();
+
+    engine.feedSlice("LINE1\r\nLINE2");
+    engine.apply();
+
+    var snap_seq: [5]model.EngineSnapshot = undefined;
+    snap_seq[0] = try engine.snapshot();
+
+    _ = engine.encodeKey('A', 0);
+    snap_seq[1] = try engine.snapshot();
+
+    engine.selectionStart(0, 0);
+    snap_seq[2] = try engine.snapshot();
+
+    const mouse = model.MouseEvent{
+        .kind = .move,
+        .button = .none,
+        .row = 1,
+        .col = 2,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 0,
+    };
+    _ = engine.encodeMouse(mouse);
+    snap_seq[3] = try engine.snapshot();
+
+    engine.selectionUpdate(0, 5);
+    snap_seq[4] = try engine.snapshot();
+
+    for (0..4) |i| {
+        try std.testing.expectEqual(snap_seq[i].rows, snap_seq[i + 1].rows);
+        try std.testing.expectEqual(snap_seq[i].cols, snap_seq[i + 1].cols);
+        try std.testing.expectEqual(snap_seq[i].cursor_row, snap_seq[i + 1].cursor_row);
+    }
+
+    for (&snap_seq) |*snap| {
+        snap.deinit();
     }
 }
