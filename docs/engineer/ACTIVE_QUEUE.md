@@ -16,75 +16,68 @@ Execution-only queue for the current engineer loop.
 
 ## Current Loop
 
-**Status:** M4-A completed and frozen.
+**Status:** M4-A accepted and frozen. Execute M4-B.
 
-M1/M2/M3/M4-A are frozen. Do not reopen input encoding or prior-milestone behavior unless
-a subsequent test exposes a direct regression.
+M1/M2/M3/M4-A are frozen. Do not reopen parser/screen/history/selection or
+M4-A input behavior unless an M4-B test exposes a direct regression.
 
-### M4-A Closeout Summary (COMPLETED)
+## M4-B Tickets
 
-- M4-A1: Input/Control contract authority (8923640)
-- M4-A2: Runtime input encode surface (97cfbfb)
-- M4-A3: Input parity and reset/mode contracts (46e1aee)
+### M4-B1: Mode-Interaction Contract Closure
 
-All validation passed. Technical issues identified by architect have been corrected:
-- Cursor key modifier encoding fixed (now supports Shift, uses correct CSI format)
-- Determinism tests fixed (no longer rely on buffer aliasing)
-- Mouse coordinate types updated (row: i32 for history support, col: u16)
-- Contracts updated to reflect implementation
-- Tracking documents updated
-
-Ready for M4-B phase.
-
-## M4-B Tickets (Next - Not Yet Active)
-
-Placeholder for next phase. M4-B will cover:
-- Mode interactions (mouse reporting, paste mode, etc.)
-- Extended key coverage (function keys, special keys)
-- Compliance and closeout testing
-
-### M4-A1: Input/Control Contract Authority (COMPLETED)
-
-- `ID`: M4-A1
-- `Target files`: new `app_architecture/contracts/INPUT_CONTROL.md`, `app_architecture/contracts/RUNTIME_API.md`, `app_architecture/contracts/MODEL_API.md`
-- `Allowed change type`: documentation-only authority update
-- `Intent`: define host-neutral input/control model and boundaries before adding new runtime behavior
-- `Required content`:
-  - canonical input event model and fields (key/modifier/mouse/control)
-  - encoding ownership boundary (what is in scope for `howl-terminal` vs host)
-  - deterministic behavior requirements and non-goals
-  - explicit interactions with existing mode/reset contracts
-- `Non-goals`: no Zig source changes; no platform event schemas; no renderer/clipboard policy
+- `ID`: M4-B1
+- `Target files`: `app_architecture/contracts/INPUT_CONTROL.md`, `app_architecture/contracts/RUNTIME_API.md`
+- `Allowed change type`: documentation-first authority update (code only if required for consistency)
+- `Intent`: close the remaining mode-interaction ambiguity by defining exactly what mode state influences encoding in M4
+- `Required behavior`:
+  - one unambiguous rule for context sensitivity (mode-aware vs fully mode-agnostic) for current encode surface
+  - explicit reset/resetScreen effects on input mode state
+  - explicit non-goals for unsupported mode-dependent behavior in M4
+- `Non-goals`: no host/platform event schemas; no renderer or clipboard policy
 - `Validation`: `zig build`; `zig build test`; `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
-- `Stop conditions`: stop if contract requires host/platform coupling or breaks frozen M1-M3 API guarantees
+- `Stop conditions`: stop if closure requires breaking M4-A API signatures or reopening frozen M1-M3 behavior
 
-### M4-A2: Runtime Input Encode Surface
+### M4-B2: Extended Key Coverage
 
-- `ID`: M4-A2
-- `Target files`: `src/runtime/engine.zig`, `src/model/types.zig`, `src/root.zig`, `src/test/relay.zig`, any new `src/runtime/*` module needed
-- `Allowed change type`: add minimal host-neutral input encode surface in runtime
-- `Intent`: provide deterministic control-byte output for supported input events without exposing parser/pipeline internals
+- `ID`: M4-B2
+- `Target files`: `src/runtime/engine.zig`, `src/model.zig`, `src/model/types.zig`, `src/test/relay.zig`, `app_architecture/contracts/INPUT_CONTROL.md`
+- `Allowed change type`: runtime encode expansion + tests + contract sync
+- `Intent`: add deterministic encoding for remaining core non-printable keys in M4 scope
 - `Required behavior`:
-  - input API accepts abstract model input types only
-  - output bytes are deterministic for covered key/control cases
-  - no mutation of frozen history/selection behavior
-- `Non-goals`: no host adapters; no platform keycode tables; no IME/editor policy; no compatibility alias APIs
+  - implement deterministic encode behavior for `INS`, `DEL`, `HOME`, `END`, `PAGEUP`, `PAGEDOWN`
+  - encode output must be stable for all modifier combinations currently supported by policy
+  - no mutation of parser/screen/history/selection state during encode calls
+- `Non-goals`: no function key matrix yet; no mode-specific mouse reporting formats
 - `Validation`: `zig build`; `zig build test`; shim grep above
-- `Stop conditions`: stop if implementation requires host platform event dependencies or incompatible runtime API breaks
+- `Stop conditions`: stop if any key requires host layout/platform keycode coupling
 
-### M4-A3: Input Parity and Reset/Mode Contracts
+### M4-B3: Function-Key Baseline
 
-- `ID`: M4-A3
-- `Target files`: `src/test/relay.zig`, `app_architecture/contracts/INPUT_CONTROL.md`, `app_architecture/contracts/RUNTIME_API.md`
-- `Allowed change type`: tests + contract tightening for implemented M4 input slice
-- `Intent`: lock determinism for initial input/control behavior and preserve reset/mode expectations
+- `ID`: M4-B3
+- `Target files`: `src/model/types.zig`, `src/model.zig`, `src/runtime/engine.zig`, `src/test/relay.zig`, `app_architecture/contracts/INPUT_CONTROL.md`, `app_architecture/contracts/MODEL_API.md`
+- `Allowed change type`: add F-key constants/surface + deterministic encode support + tests
+- `Intent`: establish a minimal but explicit function-key encode baseline in M4
 - `Required behavior`:
-  - parity tests for representative input/control sequences
-  - explicit reset and mode interaction assertions for new input API
-  - contract text reflects implemented behavior exactly
-- `Non-goals`: no broad feature expansion beyond the implemented M4-A2 surface
+  - add canonical model constants for function keys in scoped range (`F1`-`F12`)
+  - add deterministic encode mappings with modifiers per adopted contract
+  - include runtime tests proving determinism and reset/resetScreen stability
+- `Non-goals`: no full terminal profile compatibility matrix; no host-specific function-key remapping
 - `Validation`: `zig build`; `zig build test`; shim grep above
-- `Stop conditions`: stop if parity cannot be established without reopening frozen M1-M3 semantics
+- `Stop conditions`: stop if proposed mappings conflict with frozen M4-B1 contract decisions
+
+### M4-B4: M4 Closeout Evidence Pack
+
+- `ID`: M4-B4
+- `Target files`: `src/test/relay.zig`, `app_architecture/contracts/INPUT_CONTROL.md`, `app_architecture/authorities/MILESTONE.md`, `docs/architect/MILESTONE_PROGRESS.md`, `docs/engineer/ACTIVE_QUEUE.md`
+- `Allowed change type`: tests + closeout docs
+- `Intent`: finish remaining M4 checklist items and prepare milestone freeze transition
+- `Required behavior`:
+  - parity/replay tests demonstrate representative control-output coverage for implemented M4 scope
+  - M4 checklist reflects completed scope only (no overclaims)
+  - progress board and queue are updated for post-M4 handoff
+- `Non-goals`: no expansion beyond implemented M4 features
+- `Validation`: `zig build`; `zig build test`; shim grep above
+- `Stop conditions`: stop if required parity cannot be demonstrated without changing frozen milestone behavior
 
 ## Report Format
 
