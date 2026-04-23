@@ -27,9 +27,11 @@ Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`,
 - Responsibility: cell content and style representation.
 - Breakage: field/type changes; semantic changes to color/default behavior.
 
-**SelectionPos / TerminalSelection** (re-exported from selection module)
-- Responsibility: selection data representation.
-- Breakage: field/type changes.
+**SelectionPos / TerminalSelection** (re-exported from selection module, M3)
+- Responsibility: selection endpoint and state data representation.
+- Ownership: M3 selection primitive.
+- Breakage: field/type changes; coordinate representation changes.
+- Coordinate semantics: defined in `app_architecture/contracts/HISTORY_SELECTION.md`.
 
 **defaultCell**
 - Responsibility: default cell construction helper.
@@ -56,12 +58,26 @@ Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`,
 - `Metrics.beginFrame` updates frame EMA only after an initial frame timestamp exists.
 - `Metrics.recordDraw` updates draw EMA; updates input-latency metrics only when `last_input_time` is set.
 
+## M3 History and Selection Integration
+
+History and selection are added in M3 as transparent extensions:
+
+- Selection state is independent of visible screen and does not affect M1-M2 cursor/cell behavior.
+- Selection is never cleared or invalidated by semantic screen events (`reset()`, DECSTR, `clear()`).
+- History storage is optional and allocator-owned; does not affect M1-M2 visible-screen guarantees.
+- Selection endpoints use signed coordinates to reference both viewport and history rows.
+- History is truncated explicitly only when capacity is reduced, not by any semantic screen operation.
+- Zero-cell or zero-dimension screens do not allocate history regardless of M3 configuration.
+
+Detailed history and selection semantics are in `app_architecture/contracts/HISTORY_SELECTION.md`.
+
 ## Non-Goals
 
 - No host/session/platform coupling.
 - No rendering policy decisions.
 - No PTY/protocol dispatch behavior.
 - No scrollback/wrap/terminal-runtime policy.
+- No text extraction, clipboard, or selection painting (M3 provides coordinate model only).
 
 ## Breaking Change Rule
 

@@ -124,6 +124,21 @@ Interruption coverage index (`src/test/relay.zig`):
 - Mode 2: entire screen.
 - `reset_screen` / `reset` returns cursor to origin, clears pending wrap, and zeroes existing cells without changing dimensions.
 - Reset also restores mode defaults (`cursor_visible=true`, `auto_wrap=true`).
+- History (when present in M3) is **not** truncated or modified by `reset_screen` or any M2 semantic event.
+
+## M2 Semantics and M3 History
+
+History storage is added in M3 without changing any M2 visible-screen semantics:
+
+- All M2 behavioral guarantees for visible viewport coordinates remain unchanged.
+- `line_feed` at bottom row and pending-wrap bottom scroll capture scrolled rows to history (if configured) but do not change viewport cursor or cell behavior.
+- Selection state (added in M3) does not affect semantic screen behavior.
+- `reset()` and DECSTR do not truncate history or affect selection.
+- For screens created without cell storage (cursor-only), history is not allocated regardless of M3 configuration.
+- Zero-dimension screens continue to have no cell plane and do not allocate history.
+- Parity and determinism guarantees from M2 are preserved: equivalent byte streams produce identical visible-screen end state regardless of history configuration.
+
+History details are defined in `app_architecture/contracts/HISTORY_SELECTION.md`.
 
 ## Zero-Dimension Screen Behavior
 

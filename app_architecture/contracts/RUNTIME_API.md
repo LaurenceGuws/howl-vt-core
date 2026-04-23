@@ -52,12 +52,17 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Breakage: clearing parser state, dropping queued events, or preserving visible cells/cursor state.
 
 **screen(self) -> *const ScreenState**
-- Returns read-only access to current screen state.
+- Returns read-only access to current screen state (M1-M2 visible viewport).
 - Breakage: returning mutable state, changing lifetime, or returning another state representation.
 
 **queuedEventCount(self) -> usize**
 - Returns pending bridge event count.
 - Breakage: changing count semantics away from `Pipeline.len`.
+
+**history() const methods (M3)**
+- M3 adds const read-only history accessors through `Engine`.
+- History read surfaces are defined in `app_architecture/contracts/HISTORY_SELECTION.md`.
+- Breakage: exposing mutable history access; changing const lifetime; breaking history API contract.
 
 ## Behavioral Guarantees
 
