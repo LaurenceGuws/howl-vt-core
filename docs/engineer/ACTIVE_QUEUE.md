@@ -16,92 +16,23 @@ Execution-only queue for current engineer loop.
 
 ## Current Loop
 
-**Status:** M1 frozen; M2 closeout execution wave active.
+**Status:** M2 frozen; awaiting M3 scope definition.
 
-### TICKET M2-CLOSE-01: Cursor Alias Semantics Pack (`a`, `e`, `` ` ``)
+## M2 Freeze Handoff
 
-**Target files**
-- `src/event/semantic.zig`
-- `src/screen/state.zig`
-- `src/test/relay.zig`
-- `app_architecture/contracts/SEMANTIC_SCREEN.md`
+M2 Terminal State Breadth is **complete and frozen**. All checklist items are implemented and covered by deterministic replay/parity/runtime test evidence:
 
-**Allowed change type**
-- Add semantic mappings for cursor alias finals:
-  - `CSI a` -> horizontal relative position (alias of CUF behavior)
-  - `CSI e` -> vertical relative position (alias of CUD behavior)
-  - `CSI \`` -> horizontal absolute position (alias of CHA behavior)
-- Add deterministic replay/parity/parity-chunked/runtime coverage for each alias.
-- Add edge checks (default param, clamp behavior) for each alias.
-- Update contract mapping/guarantees for alias coverage.
+- Wrap semantics (`A`/`B`/`C`/`D`/`E`/`F` cursor motion, line wrapping, scroll behavior)
+- Tab semantics (`I`/`Z`/HT tabulation, clamping, split-feed interruption)
+- Mode semantics (`?25`/`?7` cursor visibility and auto-wrap)
+- Reset/state consistency (`clear`, `reset`, `resetScreen`, DECSTR)
+- Cursor alias semantics (`a`/`e`/`` ` `` as aliases for CUF/CUD/CHA)
 
-**Non-goals**
-- Do not change parser/bridge ownership boundaries.
-- Do not alter existing semantics for `A/B/C/D/E/F/G/H/f/d/I/Z/J/K/?25/?7/DECSTR`.
-- Do not add host/runtime API surface.
+Contract and test coverage are in `app_architecture/contracts/SEMANTIC_SCREEN.md` and `src/test/relay.zig`.
 
-**Validation**
-- `zig build`
-- `zig build test`
-- `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
+## Next Milestone
 
-**Stop conditions**
-- If alias mapping requires parser or bridge architecture changes, stop and report.
-- If any existing replay/parity scenario changes behavior unexpectedly, stop and report exact failing tests before patching.
-
-### TICKET M2-CLOSE-02: Alias Interruption Matrix (`DECSTR` ordering)
-
-**Target files**
-- `src/test/relay.zig`
-- `app_architecture/contracts/SEMANTIC_SCREEN.md`
-- `app_architecture/contracts/RUNTIME_API.md`
-
-**Allowed change type**
-- Extend interruption-order coverage for `a/e/\`` with both stream classes:
-  - split alias interrupted by DECSTR bytes
-  - split alias started after DECSTR
-- Add evidence in all lanes:
-  - direct replay
-  - parity (non-chunked)
-  - parity (chunked)
-  - runtime integration
-- Update interruption coverage index/scope text in contracts.
-
-**Non-goals**
-- Do not introduce new semantic variants beyond alias work from M2-CLOSE-01.
-- Do not rewrite existing interruption assertions for previously covered families unless required by failing tests.
-
-**Validation**
-- `zig build`
-- `zig build test`
-- `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
-
-**Stop conditions**
-- If interruption behavior is nondeterministic between direct and runtime paths, stop and report minimal repro bytes + observed divergence.
-- If contract wording would conflict with current tested behavior, stop and report proposed wording delta.
-
-### TICKET M2-CLOSE-03: M2 Breadth Closure + Freeze Prep
-
-**Target files**
-- `app_architecture/authorities/MILESTONE.md`
-- `docs/architect/MILESTONE_PROGRESS.md`
-- `docs/engineer/ACTIVE_QUEUE.md`
-
-**Allowed change type**
-- Mark M2 checklist items complete only if backed by merged tests/contracts.
-- Replace queue with explicit M2 freeze handoff or next-milestone entrypoint.
-- Align milestone progress wording to final M2 outcome.
-
-**Non-goals**
-- No source changes in `src/**`.
-- No new feature scope in this ticket.
-
-**Validation**
-- `zig build`
-- `zig build test`
-
-**Stop conditions**
-- If any M2 checklist item lacks authoritative test coverage, stop and list the missing coverage item(s) rather than marking done.
+M3 **History and Selection** is planned but not yet scoped. Awaiting architect design and milestone breakdown.
 
 ## Ticket Format (Required)
 

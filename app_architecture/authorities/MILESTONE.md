@@ -32,7 +32,7 @@ validated by replay/parity/runtime evidence.
 - `[x]` Tab semantics: HT/CHT/CBT behavior, clamping, split-feed handling, and interruption determinism are locked.
 - `[x]` Mode semantics: DEC private mode state (`?25`, `?7`) is deterministic and reset-consistent.
 - `[x]` Reset/state consistency: `clear`, `reset`, `resetScreen`, and DECSTR behavior are contract-aligned and parity-covered.
-- `[ ]` Remaining core screen-state breadth audit and closure pass for M2 (identify any unmapped in-scope cursor/control semantics and either implement or explicitly defer with authority rationale).
+- `[x]` Cursor alias semantics: CSI `a` (CUF alias), `e` (CUD alias), and `` ` `` (CHA alias) are mapped, deterministic, and parity-tested.
 
 ### M2 Closeout Sequence
 
