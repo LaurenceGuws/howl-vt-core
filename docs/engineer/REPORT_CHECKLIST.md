@@ -13,8 +13,13 @@ Before reporting work as complete, run this checklist.
 Human Rules:
 1. No compatibility/fallback/workaround/in-case code paths. Keep things KISS, DRY, and unambiguous.
 2. Naming conventions and docstrings are treated the same way: details live in markdown; file/fn/folder/comment names stay simple, clean, and intentional.
-3. `//!` rule: every `.zig` file in this repo must have a module definition doc comment in the approved format.
-4. `///` rule: every frozen public symbol must document intent and responsibility (where applicable) for ZLS completion integration.
+3. `//!` rule: every `.zig` file in this repo must have a module definition doc comment in this explicit format:
+   - `//! Responsibility: <what this module owns>`
+   - `//! Ownership: <which lane/authority owns it>`
+   - `//! Reason: <why this module exists as a seam>`
+4. `///` rule: every frozen public symbol must use concise consumer-facing docs in this explicit format:
+   - `/// <intent sentence>.`
+   - `/// Responsibility: <symbol responsibility>.` (only where applicable)
 5. Doc-comment scope rule: `//!` and `///` comments must be short, accurate, and domain-focused. They are consumer-facing module/API documentation, not ticket tracking, historical notes, or team collaboration logs.
 6. `///` and `//!` comment lines are architect/human owned unless explicitly authorized.
 7. `checkins/` is read-only for agents; use it only as context.

@@ -292,7 +292,7 @@ pub const Parser = struct {
                     self.finishOsc();
                     return;
                 }
-                // Stray ESC marker is dropped; keep the following byte as payload data.
+                
                 self.osc_state = .osc;
                 if (self.osc_buffer.items.len < 4096) {
                     self.osc_buffer.append(self.allocator, byte) catch {};
@@ -361,7 +361,7 @@ pub const Parser = struct {
                     self.finishDcs();
                     return;
                 }
-                // Stray ESC marker is dropped; keep the following byte as payload data.
+                
                 self.dcs_state = .dcs;
                 if (self.dcs_buffer.items.len < 4096) {
                     self.dcs_buffer.append(self.allocator, byte) catch {};

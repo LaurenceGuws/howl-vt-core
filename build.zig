@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    // Library/test-only build graph: module tests include relay integration via root.zig.
+    
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
