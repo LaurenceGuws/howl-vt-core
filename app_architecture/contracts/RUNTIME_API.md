@@ -65,7 +65,8 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - For equivalent byte streams, direct `Pipeline+ScreenState` and `Engine` produce identical cursor, cell, and queue end states.
 - Split-feed chunking does not change final behavior relative to feeding the same bytes as one slice.
 - If a split CSI is interrupted by a new escape sequence before its final byte, runtime behavior remains deterministic and stream-order dependent (no retroactive reinterpretation of the interrupted CSI bytes).
-- This interruption rule is verified across tabulation CSI (`I`/`Z`), DEC private mode CSI (`?25`/`?7`), absolute-position CSI (`G`/`d`), and line-position CSI (`E`/`F`) in replay, parity, and runtime integration tests.
+- This interruption rule is verified across tabulation CSI (`I`/`Z`), DEC private mode CSI (`?25`/`?7`), absolute-position CSI (`G`/`d`), line-position CSI (`E`/`F`), and relative cursor CSI (`B`/`C`) in replay, parity, and runtime integration tests.
+- Alias finals (`e`, `a`, `` ` ``) follow their mapped base-final behavior (`B`, `C`, `G`).
 - Ignored-event paths do not mutate screen state through `Engine`.
 - Zero-dimension behavior matches `ScreenState` and `Pipeline` contracts.
 - `reset()` and `resetScreen()` are intentionally separate: parser/queue reset does not clear screen, and screen reset does not clear parser/queue state.
