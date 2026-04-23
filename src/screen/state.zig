@@ -115,6 +115,20 @@ pub const ScreenState = struct {
         return c[@as(usize, row) * self.cols + col];
     }
 
+    pub fn historyRowAt(self: *const ScreenState, history_idx: u16, col: u16) u21 {
+        const h = self.history orelse return 0;
+        if (history_idx >= self.history_count or col >= self.cols) return 0;
+        return h[@as(usize, history_idx) * @as(usize, self.cols) + @as(usize, col)];
+    }
+
+    pub fn historyCount(self: *const ScreenState) u16 {
+        return self.history_count;
+    }
+
+    pub fn historyCapacity(self: *const ScreenState) u16 {
+        return self.history_capacity;
+    }
+
     pub fn apply(self: *ScreenState, event: SemanticEvent) void {
         switch (event) {
             .cursor_up => |n| {

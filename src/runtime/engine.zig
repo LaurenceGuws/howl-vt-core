@@ -36,6 +36,19 @@ pub const Engine = struct {
         };
     }
 
+    /// Initialize engine with cell buffer and bounded history (M3+).
+    pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !Engine {
+        var pipeline = try pipeline_mod.Pipeline.init(allocator);
+        errdefer pipeline.deinit();
+        var state = try screen_mod.ScreenState.initWithCellsAndHistory(allocator, rows, cols, history_capacity);
+        errdefer state.deinit(allocator);
+        return Engine{
+            .allocator = allocator,
+            .pipeline = pipeline,
+            .state = state,
+        };
+    }
+
     /// Deinitialize engine and release all resources.
     pub fn deinit(self: *Engine) void {
         self.state.deinit(self.allocator);
@@ -81,5 +94,20 @@ pub const Engine = struct {
     /// Get count of pending bridge events before apply.
     pub fn queuedEventCount(self: *const Engine) usize {
         return self.pipeline.len();
+    }
+
+    /// Get const cell value from history at given history row and column (M3+).
+    pub fn historyRowAt(self: *const Engine, history_idx: u16, col: u16) u21 {
+        return self.state.historyRowAt(history_idx, col);
+    }
+
+    /// Get count of rows currently in history buffer (M3+).
+    pub fn historyCount(self: *const Engine) u16 {
+        return self.state.historyCount();
+    }
+
+    /// Get max capacity of history buffer (M3+).
+    pub fn historyCapacity(self: *const Engine) u16 {
+        return self.state.historyCapacity();
     }
 };

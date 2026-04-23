@@ -4355,3 +4355,57 @@ test "runtime: complex sequence with cursor/text/erase" {
     try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
     try std.testing.expectEqual(@as(u21, 'l'), engine.screen().cellAt(1, 0));
 }
+
+test "runtime: initWithCellsAndHistory creates history" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer engine.deinit();
+    try std.testing.expectEqual(@as(u16, 50), engine.historyCapacity());
+    try std.testing.expectEqual(@as(u16, 0), engine.historyCount());
+}
+
+test "runtime: history accumulates via scroll" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[B\x0A");
+    engine.apply();
+    try std.testing.expectEqual(@as(u16, 1), engine.historyCount());
+    try std.testing.expectEqual(@as(u21, 'a'), engine.historyRowAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), engine.historyRowAt(0, 1));
+    try std.testing.expectEqual(@as(u21, 'c'), engine.historyRowAt(0, 2));
+}
+
+test "runtime: history read returns zero for out-of-bounds" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer engine.deinit();
+    engine.feedSlice("abc");
+    engine.apply();
+    engine.feedSlice("\x1b[B\x0A");
+    engine.apply();
+    try std.testing.expectEqual(@as(u21, 0), engine.historyRowAt(1, 0));
+    try std.testing.expectEqual(@as(u21, 0), engine.historyRowAt(0, 10));
+}
+
+test "runtime: direct screen and engine history states match" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 10);
+    defer engine.deinit();
+    engine.feedSlice("test");
+    engine.apply();
+    engine.feedSlice("\x1b[B\x0A");
+    engine.apply();
+    const direct_count = engine.screen().historyCount();
+    const engine_count = engine.historyCount();
+    try std.testing.expectEqual(direct_count, engine_count);
+    for (0..engine_count) |i| {
+        for (0..5) |col| {
+            const direct_cell = engine.screen().historyRowAt(@intCast(i), @intCast(col));
+            const engine_cell = engine.historyRowAt(@intCast(i), @intCast(col));
+            try std.testing.expectEqual(direct_cell, engine_cell);
+        }
+    }
+}

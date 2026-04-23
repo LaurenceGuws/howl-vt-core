@@ -27,8 +27,13 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Creates an engine with owned cell storage.
 - Breakage: changing parameters, return type, allocation ownership, or deinit requirements.
 
+**initWithCellsAndHistory(allocator, rows, cols, history_capacity) -> !Engine** (M3+)
+- Creates an engine with owned cell storage and bounded history buffer.
+- history_capacity: max rows retained when cells exist; 0 = no history.
+- Breakage: changing parameters, return type, allocation ownership, or deinit requirements.
+
 **deinit(self)**
-- Releases engine-owned pipeline and screen resources.
+- Releases engine-owned pipeline, screen, and history resources.
 - Breakage: changing allocator ownership or resource lifetime behavior.
 
 **feedByte(self, byte)** and **feedSlice(self, bytes)**
@@ -59,10 +64,18 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Returns pending bridge event count.
 - Breakage: changing count semantics away from `Pipeline.len`.
 
-**history() const methods (M3)**
-- M3 adds const read-only history accessors through `Engine`.
-- History read surfaces are defined in `app_architecture/contracts/HISTORY_SELECTION.md`.
-- Breakage: exposing mutable history access; changing const lifetime; breaking history API contract.
+**historyRowAt(history_idx, col) -> u21** (M3+)
+- Returns const cell value from history buffer at given history row index and column.
+- Returns 0 if history_idx >= historyCount or col >= cols.
+- Breakage: changing return type, signature, or exposing mutable access.
+
+**historyCount(self) -> u16** (M3+)
+- Returns current number of rows in history buffer (0 to historyCapacity).
+- Breakage: changing return type or count semantics.
+
+**historyCapacity(self) -> u16** (M3+)
+- Returns max history buffer capacity (0 if no history configured).
+- Breakage: changing return type or capacity semantics.
 
 ## Behavioral Guarantees
 
