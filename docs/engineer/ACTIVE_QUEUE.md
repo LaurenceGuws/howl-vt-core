@@ -11,60 +11,57 @@ Execution-only queue for the current engineer loop.
 ## Scope Anchor
 
 - Milestone authority: `app_architecture/authorities/MILESTONE.md`
-- M6 authority: `app_architecture/authorities/M6_FOUNDATION.md`
+- M7 authority: `app_architecture/authorities/M7_FOUNDATION.md`
 - Runtime contract: `app_architecture/contracts/RUNTIME_API.md`
 - Model contract: `app_architecture/contracts/MODEL_API.md`
 - Architect workflow: `docs/architect/WORKFLOW.md`
 
 ## Current Loop
 
-**Status:** M6-A complete. Execute M6-B and M6-C.
+**Status:** M6 complete and frozen. Execute M7 scope planning.
 
-M1-M5 are frozen. Do not reopen parser/screen/history/selection/input/runtime
-semantics unless an M6 test exposes a direct regression.
+M1-M6 are frozen. Do not reopen earlier milestone semantics unless a current
+milestone test exposes a direct regression rooted in earlier work.
 
-M6-A: Contract closure and snapshot surface baseline are complete.
-- SNAPSHOT_REPLAY.md published with payload scope, replay framing, non-goals, breakage rules.
-- Snapshot API implemented: src/model/snapshot.zig + Engine.snapshot().
-- Parity and split-feed tests included in src/test/relay.zig.
+M6 completion summary:
+- SNAPSHOT_REPLAY.md contract authority published (payload scope, replay framing, determinism, non-goals).
+- Snapshot API hardened: src/model/snapshot.zig + comprehensive docstrings.
+- Replay evidence matrix validates determinism, parity, and reset/clear boundaries (10 tests).
+- 432/432 tests pass; no mutable escape hatches; split-feed invariant holds.
 
-## M6-B and M6-C Execution Order (Do Not Reorder)
+## M7 Planning Phase (Scope Definition Only)
 
-### M6-B: Snapshot Surface Hardening
-
-- Target files:
-  - `src/model/snapshot.zig`
-  - `src/runtime/engine.zig`
-  - `app_architecture/contracts/SNAPSHOT_REPLAY.md` (docstring references only)
-- Allowed change type: additive docstrings and API clarity only.
-- Required output:
-  - add comprehensive docstrings to EngineSnapshot methods aligned to M6-A contract.
-  - ensure snapshot() method documentation covers determinism guarantees.
-  - ensure all public snapshot API is documented with contract references.
-- Non-goals:
-  - no API signature changes.
-  - no new tests (test coverage added in M6-A2).
-  - no persistence/restore logic.
-- Stop conditions:
-  - if docstrings suggest API changes needed, pause and flag for M6-C design review.
-
-### M6-C: Replay Evidence Matrix
+### M7-A: Performance Audit and Bounded Allocation Strategy
 
 - Target files:
-  - `src/test/relay.zig`
-  - `app_architecture/contracts/SNAPSHOT_REPLAY.md` (validation notes only)
-- Allowed change type: additive tests for replay/parity scenarios.
+  - `app_architecture/authorities/M7_FOUNDATION.md` (new)
+  - `app_architecture/contracts/RUNTIME_API.md` (memory bounds reference)
+- Allowed change type: authority document creation and planning notes only.
 - Required output:
-  - add tests validating reset/clear/snapshot boundary behavior (M6-A contract section).
-  - add tests for snapshot/replay invariants across history eviction scenarios.
-  - add cross-scenario parity tests (direct pipeline vs runtime engine vs split-feed).
-  - validate snapshot determinism across mode changes (cursor_visible, auto_wrap toggle).
+  - define M7 scope: performance audit, bounded allocation enforcement, hot-path analysis.
+  - establish allocation discipline policy (allocator ownership, lifetime guarantees).
+  - document performance baseline targets (latency percentiles, throughput, memory caps).
+  - define explicit non-goals (optimization beyond policy, streaming/incremental design, runtime tuning).
 - Non-goals:
-  - no new snapshot API methods.
-  - no persistence/file format.
-  - no performance optimization.
+  - no code changes.
+  - no implementation work.
+  - no performance optimization (deferred to M7-B implementation phase).
 - Stop conditions:
-  - if tests reveal snapshot/replay divergence from M1-M5 contracts, stop and report root cause.
+  - if M7 scope conflicts with M1-M6 frozen contracts, stop and report exact conflict.
+
+### M7-B: Memory Discipline Baseline (Planning Queue Advance)
+
+- Target files:
+  - `docs/architect/MILESTONE_PROGRESS.md` (M7-A notes)
+  - `docs/engineer/ACTIVE_QUEUE.md` (replace with M7-B implementation tickets)
+  - `app_architecture/authorities/MILESTONE.md` (M7-A checklist mark)
+- Allowed change type: status update and implementation queue definition only.
+- Required output:
+  - mark M7-A planning complete.
+  - publish M7-B implementation queue with bounded allocation audit tickets.
+- Non-goals:
+  - no code changes.
+  - no M7-B implementation yet.
 
 ## Engineer Report Format
 
@@ -80,25 +77,8 @@ M6-A: Contract closure and snapshot surface baseline are complete.
 - `zig build test`
 - `rg -n "compat[^ib]|fallback|workaround|shim" --glob '*.zig' src`
 
-### M6-D: Freeze Evidence and M7 Handoff
-
-- Target files:
-  - `app_architecture/authorities/MILESTONE.md` (M6 checklist final marks)
-  - `app_architecture/authorities/M6_FOUNDATION.md` (freeze notes only)
-  - `docs/architect/MILESTONE_PROGRESS.md` (M6 status to done, prepare M7 scope)
-  - `docs/engineer/ACTIVE_QUEUE.md` (replace with M7 planning queue)
-- Allowed change type: status documentation and M7 planning queue only.
-- Required output:
-  - mark M6-B and M6-C complete in checklist.
-  - mark M6 done in milestone progress.
-  - document M6 freeze state in M6_FOUNDATION.md notes.
-  - publish M7 planning queue with M7 scope definition.
-- Non-goals:
-  - no code changes.
-  - no M7 implementation (planning tickets only).
-
 ## Guardrails
 
 - No compatibility/fallback/workaround/shim paths.
 - No host/platform/renderer lifecycle imports in runtime/model/event/screen lanes.
-- No scope expansion into M6-D during M6-B/M6-C execution.
+- No scope expansion into M7-B during M7-A planning.

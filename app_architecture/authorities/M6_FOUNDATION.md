@@ -109,3 +109,31 @@ For files/symbols stabilized by M6:
 
 - each owned file keeps top-level `//!` ownership header.
 - each stable public symbol has `///` contract-aligned behavior docs.
+
+## M6 Freeze State
+
+M6 is complete and frozen as of `a0932b9`:
+
+- **M6-A**: SNAPSHOT_REPLAY.md contract published with payload scope, replay framing
+  rules, determinism claims, coordinate semantics, non-goals, and breakage rules.
+  Contract authority is unambiguous and unambiguous across RUNTIME_API, MODEL_API
+  without requiring M1-M5 semantic changes.
+
+- **M6-B**: Snapshot surface hardened with comprehensive docstrings. EngineSnapshot
+  type and methods fully documented with contract references, determinism
+  guarantees, memory ownership, and read-only guarantees.
+
+- **M6-C**: Replay evidence matrix validates snapshot/replay invariants across
+  representative test scenarios: reset/clear/snapshot boundaries, mode changes
+  (cursor_visible, auto_wrap), history wraparound, direct pipeline vs runtime
+  parity, split-feed chunking equivalence, and selection state capture.
+
+- **Evidence**: 432/432 tests pass. Snapshot API is read-only const and
+  deterministic; no mutable escape hatches. Split-feed invariant holds across
+  feed sequence variations. Identical byte sequences produce identical snapshots
+  regardless of chunking. Reset/clear/resetScreen boundary behavior is explicit
+  and tested. No M1-M5 semantic mutations required.
+
+- **Handoff**: M7 queue published with performance/memory discipline scope.
+  Next milestone will audit hot paths, enforce bounded allocations, and
+  establish memory discipline baseline.
