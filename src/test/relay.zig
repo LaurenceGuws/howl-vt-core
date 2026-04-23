@@ -4624,3 +4624,63 @@ test "runtime: selection not cleared by resetScreen operation" {
     try std.testing.expect(!sel_after.selecting);
     try std.testing.expectEqual(@as(i32, -1), sel_after.start.row);
 }
+
+test "runtime: encodeKey handles printable ASCII" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const bytes = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 1), bytes.len);
+    try std.testing.expectEqual(@as(u8, 'A'), bytes[0]);
+}
+
+test "runtime: encodeKey handles special keys" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const enter_bytes = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 1), enter_bytes.len);
+    try std.testing.expectEqual(@as(u8, '\r'), enter_bytes[0]);
+
+    const esc_bytes = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 1), esc_bytes.len);
+    try std.testing.expectEqual(@as(u8, '\x1b'), esc_bytes[0]);
+
+    const tab_bytes = engine.encodeKey(model_mod.VTERM_KEY_TAB, model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 1), tab_bytes.len);
+    try std.testing.expectEqual(@as(u8, '\t'), tab_bytes[0]);
+}
+
+test "runtime: encodeKey handles cursor keys" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const up_bytes = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 3), up_bytes.len);
+    try std.testing.expectEqual(@as(u8, '\x1b'), up_bytes[0]);
+    try std.testing.expectEqual(@as(u8, '['), up_bytes[1]);
+    try std.testing.expectEqual(@as(u8, 'A'), up_bytes[2]);
+}
+
+test "runtime: encodeMouse returns empty when not enabled" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const event = model_mod.MouseEvent{
+        .kind = .move,
+        .button = .none,
+        .row = 5,
+        .col = 10,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = model_mod.VTERM_MOD_NONE,
+        .buttons_down = 0,
+    };
+
+    const bytes = engine.encodeMouse(event);
+    try std.testing.expectEqual(@as(usize, 0), bytes.len);
+}

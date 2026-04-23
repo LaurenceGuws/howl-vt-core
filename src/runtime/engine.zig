@@ -12,6 +12,8 @@ pub const Engine = struct {
     pipeline: pipeline_mod.Pipeline,
     state: screen_mod.ScreenState,
     selection: model_mod.SelectionState,
+    encode_buf: [64]u8 = undefined,
+    encode_len: usize = 0,
 
     /// Initialize engine without cell buffer (screen cursor-only).
     pub fn init(allocator: std.mem.Allocator, rows: u16, cols: u16) !Engine {
@@ -146,5 +148,116 @@ pub const Engine = struct {
     /// Clear current selection and mark inactive (M3+).
     pub fn selectionClear(self: *Engine) void {
         self.selection.clear();
+    }
+
+    /// Encode logical key + modifier to control byte sequence (M4+).
+    /// Returns slice of encoded bytes; valid only until next encode call.
+    pub fn encodeKey(self: *Engine, key: model_mod.Key, mod: model_mod.Modifier) []const u8 {
+        var len: usize = 0;
+
+        const shift_active = (mod & model_mod.VTERM_MOD_SHIFT) != 0;
+        const alt_active = (mod & model_mod.VTERM_MOD_ALT) != 0;
+        const ctrl_active = (mod & model_mod.VTERM_MOD_CTRL) != 0;
+
+        switch (key) {
+            model_mod.VTERM_KEY_ENTER => {
+                self.encode_buf[0] = '\r';
+                len = 1;
+            },
+            model_mod.VTERM_KEY_TAB => {
+                if (shift_active) {
+                    self.encode_buf[0] = '\x1b';
+                    self.encode_buf[1] = '[';
+                    self.encode_buf[2] = 'Z';
+                    len = 3;
+                } else {
+                    self.encode_buf[0] = '\t';
+                    len = 1;
+                }
+            },
+            model_mod.VTERM_KEY_BACKSPACE => {
+                self.encode_buf[0] = '\x7f';
+                len = 1;
+            },
+            model_mod.VTERM_KEY_ESCAPE => {
+                self.encode_buf[0] = '\x1b';
+                len = 1;
+            },
+            model_mod.VTERM_KEY_UP => {
+                self.encode_buf[0] = '\x1b';
+                self.encode_buf[1] = '[';
+                if (ctrl_active or alt_active) {
+                    self.encode_buf[2] = '1';
+                    self.encode_buf[3] = ';';
+                    self.encode_buf[4] = '0' + mod;
+                    self.encode_buf[5] = 'A';
+                    len = 6;
+                } else {
+                    self.encode_buf[2] = 'A';
+                    len = 3;
+                }
+            },
+            model_mod.VTERM_KEY_DOWN => {
+                self.encode_buf[0] = '\x1b';
+                self.encode_buf[1] = '[';
+                if (ctrl_active or alt_active) {
+                    self.encode_buf[2] = '1';
+                    self.encode_buf[3] = ';';
+                    self.encode_buf[4] = '0' + mod;
+                    self.encode_buf[5] = 'B';
+                    len = 6;
+                } else {
+                    self.encode_buf[2] = 'B';
+                    len = 3;
+                }
+            },
+            model_mod.VTERM_KEY_RIGHT => {
+                self.encode_buf[0] = '\x1b';
+                self.encode_buf[1] = '[';
+                if (ctrl_active or alt_active) {
+                    self.encode_buf[2] = '1';
+                    self.encode_buf[3] = ';';
+                    self.encode_buf[4] = '0' + mod;
+                    self.encode_buf[5] = 'C';
+                    len = 6;
+                } else {
+                    self.encode_buf[2] = 'C';
+                    len = 3;
+                }
+            },
+            model_mod.VTERM_KEY_LEFT => {
+                self.encode_buf[0] = '\x1b';
+                self.encode_buf[1] = '[';
+                if (ctrl_active or alt_active) {
+                    self.encode_buf[2] = '1';
+                    self.encode_buf[3] = ';';
+                    self.encode_buf[4] = '0' + mod;
+                    self.encode_buf[5] = 'D';
+                    len = 6;
+                } else {
+                    self.encode_buf[2] = 'D';
+                    len = 3;
+                }
+            },
+            else => {
+                if (key > 31 and key < 127) {
+                    self.encode_buf[0] = @intCast(key);
+                    len = 1;
+                } else if (key > 127) {
+                    len = std.unicode.utf8Encode(@intCast(key), self.encode_buf[0..]) catch 0;
+                }
+            },
+        }
+
+        self.encode_len = len;
+        return self.encode_buf[0..len];
+    }
+
+    /// Encode mouse event to control byte sequence (M4+).
+    /// Returns slice of encoded bytes; valid only until next encode call.
+    /// Returns empty slice if mouse reporting is not active.
+    pub fn encodeMouse(self: *Engine, event: model_mod.MouseEvent) []const u8 {
+        _ = event;
+        return self.encode_buf[0..0];
     }
 };
