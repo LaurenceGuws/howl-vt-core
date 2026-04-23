@@ -4494,3 +4494,75 @@ test "selection: finish stops selecting but keeps active" {
     try std.testing.expect(state.active);
     try std.testing.expect(!state.selecting);
 }
+
+test "runtime: selection state integrated into engine cursor-only mode" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
+    engine.selectionStart(3, 5);
+    const sel = engine.selectionState().?;
+    try std.testing.expectEqual(@as(i32, 3), sel.start.row);
+    try std.testing.expectEqual(@as(u16, 5), sel.start.col);
+}
+
+test "runtime: selection state integrated into engine with cells" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    defer engine.deinit();
+
+    engine.selectionStart(2, 10);
+    engine.selectionUpdate(5, 15);
+    const sel = engine.selectionState().?;
+    try std.testing.expectEqual(@as(i32, 2), sel.start.row);
+    try std.testing.expectEqual(@as(i32, 5), sel.end.row);
+}
+
+test "runtime: selection state survives reset" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("hello");
+    engine.apply();
+    engine.selectionStart(0, 1);
+    engine.selectionFinish();
+
+    engine.reset();
+
+    const sel = engine.selectionState().?;
+    try std.testing.expectEqual(@as(i32, 0), sel.start.row);
+    try std.testing.expectEqual(@as(u16, 1), sel.start.col);
+    try std.testing.expect(!sel.selecting);
+}
+
+test "runtime: selection survives resetScreen" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("text\n");
+    engine.apply();
+    engine.selectionStart(-1, 2);
+    const pre_reset = engine.selectionState().?;
+    try std.testing.expect(pre_reset.active);
+
+    engine.resetScreen();
+
+    const post_reset = engine.selectionState().?;
+    try std.testing.expectEqual(@as(i32, -1), post_reset.start.row);
+    try std.testing.expect(post_reset.active);
+}
+
+test "runtime: selection clear deactivates through engine" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    engine.selectionStart(5, 7);
+    try std.testing.expect(engine.selectionState() != null);
+
+    engine.selectionClear();
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
+}

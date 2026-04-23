@@ -5,11 +5,13 @@
 const std = @import("std");
 const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
+const model_mod = @import("../model.zig");
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,
     state: screen_mod.ScreenState,
+    selection: model_mod.SelectionState,
 
     /// Initialize engine without cell buffer (screen cursor-only).
     pub fn init(allocator: std.mem.Allocator, rows: u16, cols: u16) !Engine {
@@ -20,6 +22,7 @@ pub const Engine = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
+            .selection = model_mod.SelectionState.init(),
         };
     }
 
@@ -33,6 +36,7 @@ pub const Engine = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
+            .selection = model_mod.SelectionState.init(),
         };
     }
 
@@ -46,6 +50,7 @@ pub const Engine = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
+            .selection = model_mod.SelectionState.init(),
         };
     }
 
@@ -109,5 +114,30 @@ pub const Engine = struct {
     /// Get max capacity of history buffer (M3+).
     pub fn historyCapacity(self: *const Engine) u16 {
         return self.state.historyCapacity();
+    }
+
+    /// Get current selection state when active; null if inactive (M3+).
+    pub fn selectionState(self: *const Engine) ?model_mod.TerminalSelection {
+        return self.selection.state();
+    }
+
+    /// Begin new selection at (row, col) (M3+).
+    pub fn selectionStart(self: *Engine, row: i32, col: u16) void {
+        self.selection.start(row, col);
+    }
+
+    /// Update selection end position while active (M3+).
+    pub fn selectionUpdate(self: *Engine, row: i32, col: u16) void {
+        self.selection.update(row, col);
+    }
+
+    /// Mark active selection as finished (M3+).
+    pub fn selectionFinish(self: *Engine) void {
+        self.selection.finish();
+    }
+
+    /// Clear current selection and mark inactive (M3+).
+    pub fn selectionClear(self: *Engine) void {
+        self.selection.clear();
     }
 };

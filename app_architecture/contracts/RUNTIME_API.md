@@ -78,6 +78,26 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 - Returns max history buffer capacity (0 if no history configured).
 - Breakage: changing return type or capacity semantics.
 
+**selectionState(self) -> ?TerminalSelection** (M3+)
+- Returns current selection snapshot when active; null if inactive.
+- Breakage: changing return type or selection state semantics.
+
+**selectionStart(self, row, col)** (M3+)
+- Begin new selection at (row, col) where row is i32 (viewport/history) and col is u16 (viewport).
+- Breakage: changing parameter types or start semantics.
+
+**selectionUpdate(self, row, col)** (M3+)
+- Update selection end position while active.
+- Breakage: changing parameter types or update semantics.
+
+**selectionFinish(self)** (M3+)
+- Mark active selection as finished; selection remains accessible until clear().
+- Breakage: changing finish semantics.
+
+**selectionClear(self)** (M3+)
+- Clear current selection and mark inactive.
+- Breakage: changing clear semantics.
+
 ## Behavioral Guarantees
 
 - `Engine` is a transparent facade over `Pipeline` plus `ScreenState`.
