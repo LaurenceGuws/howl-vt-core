@@ -66,6 +66,7 @@ Authority for `src/runtime/engine.zig` and the root `runtime` export.
 
 **historyRowAt(history_idx, col) -> u21** (M3+)
 - Returns const cell value from history buffer at given history row index and column.
+- `history_idx` is recency-ordered: `0` is most recent history row (`-1` in History Selection coordinate model), `1` is next older, etc.
 - Returns 0 if history_idx >= historyCount or col >= cols.
 - Breakage: changing return type, signature, or exposing mutable access.
 

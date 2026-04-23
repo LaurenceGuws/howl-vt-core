@@ -37,6 +37,7 @@ Defines the shared coordinate space, history capacity policy, and selection life
 
 ### History Access
 - History is readable through runtime const facade only; no direct mutable access.
+- Runtime `historyRowAt(history_idx, col)` is recency-ordered: `history_idx=0` maps to row `-1`, `history_idx=1` maps to row `-2`, and so on.
 - History rows are stable; reallocation does not occur after initial allocation.
 - Capacity is bounded; no overflow can occur.
 

@@ -4409,3 +4409,26 @@ test "runtime: direct screen and engine history states match" {
         }
     }
 }
+
+test "runtime: history accessor ordering remains stable after wraparound" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 2, 2);
+    defer engine.deinit();
+
+    var row_num: u21 = '1';
+    var i: u16 = 0;
+    while (i < 4) : (i += 1) {
+        const pair = [_]u8{ @intCast(row_num), @intCast(row_num) };
+        engine.feedSlice("\x1b[H");
+        engine.feedSlice(pair[0..]);
+        engine.feedSlice("\x1b[B\x0A");
+        engine.apply();
+        row_num += 1;
+    }
+
+    try std.testing.expectEqual(@as(u16, 2), engine.historyCount());
+    try std.testing.expectEqual(@as(u21, '4'), engine.historyRowAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '4'), engine.historyRowAt(0, 1));
+    try std.testing.expectEqual(@as(u21, '3'), engine.historyRowAt(1, 0));
+    try std.testing.expectEqual(@as(u21, '3'), engine.historyRowAt(1, 1));
+}

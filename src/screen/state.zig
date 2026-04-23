@@ -118,7 +118,10 @@ pub const ScreenState = struct {
     pub fn historyRowAt(self: *const ScreenState, history_idx: u16, col: u16) u21 {
         const h = self.history orelse return 0;
         if (history_idx >= self.history_count or col >= self.cols) return 0;
-        return h[@as(usize, history_idx) * @as(usize, self.cols) + @as(usize, col)];
+        const cap = @as(usize, self.history_capacity);
+        const newest_slot = (@as(usize, self.history_write_idx) + cap - 1) % cap;
+        const logical_slot = (newest_slot + cap - @as(usize, history_idx)) % cap;
+        return h[logical_slot * @as(usize, self.cols) + @as(usize, col)];
     }
 
     pub fn historyCount(self: *const ScreenState) u16 {
@@ -730,11 +733,10 @@ test "screen: history capacity limits with wraparound" {
         row_num += 1;
     }
     try std.testing.expectEqual(@as(u16, 2), s.history_count);
-    const h = s.history.?;
-    try std.testing.expectEqual(@as(u21, '3'), h[0]);
-    try std.testing.expectEqual(@as(u21, '3'), h[1]);
-    try std.testing.expectEqual(@as(u21, '4'), h[2]);
-    try std.testing.expectEqual(@as(u21, '4'), h[3]);
+    try std.testing.expectEqual(@as(u21, '4'), s.historyRowAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '4'), s.historyRowAt(0, 1));
+    try std.testing.expectEqual(@as(u21, '3'), s.historyRowAt(1, 0));
+    try std.testing.expectEqual(@as(u21, '3'), s.historyRowAt(1, 1));
 }
 
 test "screen: reset does not truncate history" {
