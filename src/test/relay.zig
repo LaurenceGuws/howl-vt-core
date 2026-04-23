@@ -4684,3 +4684,76 @@ test "runtime: encodeMouse returns empty when not enabled" {
     const bytes = engine.encodeMouse(event);
     try std.testing.expectEqual(@as(usize, 0), bytes.len);
 }
+
+test "runtime: input encoding is deterministic for repeated calls" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const bytes1 = engine.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
+    const bytes2 = engine.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
+
+    try std.testing.expectEqual(bytes1.len, bytes2.len);
+    try std.testing.expectEqualSlices(u8, bytes1, bytes2);
+}
+
+test "runtime: input encoding survives reset operation" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const before_bytes = before_reset[0..before_reset.len];
+
+    engine.reset();
+
+    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const after_bytes = after_reset[0..after_reset.len];
+
+    try std.testing.expectEqualSlices(u8, before_bytes, after_bytes);
+}
+
+test "runtime: input encoding survives resetScreen operation" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("test");
+    engine.apply();
+
+    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const before_bytes = before_reset[0..before_reset.len];
+
+    engine.resetScreen();
+
+    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const after_bytes = after_reset[0..after_reset.len];
+
+    try std.testing.expectEqualSlices(u8, before_bytes, after_bytes);
+}
+
+test "runtime: input does not affect selection state" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    engine.selectionStart(2, 5);
+    const before_sel = engine.selectionState().?;
+
+    _ = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
+
+    const after_sel = engine.selectionState().?;
+    try std.testing.expectEqual(before_sel.active, after_sel.active);
+    try std.testing.expectEqual(before_sel.start.row, after_sel.start.row);
+    try std.testing.expectEqual(before_sel.start.col, after_sel.start.col);
+}
+
+test "runtime: input encoding output is not mutable from caller" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    defer engine.deinit();
+
+    const bytes = engine.encodeKey('B', model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(@as(usize, 1), bytes.len);
+    try std.testing.expectEqual(@as(u8, 'B'), bytes[0]);
+}

@@ -132,6 +132,37 @@ Required for any breaking change:
 - Update MODEL_API.md and RUNTIME_API.md if method signatures change.
 - Update M4 relay tests if control byte output changes.
 
+## Implementation Coverage (M4-A2)
+
+### Currently Covered
+
+**Printable Characters**
+- ASCII printable range (32-126): output single byte as-is.
+- High codepoints (>127): encode as UTF-8 bytes.
+
+**Special Keys**
+- VTERM_KEY_ENTER: output `\r` (carriage return).
+- VTERM_KEY_ESCAPE: output `\x1b` (escape).
+- VTERM_KEY_TAB: output `\t`; with Shift output CSI Z (shift-tab).
+- VTERM_KEY_BACKSPACE: output `\x7f` (delete).
+
+**Cursor Keys**
+- VTERM_KEY_UP, DOWN, LEFT, RIGHT: output CSI sequences (A, B, D, C).
+- With Ctrl or Alt: output modified CSI sequences with modifier parameter.
+
+**Determinism Guarantees**
+- encodeKey(key, mod) returns identical bytes for identical inputs.
+- encodeMouse currently returns empty slice (placeholder for future mouse reporting).
+- No context-dependent encoding; reset/resetScreen do not affect encoding output.
+- Input operations do not mutate parser, screen, history, or selection state.
+
+### Future Coverage (Post-M4-A)
+
+- Function keys (F1-F12) with modifiers.
+- Mouse event reporting (SGR 1006, X11 formats).
+- Additional special keys (Insert, Delete, Page Up/Down, Home, End).
+- Mode-dependent behaviors (paste mode, application keypad).
+
 ## Non-Goals
 
 - Grapheme clustering, combining marks, or Unicode normalization.
