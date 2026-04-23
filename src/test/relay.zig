@@ -6501,3 +6501,263 @@ test "M9-FX-009: snapshot stability - repeated captures across mixed ops" {
         try std.testing.expectEqual(cp_seq[i].auto_wrap, cp_seq[i + 1].auto_wrap);
     }
 }
+
+test "M10-E1: M10-FX-001 burst feed/apply stress loop" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    defer engine.deinit();
+
+    const bursts = 50;
+    var iteration: usize = 0;
+    while (iteration < bursts) : (iteration += 1) {
+        engine.feedSlice("BURST");
+        engine.apply();
+        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(@as(usize, 0), cp.queued_event_count);
+    }
+}
+
+test "M10-E1: M10-FX-002 mixed reset boundary stress under load" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    var iteration: usize = 0;
+    while (iteration < 20) : (iteration += 1) {
+        engine.feedSlice("TEXT");
+        engine.apply();
+
+        engine.feedSlice("\x1b[H");
+        engine.clear();
+
+        engine.feedSlice("\x1b[m");
+        engine.reset();
+
+        engine.resetScreen();
+
+        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(@as(u16, 0), cp.cursor_row);
+        try std.testing.expectEqual(@as(u16, 0), cp.cursor_col);
+    }
+}
+
+test "M10-E2: M10-FX-003 selection/history drift loop (soak)" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 20);
+    defer engine.deinit();
+
+    var checkpoints: [10]ConformanceCheckpoint = undefined;
+
+    var iteration: usize = 0;
+    while (iteration < 10) : (iteration += 1) {
+        engine.feedSlice("LINE");
+        engine.apply();
+
+        engine.selectionStart(0, 0);
+        engine.selectionUpdate(0, 3);
+        engine.selectionFinish();
+
+        checkpoints[iteration] = try ConformanceCheckpoint.capture(gpa, &engine);
+    }
+
+    for (0..9) |i| {
+        try std.testing.expectEqual(checkpoints[i].history_capacity, checkpoints[i + 1].history_capacity);
+        try std.testing.expectEqual(checkpoints[i].rows, checkpoints[i + 1].rows);
+        try std.testing.expectEqual(checkpoints[i].cols, checkpoints[i + 1].cols);
+    }
+}
+
+test "M10-E1: M10-FX-004 encode interleave stress" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    var iteration: usize = 0;
+    while (iteration < 30) : (iteration += 1) {
+        _ = engine.encodeKey('A', 0);
+        engine.feedSlice("X");
+        _ = engine.encodeKey('B', 1);
+        engine.apply();
+
+        const mouse = model_mod.MouseEvent{
+            .kind = .move,
+            .button = .none,
+            .row = 0,
+            .col = 0,
+            .pixel_x = null,
+            .pixel_y = null,
+            .mod = 0,
+            .buttons_down = 0,
+        };
+        _ = engine.encodeMouse(mouse);
+
+        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(@as(usize, 0), cp.queued_event_count);
+    }
+}
+
+test "M10-E2: M10-FX-005 snapshot drift loop (soak)" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    var snapshots: [8]model_mod.EngineSnapshot = undefined;
+
+    engine.feedSlice("INITIAL");
+    engine.apply();
+
+    var iteration: usize = 0;
+    while (iteration < 8) : (iteration += 1) {
+        engine.feedSlice("X");
+        engine.apply();
+
+        snapshots[iteration] = try engine.snapshot();
+    }
+
+    for (0..7) |i| {
+        try std.testing.expectEqual(snapshots[i].rows, snapshots[i + 1].rows);
+        try std.testing.expectEqual(snapshots[i].cols, snapshots[i + 1].cols);
+        try std.testing.expectEqual(snapshots[i].history_capacity, snapshots[i + 1].history_capacity);
+    }
+
+    for (&snapshots) |*snap| {
+        snap.deinit();
+    }
+}
+
+test "M10-E2: M10-FX-006 mode toggle soak with assertions" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("TEST");
+    engine.apply();
+
+    var iteration: usize = 0;
+    while (iteration < 15) : (iteration += 1) {
+        engine.feedSlice("\x1b[?25l");
+        engine.apply();
+        var cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(false, cp.cursor_visible);
+
+        engine.feedSlice("\x1b[?7l");
+        engine.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(false, cp.auto_wrap);
+
+        engine.feedSlice("\x1b[?25h");
+        engine.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(true, cp.cursor_visible);
+
+        engine.feedSlice("\x1b[?7h");
+        engine.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        try std.testing.expectEqual(true, cp.auto_wrap);
+    }
+}
+
+test "M10-E3: drift detection - mixed selection/history operations (E3 class)" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 16);
+    defer engine.deinit();
+
+    var checkpoints: [12]ConformanceCheckpoint = undefined;
+
+    var idx: usize = 0;
+    while (idx < 3) : (idx += 1) {
+        engine.feedSlice("ABC\r\n");
+        engine.apply();
+
+        engine.selectionStart(0, 0);
+        checkpoints[idx * 4] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+        engine.selectionUpdate(0, 2);
+        checkpoints[idx * 4 + 1] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+        engine.selectionFinish();
+        checkpoints[idx * 4 + 2] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+        engine.selectionClear();
+        checkpoints[idx * 4 + 3] = try ConformanceCheckpoint.capture(gpa, &engine);
+    }
+
+    for (0..11) |i| {
+        try std.testing.expectEqual(checkpoints[i].rows, checkpoints[i + 1].rows);
+        try std.testing.expectEqual(checkpoints[i].cols, checkpoints[i + 1].cols);
+    }
+}
+
+test "M10-E3: drift detection - encode operations preserve state invariants (E3 class)" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    defer engine.deinit();
+
+    engine.feedSlice("DATA");
+    engine.apply();
+
+    var checkpoints: [6]ConformanceCheckpoint = undefined;
+
+    checkpoints[0] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    _ = engine.encodeKey('X', 0);
+    checkpoints[1] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    _ = engine.encodeKey('Y', 1);
+    _ = engine.encodeKey('Z', 2);
+    checkpoints[2] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    const mouse = model_mod.MouseEvent{
+        .kind = .press,
+        .button = .left,
+        .row = 0,
+        .col = 0,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 1,
+    };
+    _ = engine.encodeMouse(mouse);
+    checkpoints[3] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    engine.feedSlice("E");
+    checkpoints[4] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    engine.apply();
+    checkpoints[5] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+    for (0..5) |i| {
+        try std.testing.expectEqual(checkpoints[i].cursor_visible, checkpoints[i + 1].cursor_visible);
+        try std.testing.expectEqual(checkpoints[i].auto_wrap, checkpoints[i + 1].auto_wrap);
+    }
+}
+
+test "M10-E3: drift detection - reset boundary invariants (E3 class)" {
+    const gpa = std.testing.allocator;
+    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 12);
+    defer engine.deinit();
+
+    var checkpoints: [9]ConformanceCheckpoint = undefined;
+
+    var iteration: usize = 0;
+    while (iteration < 3) : (iteration += 1) {
+        engine.feedSlice("DATA\r\nMORE");
+        engine.apply();
+        checkpoints[iteration * 3] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+        engine.reset();
+        checkpoints[iteration * 3 + 1] = try ConformanceCheckpoint.capture(gpa, &engine);
+
+        engine.resetScreen();
+        checkpoints[iteration * 3 + 2] = try ConformanceCheckpoint.capture(gpa, &engine);
+    }
+
+    for (0..8) |i| {
+        try std.testing.expectEqual(checkpoints[i].rows, checkpoints[i + 1].rows);
+        try std.testing.expectEqual(checkpoints[i].cols, checkpoints[i + 1].cols);
+    }
+
+    for (0..3) |cycle| {
+        try std.testing.expectEqual(checkpoints[cycle * 3 + 1].history_count, checkpoints[cycle * 3].history_count);
+    }
+}
