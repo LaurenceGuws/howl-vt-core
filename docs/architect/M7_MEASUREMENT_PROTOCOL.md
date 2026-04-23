@@ -46,6 +46,10 @@ Two measurement modes are allowed:
 `runtime_mode` is required for acceptance. `direct_mode` is optional diagnostic
 support when isolating hotspots.
 
+Reference harness command for baseline/proposal runs:
+
+- `zig build m7-baseline`
+
 ## Run Discipline
 
 Every reported result must follow this discipline:

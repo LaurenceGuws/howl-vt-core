@@ -14,6 +14,8 @@ audit mode for performance and memory discipline.
 - `app_architecture/authorities/M7_FOUNDATION.md`
 - `docs/architect/M7_AUDIT.md`
 - `docs/architect/M7_MEASUREMENT_PROTOCOL.md`
+- `docs/architect/M7_FIXTURES.md`
+- `docs/architect/M7_BASELINE.md`
 - `app_architecture/authorities/MILESTONE.md`
 - `docs/architect/MILESTONE_PROGRESS.md`
 
