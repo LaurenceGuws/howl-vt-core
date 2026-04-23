@@ -32,6 +32,10 @@ Each measured change must run against one or more workload families:
 - `mixed_interactive`: short bursts of text/control with frequent `apply`
 - `snapshot_opt_in`: explicit snapshot capture cost (not part of hot-loop score)
 
+Canonical fixture definitions are in:
+
+- `docs/architect/M7_FIXTURES.md`
+
 ## Measurement Modes
 
 Two measurement modes are allowed:
