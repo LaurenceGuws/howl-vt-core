@@ -1,6 +1,6 @@
 # Howl Terminal Model API Contract
 
-`MODEL_API_CONTRACT` — frozen as of HT-044.
+`MODEL_API_CONTRACT` — frozen as of HT-044. M4 input/control additions authority: `INPUT_CONTROL.md`.
 Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`, and `src/model/metrics.zig`.
 
 ## Stable Exported Symbols
@@ -51,6 +51,37 @@ Authority for `src/model.zig`, `src/model/types.zig`, `src/model/selection.zig`,
 - Responsibility: lightweight runtime metrics accumulation (`init`, `beginFrame`, `noteInput`, `recordDraw`).
 - Ownership: model metrics primitive.
 - Breakage: field/schema changes; EMA and latency update semantic changes.
+
+### Input and Control Types (`src/model/types.zig`, M4+)
+
+**Key / Modifier / PhysicalKey** (type aliases)
+- Responsibility: represent logical key identity and modifier state.
+- Ownership: M4 input primitive.
+- Key: abstract logical key identifier (VTERM_KEY_* constants or codepoint).
+- Modifier: bit flags (VTERM_MOD_SHIFT, VTERM_MOD_ALT, VTERM_MOD_CTRL).
+- Breakage: changing Key/Modifier representation or constant values.
+
+**KeyboardAlternateMetadata**
+- Responsibility: optional extended keyboard event metadata for alternate reporting.
+- Ownership: M4 input primitive (host provides, may be null).
+- Fields: physical_key, produced_text_utf8, base_codepoint, shifted_codepoint, alternate_layout_codepoint, text_is_composed.
+- Breakage: field type changes, semantic changes to composed-text marking.
+
+**MouseButton / MouseEventKind / MouseEvent**
+- Responsibility: mouse event model (button type, event kind, position, state).
+- Ownership: M4 input primitive.
+- MouseButton: none, left, middle, right, wheel_up, wheel_down.
+- MouseEventKind: press, release, move, wheel.
+- MouseEvent fields: kind, button, row, col, pixel_x, pixel_y, mod, buttons_down.
+- Breakage: field/enum changes, removing button/event types.
+
+**Input Coordinate Semantics (M4+)**
+- Mouse row/col: 0-based terminal cell coordinates (viewport, or negative if history-aware).
+- pixel_x, pixel_y: optional intra-cell pixel offsets (host-dependent, may be null).
+- Determinism: no context-dependent coordinate transformation.
+
+**Detailed Input Semantics**
+- Canonical input model and encoding boundary defined in `app_architecture/contracts/INPUT_CONTROL.md`.
 
 ## Behavioral Guarantees
 
