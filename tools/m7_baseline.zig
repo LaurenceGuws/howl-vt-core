@@ -3,7 +3,7 @@
 //! Reason: provide reproducible local latency/throughput/allocation evidence.
 
 const std = @import("std");
-const terminal = @import("terminal");
+const terminal = @import("vt_core");
 
 const WorkloadResult = struct {
     name: []const u8,

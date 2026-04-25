@@ -1,9 +1,9 @@
 .{
-    .name = .howl_terminal,
+    .name = .vt_core,
 
     .version = "0.0.0",
 
-    .fingerprint = 0x5a325bc9bf04aeaa,
+    .fingerprint = 0x72ed77f14813384d,
 
     .minimum_zig_version = "0.15.2",
 

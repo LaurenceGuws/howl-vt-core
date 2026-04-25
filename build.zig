@@ -7,7 +7,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const mod = b.addModule("terminal", .{
+    const mod = b.addModule("vt_core", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    m7_baseline_mod.addImport("terminal", mod);
+    m7_baseline_mod.addImport("vt_core", mod);
     const m7_baseline_exe = b.addExecutable(.{
         .name = "m7_baseline",
         .root_module = m7_baseline_mod,

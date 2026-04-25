@@ -23,7 +23,7 @@ Style and color expansion is outside this milestone and not part of current exec
 
 ## M1 package surface (host-neutral)
 
-The `howl_terminal` module root orders the stable M1 seam first:
+The `vt_core` module root orders the stable M1 seam first:
 
 1. `parser` — byte and escape parsing into sink events
 2. `pipeline` — parser plus bridge queue and `applyToScreen`
