@@ -33,6 +33,13 @@ Execution evidence commits:
 4. No production semantic drift was introduced.
 5. Rolling freeze cadence is now explicit for sustained M10 quality.
 
+## Legacy Test-Name Cleanup Evidence
+
+- Rename map: `docs/review/m10/VT_CORE_TEST_RENAME_MAP.md`
+- Before cleanup: `architecture_guard.sh` reported 85 test-name policy violations in `src/root.zig` and `src/test/relay.zig`.
+- After cleanup: `architecture_guard.sh` reported 0 test-name policy violations for `howl-vt-core`.
+- Residual risk: none in the renamed files; no allowlist entries were required.
+
 ## Acceptance
 
 `M10` is accepted and frozen.

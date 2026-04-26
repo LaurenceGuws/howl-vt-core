@@ -52,3 +52,5 @@ Each cycle outputs:
 - evidence classes covered,
 - pass/fail summary,
 - explicit carry-forward actions.
+
+For repo-local cleanup batches, the pass/fail summary must include before/after guard violation counts and a direct residual-risk statement.
