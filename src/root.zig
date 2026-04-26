@@ -26,7 +26,7 @@ comptime {
     _ = @import("test/relay.zig");
 }
 
-test "root: exposes M1 host-neutral module surface" {
+test "root: exposes host-neutral module surface" {
     try std.testing.expect(@hasDecl(@This(), "parser"));
     try std.testing.expect(@hasDecl(@This(), "pipeline"));
     try std.testing.expect(@hasDecl(@This(), "semantic"));
@@ -35,7 +35,7 @@ test "root: exposes M1 host-neutral module surface" {
     try std.testing.expect(@hasDecl(@This(), "runtime"));
 }
 
-test "root: runtime Engine exposes frozen M1 facade methods" {
+test "root: runtime Engine exposes stable facade methods" {
     const Engine = runtime.Engine;
     try std.testing.expect(@hasDecl(Engine, "init"));
     try std.testing.expect(@hasDecl(Engine, "initWithCells"));
@@ -68,7 +68,7 @@ test "root: runtime Engine method signatures remain host-facing" {
     _ = .{ init_fn, init_cells_fn, deinit_fn, feed_byte_fn, feed_slice_fn, apply_fn, clear_fn, reset_fn, reset_screen_fn, screen_fn, queue_fn };
 }
 
-test "M8-E1: runtime Engine const-read methods (M3+ history/selection)" {
+test "runtime: const-read history and selection accessors stay stable" {
     const Engine = runtime.Engine;
     const history_row_fn: fn (*const Engine, u16, u16) u21 = Engine.historyRowAt;
     const history_count_fn: fn (*const Engine) u16 = Engine.historyCount;
@@ -77,7 +77,7 @@ test "M8-E1: runtime Engine const-read methods (M3+ history/selection)" {
     _ = .{ history_row_fn, history_count_fn, history_capacity_fn, selection_state_fn };
 }
 
-test "M8-E1: runtime Engine M5+ lifecycle methods remain stable" {
+test "runtime: lifecycle extension methods stay stable" {
     const Engine = runtime.Engine;
     const init_cells_history_fn: fn (std.mem.Allocator, u16, u16, u16) anyerror!Engine = Engine.initWithCellsAndHistory;
     const selection_start_fn: fn (*Engine, i32, u16) void = Engine.selectionStart;
@@ -87,7 +87,7 @@ test "M8-E1: runtime Engine M5+ lifecycle methods remain stable" {
     _ = .{ init_cells_history_fn, selection_start_fn, selection_update_fn, selection_finish_fn, selection_clear_fn };
 }
 
-test "M8-E1: runtime Engine snapshot surface and deterministic" {
+test "runtime: snapshot surface remains deterministic" {
     const Engine = runtime.Engine;
     const allocator = std.testing.allocator;
     var engine = try Engine.initWithCells(allocator, 5, 10);
@@ -108,7 +108,7 @@ test "M8-E1: runtime Engine snapshot surface and deterministic" {
     try std.testing.expectEqual(snap1.cursor_col, snap2.cursor_col);
 }
 
-test "M8-E1: encodeKey and encodeMouse methods present and callable" {
+test "runtime: encodeKey and encodeMouse methods are callable" {
     const Engine = runtime.Engine;
     const allocator = std.testing.allocator;
     var engine = try Engine.initWithCells(allocator, 5, 10);
@@ -136,7 +136,7 @@ test "M8-E1: encodeKey and encodeMouse methods present and callable" {
     try std.testing.expectEqual(snap_before.selection, snap_after.selection);
 }
 
-test "M8-E1: encodeMouse placeholder returns empty output" {
+test "runtime: encodeMouse returns empty output" {
     const allocator = std.testing.allocator;
     var engine = try runtime.Engine.initWithCells(allocator, 5, 10);
     defer engine.deinit();
@@ -160,7 +160,7 @@ test "M8-E1: encodeMouse placeholder returns empty output" {
     try std.testing.expectEqualSlices(u8, "", output);
 }
 
-test "M8-E1: encodeMouse does not mutate observable engine state" {
+test "runtime: encodeMouse does not mutate observable engine state" {
     const allocator = std.testing.allocator;
     var engine = try runtime.Engine.initWithCells(allocator, 5, 10);
     defer engine.deinit();
