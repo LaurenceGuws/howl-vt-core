@@ -158,5 +158,5 @@ pub const SelectionState = selection.SelectionState;
 /// Metrics API re-export.
 pub const Metrics = metrics.Metrics;
 
-/// Engine snapshot re-export.
-pub const EngineSnapshot = snapshot.EngineSnapshot;
+/// VtCore snapshot re-export.
+pub const VtCoreSnapshot = snapshot.VtCoreSnapshot;

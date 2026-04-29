@@ -9,7 +9,7 @@ const csi_mod = @import("../parser/csi.zig");
 const bridge_mod = @import("../event/bridge.zig");
 const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
-const mod = @import("../runtime/engine.zig");
+const mod = @import("../runtime/vt_core.zig");
 const model_mod = @import("../model.zig");
 
 const Event = union(enum) {
@@ -1853,37 +1853,37 @@ fn runParityScenario(gpa: std.mem.Allocator, scenario: ParityScenario) !void {
         screen_mod.ScreenState.init(scenario.rows, scenario.cols);
     defer if (scenario.with_cells) direct_screen.deinit(gpa);
 
-    var engine = if (scenario.with_cells)
-        try mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    var vt_core = if (scenario.with_cells)
+        try mod.VtCore.initWithCells(gpa, scenario.rows, scenario.cols)
     else
-        try mod.Engine.init(gpa, scenario.rows, scenario.cols);
-    defer engine.deinit();
+        try mod.VtCore.init(gpa, scenario.rows, scenario.cols);
+    defer vt_core.deinit();
 
     direct_pl.feedSlice(scenario.input);
     direct_pl.applyToScreen(&direct_screen);
 
-    engine.feedSlice(scenario.input);
-    engine.apply();
+    vt_core.feedSlice(scenario.input);
+    vt_core.apply();
 
     try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
-    try std.testing.expectEqual(scenario.expected_row, engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, vt_core.screen().cursor_row);
     try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
-    try std.testing.expectEqual(scenario.expected_col, engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, vt_core.screen().cursor_col);
     try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
-    try std.testing.expectEqual(scenario.expected_queue_depth, engine.queuedEventCount());
+    try std.testing.expectEqual(scenario.expected_queue_depth, vt_core.queuedEventCount());
     if (scenario.check_cursor_visible) {
         try std.testing.expectEqual(scenario.expected_cursor_visible, direct_screen.cursor_visible);
-        try std.testing.expectEqual(scenario.expected_cursor_visible, engine.screen().cursor_visible);
+        try std.testing.expectEqual(scenario.expected_cursor_visible, vt_core.screen().cursor_visible);
     }
     if (scenario.check_auto_wrap) {
         try std.testing.expectEqual(scenario.expected_auto_wrap, direct_screen.auto_wrap);
-        try std.testing.expectEqual(scenario.expected_auto_wrap, engine.screen().auto_wrap);
+        try std.testing.expectEqual(scenario.expected_auto_wrap, vt_core.screen().auto_wrap);
     }
 
     if (scenario.check_cells) {
         for (scenario.cell_checks) |check| {
             const direct_cell = direct_screen.cellAt(check.row, check.col);
-            const cell = engine.screen().cellAt(check.row, check.col);
+            const cell = vt_core.screen().cellAt(check.row, check.col);
             try std.testing.expectEqual(direct_cell, check.codepoint);
             try std.testing.expectEqual(cell, check.codepoint);
         }
@@ -1899,38 +1899,38 @@ fn runParityChunkScenario(gpa: std.mem.Allocator, scenario: ParityChunkScenario)
         screen_mod.ScreenState.init(scenario.rows, scenario.cols);
     defer if (scenario.with_cells) direct_screen.deinit(gpa);
 
-    var engine = if (scenario.with_cells)
-        try mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    var vt_core = if (scenario.with_cells)
+        try mod.VtCore.initWithCells(gpa, scenario.rows, scenario.cols)
     else
-        try mod.Engine.init(gpa, scenario.rows, scenario.cols);
-    defer engine.deinit();
+        try mod.VtCore.init(gpa, scenario.rows, scenario.cols);
+    defer vt_core.deinit();
 
     for (scenario.chunks) |chunk| {
         direct_pl.feedSlice(chunk);
-        engine.feedSlice(chunk);
+        vt_core.feedSlice(chunk);
     }
     direct_pl.applyToScreen(&direct_screen);
-    engine.apply();
+    vt_core.apply();
 
     try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
-    try std.testing.expectEqual(scenario.expected_row, engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, vt_core.screen().cursor_row);
     try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
-    try std.testing.expectEqual(scenario.expected_col, engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, vt_core.screen().cursor_col);
     try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
-    try std.testing.expectEqual(scenario.expected_queue_depth, engine.queuedEventCount());
+    try std.testing.expectEqual(scenario.expected_queue_depth, vt_core.queuedEventCount());
     if (scenario.check_cursor_visible) {
         try std.testing.expectEqual(scenario.expected_cursor_visible, direct_screen.cursor_visible);
-        try std.testing.expectEqual(scenario.expected_cursor_visible, engine.screen().cursor_visible);
+        try std.testing.expectEqual(scenario.expected_cursor_visible, vt_core.screen().cursor_visible);
     }
     if (scenario.check_auto_wrap) {
         try std.testing.expectEqual(scenario.expected_auto_wrap, direct_screen.auto_wrap);
-        try std.testing.expectEqual(scenario.expected_auto_wrap, engine.screen().auto_wrap);
+        try std.testing.expectEqual(scenario.expected_auto_wrap, vt_core.screen().auto_wrap);
     }
 
     if (scenario.check_cells) {
         for (scenario.cell_checks) |check| {
             const direct_cell = direct_screen.cellAt(check.row, check.col);
-            const cell = engine.screen().cellAt(check.row, check.col);
+            const cell = vt_core.screen().cellAt(check.row, check.col);
             try std.testing.expectEqual(direct_cell, check.codepoint);
             try std.testing.expectEqual(cell, check.codepoint);
         }
@@ -2449,20 +2449,20 @@ test "parity: split CSI across feeds identically" {
     defer direct_pl.deinit();
     var direct_screen = screen_mod.ScreenState.init(24, 80);
 
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
 
     direct_pl.feedSlice("\x1b[");
     direct_pl.feedSlice("5");
     direct_pl.feedSlice("C");
     direct_pl.applyToScreen(&direct_screen);
 
-    engine.feedSlice("\x1b[");
-    engine.feedSlice("5");
-    engine.feedSlice("C");
-    engine.apply();
+    vt_core.feedSlice("\x1b[");
+    vt_core.feedSlice("5");
+    vt_core.feedSlice("C");
+    vt_core.apply();
 
-    try std.testing.expectEqual(direct_screen.cursor_col, engine.screen().cursor_col);
+    try std.testing.expectEqual(direct_screen.cursor_col, vt_core.screen().cursor_col);
 }
 
 test "parity: text write with cells identically" {
@@ -3696,723 +3696,723 @@ test "parity-chunked: interrupted split private auto-wrap mode remains identical
 
 test "init and deinit lifecycle" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    try std.testing.expectEqual(@as(u16, 24), engine.screen().rows);
-    try std.testing.expectEqual(@as(u16, 80), engine.screen().cols);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    try std.testing.expectEqual(@as(u16, 24), vt_core.screen().rows);
+    try std.testing.expectEqual(@as(u16, 80), vt_core.screen().cols);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "initWithCells and deinit with allocated cells" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
-    defer engine.deinit();
-    try std.testing.expectEqual(@as(u16, 4), engine.screen().rows);
-    try std.testing.expectEqual(@as(u16, 20), engine.screen().cols);
-    try std.testing.expect(engine.screen().cells != null);
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 4, 20);
+    defer vt_core.deinit();
+    try std.testing.expectEqual(@as(u16, 4), vt_core.screen().rows);
+    try std.testing.expectEqual(@as(u16, 20), vt_core.screen().cols);
+    try std.testing.expect(vt_core.screen().cells != null);
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 0));
 }
 
 test "feedByte and feedSlice accumulate in queue" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.feedByte('A');
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
-    engine.feedSlice("BC");
-    try std.testing.expectEqual(@as(usize, 2), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.feedByte('A');
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
+    vt_core.feedSlice("BC");
+    try std.testing.expectEqual(@as(usize, 2), vt_core.queuedEventCount());
 }
 
 test "apply drains queue and updates screen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
-    defer engine.deinit();
-    engine.feedSlice("hello");
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
-    engine.apply();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u21, 'h'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'o'), engine.screen().cellAt(0, 4));
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.initWithCells(gpa, 4, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("hello");
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
+    vt_core.apply();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(@as(u21, 'h'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'o'), vt_core.screen().cellAt(0, 4));
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
 }
 
 test "clear drops pending events" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("text\x1b[5A");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.clear();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("text\x1b[5A");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.clear();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
 }
 
 test "clear drops pending HT/CHT/CBT before apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("a\x09b\x1b[2I\x1b[Z");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.clear();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("a\x09b\x1b[2I\x1b[Z");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.clear();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 0));
 }
 
 test "reset clears queue and parser state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("abc\x1b[");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.feedSlice("xyz");
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc\x1b[");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.feedSlice("xyz");
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
 }
 
 test "reset clears partial CHT parser state and queued tab work" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("a\x1b[2");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.feedSlice("Ib");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 2), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'I'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'b'), engine.screen().cellAt(0, 1));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("a\x1b[2");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.feedSlice("Ib");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 2), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'I'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), vt_core.screen().cellAt(0, 1));
 }
 
 test "resetScreen clears screen without clearing queued parser events" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 5);
-    defer engine.deinit();
-    engine.feedSlice("abcde");
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
-    engine.feedSlice("\x1b[?25l\x1b[?7l");
-    engine.apply();
-    try std.testing.expect(!engine.screen().cursor_visible);
-    try std.testing.expect(!engine.screen().auto_wrap);
-    engine.feedSlice("z");
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
-    engine.resetScreen();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
-    try std.testing.expect(engine.screen().cursor_visible);
-    try std.testing.expect(engine.screen().auto_wrap);
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 'z'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 5);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abcde");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 'a'), vt_core.screen().cellAt(0, 0));
+    vt_core.feedSlice("\x1b[?25l\x1b[?7l");
+    vt_core.apply();
+    try std.testing.expect(!vt_core.screen().cursor_visible);
+    try std.testing.expect(!vt_core.screen().auto_wrap);
+    vt_core.feedSlice("z");
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
+    vt_core.resetScreen();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 0));
+    try std.testing.expect(vt_core.screen().cursor_visible);
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 'z'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "resetScreen preserves queued HT/CHT application from cleared origin" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("xxxxx");
-    engine.apply();
-    engine.feedSlice("\x09\x1b[2Iz");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.resetScreen();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 'z'), engine.screen().cellAt(0, 19));
-    try std.testing.expectEqual(@as(u16, 19), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("xxxxx");
+    vt_core.apply();
+    vt_core.feedSlice("\x09\x1b[2Iz");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.resetScreen();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 0));
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 'z'), vt_core.screen().cellAt(0, 19));
+    try std.testing.expectEqual(@as(u16, 19), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "resetScreen preserves split CHT and queued mode change" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[?7l\x1b[2");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.resetScreen();
-    try std.testing.expect(engine.screen().auto_wrap);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    engine.feedSlice("Ixy");
-    engine.apply();
-    try std.testing.expect(!engine.screen().auto_wrap);
-    try std.testing.expectEqual(@as(u16, 18), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 16));
-    try std.testing.expectEqual(@as(u21, 'y'), engine.screen().cellAt(0, 17));
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[?7l\x1b[2");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.resetScreen();
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    vt_core.feedSlice("Ixy");
+    vt_core.apply();
+    try std.testing.expect(!vt_core.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 18), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 16));
+    try std.testing.expectEqual(@as(u21, 'y'), vt_core.screen().cellAt(0, 17));
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "resetScreen preserves partial CHT parser state with empty queue" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[2");
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.resetScreen();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    engine.feedSlice("Iw");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 17), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'w'), engine.screen().cellAt(0, 16));
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[2");
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.resetScreen();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    vt_core.feedSlice("Iw");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 17), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'w'), vt_core.screen().cellAt(0, 16));
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "resetScreen preserves split CBT and queued cursor visibility change" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("a\x1b[2I");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 16), engine.screen().cursor_col);
-    engine.feedSlice("\x1b[?25l\x1b[3");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.resetScreen();
-    try std.testing.expect(engine.screen().cursor_visible);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    engine.feedSlice("Zq");
-    engine.apply();
-    try std.testing.expect(!engine.screen().cursor_visible);
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'q'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("a\x1b[2I");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 16), vt_core.screen().cursor_col);
+    vt_core.feedSlice("\x1b[?25l\x1b[3");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.resetScreen();
+    try std.testing.expect(vt_core.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    vt_core.feedSlice("Zq");
+    vt_core.apply();
+    try std.testing.expect(!vt_core.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'q'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "reset clears queue/parser without mutating screen modes" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 5);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[?25l\x1b[?7l");
-    engine.apply();
-    try std.testing.expect(!engine.screen().cursor_visible);
-    try std.testing.expect(!engine.screen().auto_wrap);
-    engine.feedSlice("abc\x1b[");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expect(!engine.screen().cursor_visible);
-    try std.testing.expect(!engine.screen().auto_wrap);
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 5);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[?25l\x1b[?7l");
+    vt_core.apply();
+    try std.testing.expect(!vt_core.screen().cursor_visible);
+    try std.testing.expect(!vt_core.screen().auto_wrap);
+    vt_core.feedSlice("abc\x1b[");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expect(!vt_core.screen().cursor_visible);
+    try std.testing.expect(!vt_core.screen().auto_wrap);
 }
 
 test "reset clears queued mode event and split CHT parser state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[?7l\x1b[2");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expect(engine.screen().auto_wrap);
-    engine.feedSlice("Iu");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 2), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'I'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'u'), engine.screen().cellAt(0, 1));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[?7l\x1b[2");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    vt_core.feedSlice("Iu");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 2), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'I'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'u'), vt_core.screen().cellAt(0, 1));
 }
 
 test "cursor move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[5;10H");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[5;10H");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 4), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), vt_core.screen().cursor_col);
 }
 
 test "CNL move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[3E");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 3), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[3E");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 3), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "CPL move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[3F");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[3F");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "split CNL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("Ex");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("Ex");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "split CNL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("Ex");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(7, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("Ex");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(7, 0));
 }
 
 test "split CPL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("Fx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("Fx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "split CPL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("Fx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("Fx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 0));
 }
 
 test "CHA move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[9G");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[9G");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 8), vt_core.screen().cursor_col);
 }
 
 test "VPA move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[9d");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[9d");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 8), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "VPA clamp via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 5, 20);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[999d");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 5, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[999d");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 4), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "CUD alias 'e' move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[5e");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[5e");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "CUF alias 'a' move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[9a");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[9a");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), vt_core.screen().cursor_col);
 }
 
 test "CHA alias backtick move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[9`");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[9`");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 8), vt_core.screen().cursor_col);
 }
 
 test "split VPA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("dx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("dx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "split VPA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("dx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 6), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(6, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("dx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 6), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(6, 0));
 }
 
 test "CHA clamp via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[999G");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 19), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[999G");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 19), vt_core.screen().cursor_col);
 }
 
 test "split CHA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("Gx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("Gx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "split CHA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("\x1b[7");
-    engine.feedSlice("Gx");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("\x1b[7");
+    vt_core.feedSlice("Gx");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "CHT and CBT tab navigation via apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("a\x1b[2I\x1b[Zb");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'b'), engine.screen().cellAt(0, 8));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("a\x1b[2I\x1b[Zb");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 9), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), vt_core.screen().cellAt(0, 8));
 }
 
 test "DECSTR restores mode defaults before tab navigation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[?7l\x1b[?25l\x1b[!p\x1b[2Ic");
-    engine.apply();
-    try std.testing.expect(engine.screen().cursor_visible);
-    try std.testing.expect(engine.screen().auto_wrap);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 17), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'c'), engine.screen().cellAt(0, 16));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[?7l\x1b[?25l\x1b[!p\x1b[2Ic");
+    vt_core.apply();
+    try std.testing.expect(vt_core.screen().cursor_visible);
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 17), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'c'), vt_core.screen().cellAt(0, 16));
 }
 
 test "interrupted split CHT stream remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[2");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("Ix");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 7), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 3));
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[2");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("Ix");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 7), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 6));
 }
 
 test "interrupted split private cursor mode remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    try std.testing.expect(engine.screen().cursor_visible);
-    engine.feedSlice("x");
-    engine.apply();
-    engine.feedSlice("\x1b[?2");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("5l");
-    engine.apply();
-    try std.testing.expect(engine.screen().cursor_visible);
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    try std.testing.expect(vt_core.screen().cursor_visible);
+    vt_core.feedSlice("x");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[?2");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("5l");
+    vt_core.apply();
+    try std.testing.expect(vt_core.screen().cursor_visible);
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 1));
 }
 
 test "interrupted split CBT stream remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    engine.feedSlice("a\x1b[2I");
-    engine.apply();
-    engine.feedSlice("\x1b[2");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("Zy");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 19), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'a'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'y'), engine.screen().cellAt(0, 19));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("a\x1b[2I");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[2");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("Zy");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 19), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'a'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'y'), vt_core.screen().cellAt(0, 19));
 }
 
 test "interrupted split private auto-wrap mode remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
-    defer engine.deinit();
-    try std.testing.expect(engine.screen().auto_wrap);
-    engine.feedSlice("x");
-    engine.apply();
-    engine.feedSlice("\x1b[?");
-    engine.feedSlice("\x1b[!p");
-    engine.feedSlice("7l");
-    engine.apply();
-    try std.testing.expect(engine.screen().auto_wrap);
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 2, 20);
+    defer vt_core.deinit();
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    vt_core.feedSlice("x");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[?");
+    vt_core.feedSlice("\x1b[!p");
+    vt_core.feedSlice("7l");
+    vt_core.apply();
+    try std.testing.expect(vt_core.screen().auto_wrap);
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'x'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '!'), vt_core.screen().cellAt(0, 1));
 }
 
 test "text write and erase via apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
-    defer engine.deinit();
-    engine.feedSlice("hello");
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 'h'), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
-    engine.feedSlice("\x1b[K");
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 5));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 4, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("hello");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 'h'), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
+    vt_core.feedSlice("\x1b[K");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 5));
 }
 
 test "repeated apply without feed is no-op" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
-    defer engine.deinit();
-    engine.feedSlice("test");
-    engine.apply();
-    const col1 = engine.screen().cursor_col;
-    engine.apply();
-    try std.testing.expectEqual(col1, engine.screen().cursor_col);
-    engine.apply();
-    try std.testing.expectEqual(col1, engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.initWithCells(gpa, 4, 20);
+    defer vt_core.deinit();
+    vt_core.feedSlice("test");
+    vt_core.apply();
+    const col1 = vt_core.screen().cursor_col;
+    vt_core.apply();
+    try std.testing.expectEqual(col1, vt_core.screen().cursor_col);
+    vt_core.apply();
+    try std.testing.expectEqual(col1, vt_core.screen().cursor_col);
 }
 
 test "zero-dimension init is safe" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 0, 0);
-    defer engine.deinit();
-    engine.feedSlice("text\x1b[5A\x1b[999C\x1b[J");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    var vt_core = try mod.VtCore.init(gpa, 0, 0);
+    defer vt_core.deinit();
+    vt_core.feedSlice("text\x1b[5A\x1b[999C\x1b[J");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "zero-dimension tab commands are safe and deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 0, 8);
-    defer engine.deinit();
-    engine.feedSlice("\x09\x1b[2I\x1b[3Z");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 0, 8);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x09\x1b[2I\x1b[3Z");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "queuedEventCount after clear is zero" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("\x1b[1m\x1b[31mtext");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.clear();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("\x1b[1m\x1b[31mtext");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.clear();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "queuedEventCount after reset is zero" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("abc\x1b[31m");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc\x1b[31m");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "queuedEventCount after apply is zero" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("hello\x1b[5A");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    engine.apply();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("hello\x1b[5A");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    vt_core.apply();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "feed after clear accumulates new events" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 24, 80);
-    defer engine.deinit();
-    engine.feedSlice("old");
-    engine.clear();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    engine.feedSlice("new");
-    try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
+    var vt_core = try mod.VtCore.init(gpa, 24, 80);
+    defer vt_core.deinit();
+    vt_core.feedSlice("old");
+    vt_core.clear();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    vt_core.feedSlice("new");
+    try std.testing.expectEqual(@as(usize, 1), vt_core.queuedEventCount());
 }
 
 test "complex sequence with cursor/text/erase" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 15);
-    defer engine.deinit();
-    engine.feedSlice("line0");
-    engine.apply();
-    engine.feedSlice("\x0D\x0A");
-    engine.apply();
-    engine.feedSlice("line1");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(u21, 'l'), engine.screen().cellAt(1, 0));
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 15);
+    defer vt_core.deinit();
+    vt_core.feedSlice("line0");
+    vt_core.apply();
+    vt_core.feedSlice("\x0D\x0A");
+    vt_core.apply();
+    vt_core.feedSlice("line1");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(u21, 'l'), vt_core.screen().cellAt(1, 0));
 }
 
 test "initWithCellsAndHistory creates history" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
-    defer engine.deinit();
-    try std.testing.expectEqual(@as(u16, 50), engine.historyCapacity());
-    try std.testing.expectEqual(@as(u16, 0), engine.historyCount());
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer vt_core.deinit();
+    try std.testing.expectEqual(@as(u16, 50), vt_core.historyCapacity());
+    try std.testing.expectEqual(@as(u16, 0), vt_core.historyCount());
 }
 
 test "history accumulates via scroll" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[B\x0A");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 1), engine.historyCount());
-    try std.testing.expectEqual(@as(u21, 'a'), engine.historyRowAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 'b'), engine.historyRowAt(0, 1));
-    try std.testing.expectEqual(@as(u21, 'c'), engine.historyRowAt(0, 2));
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[B\x0A");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 1), vt_core.historyCount());
+    try std.testing.expectEqual(@as(u21, 'a'), vt_core.historyRowAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'b'), vt_core.historyRowAt(0, 1));
+    try std.testing.expectEqual(@as(u21, 'c'), vt_core.historyRowAt(0, 2));
 }
 
 test "history read returns zero for out-of-bounds" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
-    defer engine.deinit();
-    engine.feedSlice("abc");
-    engine.apply();
-    engine.feedSlice("\x1b[B\x0A");
-    engine.apply();
-    try std.testing.expectEqual(@as(u21, 0), engine.historyRowAt(1, 0));
-    try std.testing.expectEqual(@as(u21, 0), engine.historyRowAt(0, 10));
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 10, 50);
+    defer vt_core.deinit();
+    vt_core.feedSlice("abc");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[B\x0A");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u21, 0), vt_core.historyRowAt(1, 0));
+    try std.testing.expectEqual(@as(u21, 0), vt_core.historyRowAt(0, 10));
 }
 
-test "direct screen and engine history states match" {
+test "direct screen and vt_core history states match" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 10);
-    defer engine.deinit();
-    engine.feedSlice("test");
-    engine.apply();
-    engine.feedSlice("\x1b[B\x0A");
-    engine.apply();
-    const direct_count = engine.screen().historyCount();
-    const engine_count = engine.historyCount();
-    try std.testing.expectEqual(direct_count, engine_count);
-    for (0..engine_count) |i| {
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 5, 10);
+    defer vt_core.deinit();
+    vt_core.feedSlice("test");
+    vt_core.apply();
+    vt_core.feedSlice("\x1b[B\x0A");
+    vt_core.apply();
+    const direct_count = vt_core.screen().historyCount();
+    const vt_core_count = vt_core.historyCount();
+    try std.testing.expectEqual(direct_count, vt_core_count);
+    for (0..vt_core_count) |i| {
         for (0..5) |col| {
-            const direct_cell = engine.screen().historyRowAt(@intCast(i), @intCast(col));
-            const engine_cell = engine.historyRowAt(@intCast(i), @intCast(col));
-            try std.testing.expectEqual(direct_cell, engine_cell);
+            const direct_cell = vt_core.screen().historyRowAt(@intCast(i), @intCast(col));
+            const vt_core_cell = vt_core.historyRowAt(@intCast(i), @intCast(col));
+            try std.testing.expectEqual(direct_cell, vt_core_cell);
         }
     }
 }
 
 test "history accessor ordering remains stable after wraparound" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 2, 2);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 2, 2);
+    defer vt_core.deinit();
 
     var row_num: u21 = '1';
     var i: u16 = 0;
     while (i < 4) : (i += 1) {
         const pair = [_]u8{ @intCast(row_num), @intCast(row_num) };
-        engine.feedSlice("\x1b[H");
-        engine.feedSlice(pair[0..]);
-        engine.feedSlice("\x1b[B\x0A");
-        engine.apply();
+        vt_core.feedSlice("\x1b[H");
+        vt_core.feedSlice(pair[0..]);
+        vt_core.feedSlice("\x1b[B\x0A");
+        vt_core.apply();
         row_num += 1;
     }
 
-    try std.testing.expectEqual(@as(u16, 2), engine.historyCount());
-    try std.testing.expectEqual(@as(u21, '4'), engine.historyRowAt(0, 0));
-    try std.testing.expectEqual(@as(u21, '4'), engine.historyRowAt(0, 1));
-    try std.testing.expectEqual(@as(u21, '3'), engine.historyRowAt(1, 0));
-    try std.testing.expectEqual(@as(u21, '3'), engine.historyRowAt(1, 1));
+    try std.testing.expectEqual(@as(u16, 2), vt_core.historyCount());
+    try std.testing.expectEqual(@as(u21, '4'), vt_core.historyRowAt(0, 0));
+    try std.testing.expectEqual(@as(u21, '4'), vt_core.historyRowAt(0, 1));
+    try std.testing.expectEqual(@as(u21, '3'), vt_core.historyRowAt(1, 0));
+    try std.testing.expectEqual(@as(u21, '3'), vt_core.historyRowAt(1, 1));
 }
 
 test "selection: start and update with viewport coordinates" {
@@ -4476,43 +4476,43 @@ test "selection: finish stops selecting but keeps active" {
     try std.testing.expect(!state.selecting);
 }
 
-test "selection state integrated into engine cursor-only mode" {
+test "selection state integrated into vt_core cursor-only mode" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
-    engine.selectionStart(3, 5);
-    const sel = engine.selectionState().?;
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), vt_core.selectionState());
+    vt_core.selectionStart(3, 5);
+    const sel = vt_core.selectionState().?;
     try std.testing.expectEqual(@as(i32, 3), sel.start.row);
     try std.testing.expectEqual(@as(u16, 5), sel.start.col);
 }
 
-test "selection state integrated into engine with cells" {
+test "selection state integrated into vt_core with cells" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.selectionStart(2, 10);
-    engine.selectionUpdate(5, 15);
-    const sel = engine.selectionState().?;
+    vt_core.selectionStart(2, 10);
+    vt_core.selectionUpdate(5, 15);
+    const sel = vt_core.selectionState().?;
     try std.testing.expectEqual(@as(i32, 2), sel.start.row);
     try std.testing.expectEqual(@as(i32, 5), sel.end.row);
 }
 
 test "selection state survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("hello");
-    engine.apply();
-    engine.selectionStart(0, 1);
-    engine.selectionFinish();
+    vt_core.feedSlice("hello");
+    vt_core.apply();
+    vt_core.selectionStart(0, 1);
+    vt_core.selectionFinish();
 
-    engine.reset();
+    vt_core.reset();
 
-    const sel = engine.selectionState().?;
+    const sel = vt_core.selectionState().?;
     try std.testing.expectEqual(@as(i32, 0), sel.start.row);
     try std.testing.expectEqual(@as(u16, 1), sel.start.col);
     try std.testing.expect(!sel.selecting);
@@ -4520,87 +4520,87 @@ test "selection state survives reset" {
 
 test "selection survives resetScreen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("text\n");
-    engine.apply();
-    engine.selectionStart(-1, 2);
-    const pre_reset = engine.selectionState().?;
+    vt_core.feedSlice("text\n");
+    vt_core.apply();
+    vt_core.selectionStart(-1, 2);
+    const pre_reset = vt_core.selectionState().?;
     try std.testing.expect(pre_reset.active);
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    const post_reset = engine.selectionState().?;
+    const post_reset = vt_core.selectionState().?;
     try std.testing.expectEqual(@as(i32, -1), post_reset.start.row);
     try std.testing.expect(post_reset.active);
 }
 
-test "selection clear deactivates through engine" {
+test "selection clear deactivates through vt_core" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.selectionStart(5, 7);
-    try std.testing.expect(engine.selectionState() != null);
+    vt_core.selectionStart(5, 7);
+    try std.testing.expect(vt_core.selectionState() != null);
 
-    engine.selectionClear();
-    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
+    vt_core.selectionClear();
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), vt_core.selectionState());
 }
 
 test "selection cleared when referencing out-of-bounds history index" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 3, 2);
+    defer vt_core.deinit();
 
-    engine.feedSlice("1\x0A2\x0A3\x0A");
-    engine.apply();
+    vt_core.feedSlice("1\x0A2\x0A3\x0A");
+    vt_core.apply();
 
-    engine.selectionStart(-3, 0);
-    try std.testing.expect(engine.selectionState() != null);
+    vt_core.selectionStart(-3, 0);
+    try std.testing.expect(vt_core.selectionState() != null);
 
-    engine.feedSlice("x");
-    engine.apply();
+    vt_core.feedSlice("x");
+    vt_core.apply();
 
-    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
+    try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), vt_core.selectionState());
 }
 
 test "selection not cleared by reset operation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 3);
+    defer vt_core.deinit();
 
-    engine.feedSlice("test\x1b[H");
-    engine.apply();
+    vt_core.feedSlice("test\x1b[H");
+    vt_core.apply();
 
-    engine.selectionStart(0, 2);
-    const sel_before = engine.selectionState().?;
+    vt_core.selectionStart(0, 2);
+    const sel_before = vt_core.selectionState().?;
     try std.testing.expect(sel_before.active);
 
-    engine.reset();
+    vt_core.reset();
 
-    const sel_after = engine.selectionState().?;
+    const sel_after = vt_core.selectionState().?;
     try std.testing.expect(sel_after.active);
     try std.testing.expectEqual(@as(i32, 0), sel_after.start.row);
 }
 
 test "selection not cleared by resetScreen operation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 3);
+    defer vt_core.deinit();
 
-    engine.feedSlice("test");
-    engine.apply();
+    vt_core.feedSlice("test");
+    vt_core.apply();
 
-    engine.selectionStart(-1, 5);
-    engine.selectionFinish();
-    const sel_before = engine.selectionState().?;
+    vt_core.selectionStart(-1, 5);
+    vt_core.selectionFinish();
+    const sel_before = vt_core.selectionState().?;
     try std.testing.expect(sel_before.active);
     try std.testing.expect(!sel_before.selecting);
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    const sel_after = engine.selectionState().?;
+    const sel_after = vt_core.selectionState().?;
     try std.testing.expect(sel_after.active);
     try std.testing.expect(!sel_after.selecting);
     try std.testing.expectEqual(@as(i32, -1), sel_after.start.row);
@@ -4608,38 +4608,38 @@ test "selection not cleared by resetScreen operation" {
 
 test "encodeKey handles printable ASCII" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const bytes = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
+    const bytes = vt_core.encodeKey('A', model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), bytes.len);
     try std.testing.expectEqual(@as(u8, 'A'), bytes[0]);
 }
 
 test "encodeKey handles special keys" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const enter_bytes = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const enter_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), enter_bytes.len);
     try std.testing.expectEqual(@as(u8, '\r'), enter_bytes[0]);
 
-    const esc_bytes = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const esc_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), esc_bytes.len);
     try std.testing.expectEqual(@as(u8, '\x1b'), esc_bytes[0]);
 
-    const tab_bytes = engine.encodeKey(model_mod.VTERM_KEY_TAB, model_mod.VTERM_MOD_NONE);
+    const tab_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_TAB, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), tab_bytes.len);
     try std.testing.expectEqual(@as(u8, '\t'), tab_bytes[0]);
 }
 
 test "encodeKey handles cursor keys" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const up_bytes = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
+    const up_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 3), up_bytes.len);
     try std.testing.expectEqual(@as(u8, '\x1b'), up_bytes[0]);
     try std.testing.expectEqual(@as(u8, '['), up_bytes[1]);
@@ -4648,8 +4648,8 @@ test "encodeKey handles cursor keys" {
 
 test "encodeMouse returns empty when not enabled" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
     const event = model_mod.MouseEvent{
         .kind = .move,
@@ -4662,14 +4662,14 @@ test "encodeMouse returns empty when not enabled" {
         .buttons_down = 0,
     };
 
-    const bytes = engine.encodeMouse(event);
+    const bytes = vt_core.encodeMouse(event);
     try std.testing.expectEqual(@as(usize, 0), bytes.len);
 }
 
 test "mouse event supports history row indices" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
     const history_event = model_mod.MouseEvent{
         .kind = .move,
@@ -4699,65 +4699,65 @@ test "mouse event supports history row indices" {
 
 test "encodeKey handles extended keys (HOME, END, INS, DEL)" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const home_bytes = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_NONE);
+    const home_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 3), home_bytes.len);
     try std.testing.expectEqual(@as(u8, '\x1b'), home_bytes[0]);
     try std.testing.expectEqual(@as(u8, '['), home_bytes[1]);
     try std.testing.expectEqual(@as(u8, 'H'), home_bytes[2]);
 
-    const ins_bytes = engine.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
+    const ins_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 4), ins_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[2~", ins_bytes);
 
-    const del_bytes = engine.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_NONE);
+    const del_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 4), del_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[3~", del_bytes);
 }
 
 test "encodeKey handles page keys (PAGEUP, PAGEDOWN)" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const pageup_bytes = engine.encodeKey(model_mod.VTERM_KEY_PAGEUP, model_mod.VTERM_MOD_NONE);
+    const pageup_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_PAGEUP, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 4), pageup_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[5~", pageup_bytes);
 
-    const pagedown_bytes = engine.encodeKey(model_mod.VTERM_KEY_PAGEDOWN, model_mod.VTERM_MOD_NONE);
+    const pagedown_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_PAGEDOWN, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 4), pagedown_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[6~", pagedown_bytes);
 }
 
 test "extended key encoding with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const shift_home = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
+    const shift_home = vt_core.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqual(@as(usize, 6), shift_home.len);
     try std.testing.expectEqual(@as(u8, '2'), shift_home[4]);
 
-    const ctrl_del = engine.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_CTRL);
+    const ctrl_del = vt_core.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqual(@as(usize, 6), ctrl_del.len);
     try std.testing.expectEqual(@as(u8, '5'), ctrl_del[4]);
 }
 
 test "extended key encoding survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
+    const before_reset = vt_core.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..before_reset.len], before_reset);
     const before_len = before_reset.len;
 
-    engine.reset();
+    vt_core.reset();
 
-    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
+    const after_reset = vt_core.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
 
     try std.testing.expectEqual(before_len, after_reset.len);
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
@@ -4765,14 +4765,14 @@ test "extended key encoding survives reset" {
 
 test "extended key encoding deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const call1 = engine.encodeKey(model_mod.VTERM_KEY_END, model_mod.VTERM_MOD_ALT);
+    const call1 = vt_core.encodeKey(model_mod.VTERM_KEY_END, model_mod.VTERM_MOD_ALT);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..call1.len], call1);
 
-    const call2 = engine.encodeKey(model_mod.VTERM_KEY_END, model_mod.VTERM_MOD_ALT);
+    const call2 = vt_core.encodeKey(model_mod.VTERM_KEY_END, model_mod.VTERM_MOD_ALT);
 
     try std.testing.expectEqual(call1.len, call2.len);
     try std.testing.expectEqualSlices(u8, buf1[0..call1.len], call2);
@@ -4780,70 +4780,70 @@ test "extended key encoding deterministic for repeated calls" {
 
 test "encodeKey handles function keys F1-F4" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const f1_bytes = engine.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_NONE);
+    const f1_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 3), f1_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[P", f1_bytes);
 
-    const f2_bytes = engine.encodeKey(model_mod.VTERM_KEY_F2, model_mod.VTERM_MOD_NONE);
+    const f2_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F2, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[Q", f2_bytes);
 
-    const f3_bytes = engine.encodeKey(model_mod.VTERM_KEY_F3, model_mod.VTERM_MOD_NONE);
+    const f3_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F3, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[R", f3_bytes);
 
-    const f4_bytes = engine.encodeKey(model_mod.VTERM_KEY_F4, model_mod.VTERM_MOD_NONE);
+    const f4_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F4, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[S", f4_bytes);
 }
 
 test "encodeKey handles function keys F5-F12" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const f5_bytes = engine.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
+    const f5_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 5), f5_bytes.len);
     try std.testing.expectEqualSlices(u8, "\x1b[15~", f5_bytes);
 
-    const f9_bytes = engine.encodeKey(model_mod.VTERM_KEY_F9, model_mod.VTERM_MOD_NONE);
+    const f9_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F9, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[20~", f9_bytes);
 
-    const f12_bytes = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_NONE);
+    const f12_bytes = vt_core.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[24~", f12_bytes);
 }
 
 test "function key encoding with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const shift_f1 = engine.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_SHIFT);
+    const shift_f1 = vt_core.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqual(@as(usize, 6), shift_f1.len);
     try std.testing.expectEqual(@as(u8, '2'), shift_f1[4]);
 
-    const ctrl_f5 = engine.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_CTRL);
+    const ctrl_f5 = vt_core.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqual(@as(usize, 7), ctrl_f5.len);
     try std.testing.expectEqual(@as(u8, '5'), ctrl_f5[5]);
 
-    const alt_f12 = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_ALT);
+    const alt_f12 = vt_core.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_ALT);
     try std.testing.expectEqual(@as(usize, 7), alt_f12.len);
     try std.testing.expectEqual(@as(u8, '3'), alt_f12[5]);
 }
 
 test "function key encoding survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_F6, model_mod.VTERM_MOD_NONE);
+    const before_reset = vt_core.encodeKey(model_mod.VTERM_KEY_F6, model_mod.VTERM_MOD_NONE);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..before_reset.len], before_reset);
     const before_len = before_reset.len;
 
-    engine.reset();
+    vt_core.reset();
 
-    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_F6, model_mod.VTERM_MOD_NONE);
+    const after_reset = vt_core.encodeKey(model_mod.VTERM_KEY_F6, model_mod.VTERM_MOD_NONE);
 
     try std.testing.expectEqual(before_len, after_reset.len);
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
@@ -4851,14 +4851,14 @@ test "function key encoding survives reset" {
 
 test "function key encoding deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const call1 = engine.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_SHIFT);
+    const call1 = vt_core.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_SHIFT);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..call1.len], call1);
 
-    const call2 = engine.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_SHIFT);
+    const call2 = vt_core.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_SHIFT);
 
     try std.testing.expectEqual(call1.len, call2.len);
     try std.testing.expectEqualSlices(u8, buf1[0..call1.len], call2);
@@ -4866,14 +4866,14 @@ test "function key encoding deterministic for repeated calls" {
 
 test "input encoding is deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const bytes1 = engine.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
+    const bytes1 = vt_core.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..bytes1.len], bytes1);
 
-    const bytes2 = engine.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
+    const bytes2 = vt_core.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
 
     try std.testing.expectEqual(bytes1.len, bytes2.len);
     try std.testing.expectEqualSlices(u8, buf1[0..bytes1.len], bytes2);
@@ -4881,17 +4881,17 @@ test "input encoding is deterministic for repeated calls" {
 
 test "input encoding survives reset operation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const before_reset = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..before_reset.len], before_reset);
     const before_len = before_reset.len;
 
-    engine.reset();
+    vt_core.reset();
 
-    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const after_reset = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
 
     try std.testing.expectEqual(before_len, after_reset.len);
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
@@ -4899,20 +4899,20 @@ test "input encoding survives reset operation" {
 
 test "input encoding survives resetScreen operation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("test");
-    engine.apply();
+    vt_core.feedSlice("test");
+    vt_core.apply();
 
-    const before_reset = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const before_reset = vt_core.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
     var buf1: [64]u8 = undefined;
     @memcpy(buf1[0..before_reset.len], before_reset);
     const before_len = before_reset.len;
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    const after_reset = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const after_reset = vt_core.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
 
     try std.testing.expectEqual(before_len, after_reset.len);
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
@@ -4920,15 +4920,15 @@ test "input encoding survives resetScreen operation" {
 
 test "input does not affect selection state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.selectionStart(2, 5);
-    const before_sel = engine.selectionState().?;
+    vt_core.selectionStart(2, 5);
+    const before_sel = vt_core.selectionState().?;
 
-    _ = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
+    _ = vt_core.encodeKey('A', model_mod.VTERM_MOD_NONE);
 
-    const after_sel = engine.selectionState().?;
+    const after_sel = vt_core.selectionState().?;
     try std.testing.expectEqual(before_sel.active, after_sel.active);
     try std.testing.expectEqual(before_sel.start.row, after_sel.start.row);
     try std.testing.expectEqual(before_sel.start.col, after_sel.start.col);
@@ -4936,114 +4936,114 @@ test "input does not affect selection state" {
 
 test "input encoding output is not mutable from caller" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const bytes = engine.encodeKey('B', model_mod.VTERM_MOD_NONE);
+    const bytes = vt_core.encodeKey('B', model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), bytes.len);
     try std.testing.expectEqual(@as(u8, 'B'), bytes[0]);
 }
 
 test "input encoding: keyboard coverage across printable, control, cursor, and function keys" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const ascii = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
+    const ascii = vt_core.encodeKey('A', model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(usize, 1), ascii.len);
     try std.testing.expectEqual(@as(u8, 'A'), ascii[0]);
 
-    const enter = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const enter = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\r", enter);
 
-    const escape = engine.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
+    const escape = vt_core.encodeKey(model_mod.VTERM_KEY_ESCAPE, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b", escape);
 
-    const backspace = engine.encodeKey(model_mod.VTERM_KEY_BACKSPACE, model_mod.VTERM_MOD_NONE);
+    const backspace = vt_core.encodeKey(model_mod.VTERM_KEY_BACKSPACE, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x7f", backspace);
 
-    const up = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
+    const up = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[A", up);
 
-    const home = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_NONE);
+    const home = vt_core.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[H", home);
 
-    const del = engine.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_NONE);
+    const del = vt_core.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[3~", del);
 
-    const f1 = engine.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_NONE);
+    const f1 = vt_core.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[P", f1);
 
-    const f5 = engine.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
+    const f5 = vt_core.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[15~", f5);
 
-    const f12 = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_NONE);
+    const f12 = vt_core.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, "\x1b[24~", f12);
 }
 
 test "input encoding: modifier combinations are deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const shift_up = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    const shift_up = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqual(@as(usize, 6), shift_up.len);
     try std.testing.expectEqual(@as(u8, '2'), shift_up[4]);
 
     var buf_shift: [64]u8 = undefined;
     @memcpy(buf_shift[0..shift_up.len], shift_up);
 
-    const shift_up_2 = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    const shift_up_2 = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqualSlices(u8, buf_shift[0..shift_up.len], shift_up_2);
 
-    const alt_down = engine.encodeKey(model_mod.VTERM_KEY_DOWN, model_mod.VTERM_MOD_ALT);
+    const alt_down = vt_core.encodeKey(model_mod.VTERM_KEY_DOWN, model_mod.VTERM_MOD_ALT);
     try std.testing.expectEqual(@as(u8, '3'), alt_down[4]);
 
-    const ctrl_right = engine.encodeKey(model_mod.VTERM_KEY_RIGHT, model_mod.VTERM_MOD_CTRL);
+    const ctrl_right = vt_core.encodeKey(model_mod.VTERM_KEY_RIGHT, model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqual(@as(u8, '5'), ctrl_right[4]);
 
-    const shift_ctrl_left = engine.encodeKey(model_mod.VTERM_KEY_LEFT, model_mod.VTERM_MOD_SHIFT | model_mod.VTERM_MOD_CTRL);
+    const shift_ctrl_left = vt_core.encodeKey(model_mod.VTERM_KEY_LEFT, model_mod.VTERM_MOD_SHIFT | model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqual(@as(u8, '6'), shift_ctrl_left[4]);
 }
 
 test "input encoding: encoding survives reset and screen reset" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("\x1b[2J");
-    engine.apply();
+    vt_core.feedSlice("\x1b[2J");
+    vt_core.apply();
 
-    const before = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const before = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     var buf_before: [64]u8 = undefined;
     @memcpy(buf_before[0..before.len], before);
 
-    engine.reset();
+    vt_core.reset();
 
-    const after = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    const after = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, buf_before[0..before.len], after);
 
-    engine.resetScreen();
-    const after_screen = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
+    vt_core.resetScreen();
+    const after_screen = vt_core.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqualSlices(u8, buf_before[0..before.len], after_screen);
 }
 
 test "input encoding: encoding does not mutate state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("hello");
-    engine.apply();
-    const screen_before = engine.screen().*;
-    const history_before = engine.historyCount();
+    vt_core.feedSlice("hello");
+    vt_core.apply();
+    const screen_before = vt_core.screen().*;
+    const history_before = vt_core.historyCount();
 
-    _ = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
-    _ = engine.encodeKey('X', model_mod.VTERM_MOD_CTRL);
-    _ = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_ALT);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    _ = vt_core.encodeKey('X', model_mod.VTERM_MOD_CTRL);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_ALT);
 
-    const screen_after = engine.screen().*;
-    const history_after = engine.historyCount();
+    const screen_after = vt_core.screen().*;
+    const history_after = vt_core.historyCount();
 
     try std.testing.expectEqual(screen_before.cursor_row, screen_after.cursor_row);
     try std.testing.expectEqual(screen_before.cursor_col, screen_after.cursor_col);
@@ -5052,314 +5052,314 @@ test "input encoding: encoding does not mutate state" {
 
 test "input encoding: extended keys with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const shift_home = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
+    const shift_home = vt_core.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqual(@as(usize, 6), shift_home.len);
     try std.testing.expectEqualSlices(u8, "\x1b[1;2H", shift_home);
 
-    const ctrl_del = engine.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_CTRL);
+    const ctrl_del = vt_core.encodeKey(model_mod.VTERM_KEY_DEL, model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqual(@as(usize, 6), ctrl_del.len);
     try std.testing.expectEqualSlices(u8, "\x1b[3;5~", ctrl_del);
 
-    const alt_pageup = engine.encodeKey(model_mod.VTERM_KEY_PAGEUP, model_mod.VTERM_MOD_ALT);
+    const alt_pageup = vt_core.encodeKey(model_mod.VTERM_KEY_PAGEUP, model_mod.VTERM_MOD_ALT);
     try std.testing.expectEqual(@as(usize, 6), alt_pageup.len);
     try std.testing.expectEqualSlices(u8, "\x1b[5;3~", alt_pageup);
 }
 
 test "input encoding: function keys with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    const shift_f2 = engine.encodeKey(model_mod.VTERM_KEY_F2, model_mod.VTERM_MOD_SHIFT);
+    const shift_f2 = vt_core.encodeKey(model_mod.VTERM_KEY_F2, model_mod.VTERM_MOD_SHIFT);
     try std.testing.expectEqualSlices(u8, "\x1b[1;2Q", shift_f2);
 
-    const ctrl_f8 = engine.encodeKey(model_mod.VTERM_KEY_F8, model_mod.VTERM_MOD_CTRL);
+    const ctrl_f8 = vt_core.encodeKey(model_mod.VTERM_KEY_F8, model_mod.VTERM_MOD_CTRL);
     try std.testing.expectEqualSlices(u8, "\x1b[19;5~", ctrl_f8);
 
-    const alt_f11 = engine.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_ALT);
+    const alt_f11 = vt_core.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_ALT);
     try std.testing.expectEqualSlices(u8, "\x1b[23;3~", alt_f11);
 }
 
 test "api: clear() empties queue without mutating parser or screen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC\x1b[2J");
-    try std.testing.expect(engine.queuedEventCount() > 0);
+    vt_core.feedSlice("ABC\x1b[2J");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
 
-    const screen_before = engine.screen().*;
+    const screen_before = vt_core.screen().*;
 
-    engine.clear();
+    vt_core.clear();
 
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(screen_before.cursor_row, engine.screen().cursor_row);
-    try std.testing.expectEqual(screen_before.cursor_col, engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(screen_before.cursor_row, vt_core.screen().cursor_row);
+    try std.testing.expectEqual(screen_before.cursor_col, vt_core.screen().cursor_col);
 }
 
 test "api: reset() clears parser and queue while preserving screen modes" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("\x1b[?25l\x1b[?7h");
-    engine.apply();
+    vt_core.feedSlice("\x1b[?25l\x1b[?7h");
+    vt_core.apply();
 
-    const cursor_visible = engine.screen().cursor_visible;
-    const auto_wrap = engine.screen().auto_wrap;
+    const cursor_visible = vt_core.screen().cursor_visible;
+    const auto_wrap = vt_core.screen().auto_wrap;
 
-    engine.feedSlice("test\x1b[");
-    try std.testing.expect(engine.queuedEventCount() > 0);
+    vt_core.feedSlice("test\x1b[");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
 
-    engine.reset();
+    vt_core.reset();
 
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(cursor_visible, engine.screen().cursor_visible);
-    try std.testing.expectEqual(auto_wrap, engine.screen().auto_wrap);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(cursor_visible, vt_core.screen().cursor_visible);
+    try std.testing.expectEqual(auto_wrap, vt_core.screen().auto_wrap);
 }
 
 test "api: resetScreen() clears screen while preserving parser and queue" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("Hello");
-    engine.apply();
-    const screen_col = engine.screen().cursor_col;
+    vt_core.feedSlice("Hello");
+    vt_core.apply();
+    const screen_col = vt_core.screen().cursor_col;
     try std.testing.expect(screen_col > 0);
 
-    engine.feedSlice("\x1b[2J");
-    const queued_before = engine.queuedEventCount();
+    vt_core.feedSlice("\x1b[2J");
+    const queued_before = vt_core.queuedEventCount();
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
-    try std.testing.expectEqual(queued_before, engine.queuedEventCount());
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_row);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(queued_before, vt_core.queuedEventCount());
 }
 
 test "api: repeated apply() calls without feed are no-ops" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("X");
-    engine.apply();
-    const col_after_first = engine.screen().cursor_col;
+    vt_core.feedSlice("X");
+    vt_core.apply();
+    const col_after_first = vt_core.screen().cursor_col;
 
-    engine.apply();
-    engine.apply();
+    vt_core.apply();
+    vt_core.apply();
 
-    try std.testing.expectEqual(col_after_first, engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expectEqual(col_after_first, vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "api: feed operations queue events before apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedByte('A');
-    engine.feedByte('B');
-    engine.feedByte('C');
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    vt_core.feedByte('A');
+    vt_core.feedByte('B');
+    vt_core.feedByte('C');
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 
-    engine.feedSlice("\x1b[5;10H");
-    try std.testing.expect(engine.queuedEventCount() > 0);
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    vt_core.feedSlice("\x1b[5;10H");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(@as(u16, 9), vt_core.screen().cursor_col);
 }
 
 test "api: encode operations have no observable state effects" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("DATA");
-    engine.apply();
-    engine.selectionStart(0, 5);
+    vt_core.feedSlice("DATA");
+    vt_core.apply();
+    vt_core.selectionStart(0, 5);
 
-    const screen_state = engine.screen().*;
-    const selection_state = engine.selectionState().?;
-    const history_count = engine.historyCount();
-    const queued_count = engine.queuedEventCount();
+    const screen_state = vt_core.screen().*;
+    const selection_state = vt_core.selectionState().?;
+    const history_count = vt_core.historyCount();
+    const queued_count = vt_core.queuedEventCount();
 
-    _ = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
-    _ = engine.encodeKey('X', model_mod.VTERM_MOD_NONE);
-    _ = engine.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_CTRL);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    _ = vt_core.encodeKey('X', model_mod.VTERM_MOD_NONE);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_F12, model_mod.VTERM_MOD_CTRL);
 
-    try std.testing.expectEqual(screen_state.cursor_row, engine.screen().cursor_row);
-    try std.testing.expectEqual(screen_state.cursor_col, engine.screen().cursor_col);
-    try std.testing.expectEqual(selection_state.start.row, engine.selectionState().?.start.row);
-    try std.testing.expectEqual(selection_state.start.col, engine.selectionState().?.start.col);
-    try std.testing.expectEqual(history_count, engine.historyCount());
-    try std.testing.expectEqual(queued_count, engine.queuedEventCount());
+    try std.testing.expectEqual(screen_state.cursor_row, vt_core.screen().cursor_row);
+    try std.testing.expectEqual(screen_state.cursor_col, vt_core.screen().cursor_col);
+    try std.testing.expectEqual(selection_state.start.row, vt_core.selectionState().?.start.row);
+    try std.testing.expectEqual(selection_state.start.col, vt_core.selectionState().?.start.col);
+    try std.testing.expectEqual(history_count, vt_core.historyCount());
+    try std.testing.expectEqual(queued_count, vt_core.queuedEventCount());
 }
 
 test "api: screen() returns a const reference" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    const screen_ref = engine.screen();
+    const screen_ref = vt_core.screen();
 
     _ = screen_ref.cursor_row;
     _ = screen_ref.cursor_col;
     _ = screen_ref.cursor_visible;
 
-    const screen_ref2 = engine.screen();
+    const screen_ref2 = vt_core.screen();
     try std.testing.expectEqual(screen_ref.cursor_row, screen_ref2.cursor_row);
 }
 
 test "api: feed/apply/reset ordering" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("First");
-    engine.apply();
-    try std.testing.expect(engine.screen().cursor_col > 0);
+    vt_core.feedSlice("First");
+    vt_core.apply();
+    try std.testing.expect(vt_core.screen().cursor_col > 0);
 
-    engine.feedSlice("\x1b[H");
-    try std.testing.expect(engine.queuedEventCount() > 0);
+    vt_core.feedSlice("\x1b[H");
+    try std.testing.expect(vt_core.queuedEventCount() > 0);
 
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expect(engine.screen().cursor_col > 0);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expect(vt_core.screen().cursor_col > 0);
 
-    engine.apply();
-    try std.testing.expect(engine.screen().cursor_col > 0);
+    vt_core.apply();
+    try std.testing.expect(vt_core.screen().cursor_col > 0);
 
-    engine.feedSlice("\x1b[H");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    vt_core.feedSlice("\x1b[H");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 }
 
 test "parity: split-feed at CSI boundary preserves queue semantics" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.init(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.init(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("\x1b[5;1");
-    const queued_mid = engine.queuedEventCount();
+    vt_core.feedSlice("\x1b[5;1");
+    const queued_mid = vt_core.queuedEventCount();
     try std.testing.expectEqual(@as(usize, 0), queued_mid);
 
-    engine.feedSlice("0H");
-    const queued_after = engine.queuedEventCount();
+    vt_core.feedSlice("0H");
+    const queued_after = vt_core.queuedEventCount();
 
     try std.testing.expect(queued_after > 0);
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 9), vt_core.screen().cursor_col);
 }
 
 test "parity: feed/apply/reset/feed/apply preserves state isolation" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
 
-    engine.feedSlice("\x1b[");
-    const queued = engine.queuedEventCount();
+    vt_core.feedSlice("\x1b[");
+    const queued = vt_core.queuedEventCount();
     try std.testing.expectEqual(@as(usize, 0), queued);
 
-    engine.reset();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
-    try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
+    vt_core.reset();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
+    try std.testing.expectEqual(@as(u16, 5), vt_core.screen().cursor_col);
 
-    engine.feedSlice("WORLD");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 10), engine.screen().cursor_col);
+    vt_core.feedSlice("WORLD");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 10), vt_core.screen().cursor_col);
 }
 
 test "parity: selection and history remain stable during apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("LINE1\nLINE2\nLINE3");
-    engine.apply();
+    vt_core.feedSlice("LINE1\nLINE2\nLINE3");
+    vt_core.apply();
 
-    engine.selectionStart(1, 0);
-    const sel_before = engine.selectionState().?;
+    vt_core.selectionStart(1, 0);
+    const sel_before = vt_core.selectionState().?;
     try std.testing.expectEqual(true, sel_before.active);
 
-    engine.feedSlice("\x1b[2J");
-    engine.apply();
+    vt_core.feedSlice("\x1b[2J");
+    vt_core.apply();
 
-    const sel_after = engine.selectionState();
+    const sel_after = vt_core.selectionState();
     try std.testing.expectEqual(true, sel_after.?.active);
     try std.testing.expectEqual(sel_before.start.row, sel_after.?.start.row);
 }
 
 test "parity: encode interleaved with feed/apply does not mutate state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC");
-    engine.apply();
-    const col_after_abc = engine.screen().cursor_col;
+    vt_core.feedSlice("ABC");
+    vt_core.apply();
+    const col_after_abc = vt_core.screen().cursor_col;
 
-    _ = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
-    _ = engine.encodeKey('X', model_mod.VTERM_MOD_NONE);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
+    _ = vt_core.encodeKey('X', model_mod.VTERM_MOD_NONE);
 
-    try std.testing.expectEqual(col_after_abc, engine.screen().cursor_col);
+    try std.testing.expectEqual(col_after_abc, vt_core.screen().cursor_col);
 
-    engine.feedSlice("DEF");
-    engine.apply();
-    try std.testing.expectEqual(col_after_abc + 3, engine.screen().cursor_col);
+    vt_core.feedSlice("DEF");
+    vt_core.apply();
+    try std.testing.expectEqual(col_after_abc + 3, vt_core.screen().cursor_col);
 
-    _ = engine.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
-    try std.testing.expectEqual(col_after_abc + 3, engine.screen().cursor_col);
+    _ = vt_core.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
+    try std.testing.expectEqual(col_after_abc + 3, vt_core.screen().cursor_col);
 }
 
 test "parity: complex state machine sequence" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("A");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
+    vt_core.feedSlice("A");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
 
-    const encoded = engine.encodeKey('B', model_mod.VTERM_MOD_NONE);
+    const encoded = vt_core.encodeKey('B', model_mod.VTERM_MOD_NONE);
     try std.testing.expectEqual(@as(u8, 'B'), encoded[0]);
-    try std.testing.expectEqual(@as(u16, 1), engine.screen().cursor_col);
+    try std.testing.expectEqual(@as(u16, 1), vt_core.screen().cursor_col);
 
-    engine.feedSlice("B\x1b[5G");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_col);
+    vt_core.feedSlice("B\x1b[5G");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 4), vt_core.screen().cursor_col);
 
-    engine.reset();
-    try std.testing.expectEqual(@as(u16, 4), engine.screen().cursor_col);
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    vt_core.reset();
+    try std.testing.expectEqual(@as(u16, 4), vt_core.screen().cursor_col);
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 
-    engine.feedSlice("C\x1b[H");
-    engine.apply();
-    try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
+    vt_core.feedSlice("C\x1b[H");
+    vt_core.apply();
+    try std.testing.expectEqual(@as(u16, 0), vt_core.screen().cursor_col);
 
-    try std.testing.expectEqual(@as(u16, 0), engine.historyCount());
+    try std.testing.expectEqual(@as(u16, 0), vt_core.historyCount());
 }
 
 test "snapshot: capture from simple text" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(@as(u16, 5), snap.rows);
@@ -5378,18 +5378,18 @@ test "snapshot: capture from simple text" {
 test "snapshot: determinism across identical state" {
     const gpa = std.testing.allocator;
 
-    var engine1 = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine1.deinit();
-    engine1.feedSlice("TEST");
-    engine1.apply();
-    var snap1 = try engine1.snapshot();
+    var vt_core1 = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core1.deinit();
+    vt_core1.feedSlice("TEST");
+    vt_core1.apply();
+    var snap1 = try vt_core1.snapshot();
     defer snap1.deinit();
 
-    var engine2 = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine2.deinit();
-    engine2.feedSlice("TEST");
-    engine2.apply();
-    var snap2 = try engine2.snapshot();
+    var vt_core2 = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core2.deinit();
+    vt_core2.feedSlice("TEST");
+    vt_core2.apply();
+    var snap2 = try vt_core2.snapshot();
     defer snap2.deinit();
 
     try std.testing.expectEqual(snap1.cursor_row, snap2.cursor_row);
@@ -5406,21 +5406,21 @@ test "snapshot: determinism across identical state" {
 test "snapshot: split-feed replay equivalence" {
     const gpa = std.testing.allocator;
 
-    var engine_atomic = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine_atomic.deinit();
-    engine_atomic.feedSlice("ABCDEFGHIJ");
-    engine_atomic.apply();
-    var snap_atomic = try engine_atomic.snapshot();
+    var vt_core_atomic = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core_atomic.deinit();
+    vt_core_atomic.feedSlice("ABCDEFGHIJ");
+    vt_core_atomic.apply();
+    var snap_atomic = try vt_core_atomic.snapshot();
     defer snap_atomic.deinit();
 
-    var engine_chunked = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine_chunked.deinit();
-    engine_chunked.feedByte('A');
-    engine_chunked.feedByte('B');
-    engine_chunked.feedSlice("CD");
-    engine_chunked.feedSlice("EFGHIJ");
-    engine_chunked.apply();
-    var snap_chunked = try engine_chunked.snapshot();
+    var vt_core_chunked = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core_chunked.deinit();
+    vt_core_chunked.feedByte('A');
+    vt_core_chunked.feedByte('B');
+    vt_core_chunked.feedSlice("CD");
+    vt_core_chunked.feedSlice("EFGHIJ");
+    vt_core_chunked.apply();
+    var snap_chunked = try vt_core_chunked.snapshot();
     defer snap_chunked.deinit();
 
     try std.testing.expectEqual(snap_atomic.cursor_col, snap_chunked.cursor_col);
@@ -5434,62 +5434,62 @@ test "snapshot: split-feed replay equivalence" {
 
 test "snapshot: history capture when history is enabled" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("AAA\nBBB\nCCC\nDDD");
-    engine.apply();
+    vt_core.feedSlice("AAA\nBBB\nCCC\nDDD");
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(@as(u16, 3), snap.rows);
     try std.testing.expectEqual(@as(u16, 5), snap.cols);
     try std.testing.expectEqual(@as(u16, 10), snap.history_capacity);
-    try std.testing.expectEqual(snap.history_count, engine.historyCount());
+    try std.testing.expectEqual(snap.history_count, vt_core.historyCount());
 
     if (snap.history != null) {
         try std.testing.expect(snap.history.?.len > 0);
     }
 }
 
-test "snapshot: historyRowAt matches engine after wraparound" {
+test "snapshot: historyRowAt matches vt_core after wraparound" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 3, 2);
+    defer vt_core.deinit();
 
     // Force history ring-buffer wraparound (capacity 2, scroll more than 2 rows).
-    engine.feedSlice("111\n222\n333\n444\n555");
-    engine.apply();
+    vt_core.feedSlice("111\n222\n333\n444\n555");
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
-    try std.testing.expectEqual(engine.historyCount(), snap.history_count);
-    try std.testing.expectEqual(engine.historyCapacity(), snap.history_capacity);
+    try std.testing.expectEqual(vt_core.historyCount(), snap.history_count);
+    try std.testing.expectEqual(vt_core.historyCapacity(), snap.history_capacity);
 
     var idx: u16 = 0;
-    while (idx < engine.historyCount()) : (idx += 1) {
+    while (idx < vt_core.historyCount()) : (idx += 1) {
         var col: u16 = 0;
-        while (col < engine.screen().cols) : (col += 1) {
-            try std.testing.expectEqual(engine.historyRowAt(idx, col), snap.historyRowAt(idx, col));
+        while (col < vt_core.screen().cols) : (col += 1) {
+            try std.testing.expectEqual(vt_core.historyRowAt(idx, col), snap.historyRowAt(idx, col));
         }
     }
 }
 
 test "snapshot: selection state is included" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
 
-    engine.selectionStart(0, 0);
-    engine.selectionUpdate(0, 4);
-    engine.selectionFinish();
+    vt_core.selectionStart(0, 0);
+    vt_core.selectionUpdate(0, 4);
+    vt_core.selectionFinish();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(true, snap.selection != null);
@@ -5504,16 +5504,16 @@ test "snapshot: selection state is included" {
 
 test "snapshot: parity with direct screen state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
-    const screen = engine.screen();
+    const screen = vt_core.screen();
     try std.testing.expectEqual(screen.rows, snap.rows);
     try std.testing.expectEqual(screen.cols, snap.cols);
     try std.testing.expectEqual(screen.cursor_row, snap.cursor_row);
@@ -5524,18 +5524,18 @@ test "snapshot: parity with direct screen state" {
 
 test "replay: clear leaves snapshot unchanged" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC");
-    engine.apply();
-    var snap_before = try engine.snapshot();
+    vt_core.feedSlice("ABC");
+    vt_core.apply();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
 
-    engine.feedSlice("\x1b[H");
-    engine.clear();
+    vt_core.feedSlice("\x1b[H");
+    vt_core.clear();
 
-    var snap_after = try engine.snapshot();
+    var snap_after = try vt_core.snapshot();
     defer snap_after.deinit();
 
     try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
@@ -5544,18 +5544,18 @@ test "replay: clear leaves snapshot unchanged" {
 
 test "replay: reset preserves snapshot state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
-    var snap_before = try engine.snapshot();
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
 
-    engine.feedSlice("\x1b[H");
-    engine.reset();
+    vt_core.feedSlice("\x1b[H");
+    vt_core.reset();
 
-    var snap_after = try engine.snapshot();
+    var snap_after = try vt_core.snapshot();
     defer snap_after.deinit();
 
     try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
@@ -5568,19 +5568,19 @@ test "replay: reset preserves snapshot state" {
 
 test "replay: resetScreen clears cells while preserving history" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("LINE1\nLINE2\nLINE3\nLINE4");
-    engine.apply();
-    const hist_before = engine.historyCount();
+    vt_core.feedSlice("LINE1\nLINE2\nLINE3\nLINE4");
+    vt_core.apply();
+    const hist_before = vt_core.historyCount();
 
-    var snap_before = try engine.snapshot();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    var snap_after = try engine.snapshot();
+    var snap_after = try vt_core.snapshot();
     defer snap_after.deinit();
 
     try std.testing.expectEqual(@as(u16, 0), snap_after.cursor_row);
@@ -5597,25 +5597,25 @@ test "replay: resetScreen clears cells while preserving history" {
 test "replay: snapshot determinism across feed sequence variations" {
     const gpa = std.testing.allocator;
 
-    var engine1 = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine1.deinit();
-    engine1.feedSlice("\x1b[2J");
-    engine1.feedSlice("Line1\nLine2");
-    engine1.apply();
-    var snap1 = try engine1.snapshot();
+    var vt_core1 = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core1.deinit();
+    vt_core1.feedSlice("\x1b[2J");
+    vt_core1.feedSlice("Line1\nLine2");
+    vt_core1.apply();
+    var snap1 = try vt_core1.snapshot();
     defer snap1.deinit();
 
-    var engine2 = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine2.deinit();
-    engine2.feedByte('\x1b');
-    engine2.feedByte('[');
-    engine2.feedByte('2');
-    engine2.feedByte('J');
-    engine2.feedByte('L');
-    engine2.feedByte('i');
-    engine2.feedSlice("ne1\nLine2");
-    engine2.apply();
-    var snap2 = try engine2.snapshot();
+    var vt_core2 = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core2.deinit();
+    vt_core2.feedByte('\x1b');
+    vt_core2.feedByte('[');
+    vt_core2.feedByte('2');
+    vt_core2.feedByte('J');
+    vt_core2.feedByte('L');
+    vt_core2.feedByte('i');
+    vt_core2.feedSlice("ne1\nLine2");
+    vt_core2.apply();
+    var snap2 = try vt_core2.snapshot();
     defer snap2.deinit();
 
     try std.testing.expectEqual(snap1.cursor_row, snap2.cursor_row);
@@ -5628,41 +5628,41 @@ test "replay: snapshot determinism across feed sequence variations" {
 
 test "replay: snapshot reflects mode changes" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
-    var snap1 = try engine.snapshot();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
+    var snap1 = try vt_core.snapshot();
     defer snap1.deinit();
     try std.testing.expectEqual(true, snap1.cursor_visible);
 
-    engine.feedSlice("\x1b[?25l");
-    engine.apply();
-    var snap2 = try engine.snapshot();
+    vt_core.feedSlice("\x1b[?25l");
+    vt_core.apply();
+    var snap2 = try vt_core.snapshot();
     defer snap2.deinit();
     try std.testing.expectEqual(false, snap2.cursor_visible);
 
-    engine.feedSlice("\x1b[?25h");
-    engine.apply();
-    var snap3 = try engine.snapshot();
+    vt_core.feedSlice("\x1b[?25h");
+    vt_core.apply();
+    var snap3 = try vt_core.snapshot();
     defer snap3.deinit();
     try std.testing.expectEqual(true, snap3.cursor_visible);
 }
 
 test "replay: snapshot includes active selection endpoints" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("0123456789");
-    engine.apply();
+    vt_core.feedSlice("0123456789");
+    vt_core.apply();
 
-    engine.selectionStart(0, 2);
-    engine.selectionUpdate(0, 7);
-    engine.selectionFinish();
+    vt_core.selectionStart(0, 2);
+    vt_core.selectionUpdate(0, 7);
+    vt_core.selectionFinish();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(true, snap.selection != null);
@@ -5687,12 +5687,12 @@ test "replay: snapshot parity across direct pipeline" {
     pl.feedSlice(test_bytes);
     pl.applyToScreen(&screen);
 
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
-    engine.feedSlice(test_bytes);
-    engine.apply();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
+    vt_core.feedSlice(test_bytes);
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(screen.cursor_row, snap.cursor_row);
@@ -5710,13 +5710,13 @@ test "replay: snapshot parity across direct pipeline" {
 
 test "replay: snapshot wraparound history indices after eviction" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 3);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 2, 5, 3);
+    defer vt_core.deinit();
 
-    engine.feedSlice("A\r\nB\r\nC\r\nD\r\nE");
-    engine.apply();
+    vt_core.feedSlice("A\r\nB\r\nC\r\nD\r\nE");
+    vt_core.apply();
 
-    var snap = try engine.snapshot();
+    var snap = try vt_core.snapshot();
     defer snap.deinit();
 
     try std.testing.expectEqual(@as(u16, 3), snap.history_capacity);
@@ -5733,33 +5733,33 @@ test "replay: snapshot wraparound history indices after eviction" {
     while (row < snap.history_count) : (row += 1) {
         var col: u16 = 0;
         while (col < snap.cols) : (col += 1) {
-            try std.testing.expectEqual(engine.historyRowAt(row, col), snap.historyRowAt(row, col));
+            try std.testing.expectEqual(vt_core.historyRowAt(row, col), snap.historyRowAt(row, col));
         }
     }
 }
 
 test "stability: feed/apply/reset interleavings preserve frozen boundaries" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC");
-    engine.apply();
-    var snap1 = try engine.snapshot();
+    vt_core.feedSlice("ABC");
+    vt_core.apply();
+    var snap1 = try vt_core.snapshot();
     defer snap1.deinit();
 
-    engine.feedSlice("DEF");
-    engine.feedSlice("GHI");
-    var snap2 = try engine.snapshot();
+    vt_core.feedSlice("DEF");
+    vt_core.feedSlice("GHI");
+    var snap2 = try vt_core.snapshot();
     defer snap2.deinit();
     try std.testing.expectEqual(snap1.cursor_col, snap2.cursor_col);
 
-    engine.apply();
-    var snap3 = try engine.snapshot();
+    vt_core.apply();
+    var snap3 = try vt_core.snapshot();
     defer snap3.deinit();
 
-    engine.reset();
-    var snap4 = try engine.snapshot();
+    vt_core.reset();
+    var snap4 = try vt_core.snapshot();
     defer snap4.deinit();
 
     try std.testing.expectEqual(snap3.cursor_row, snap4.cursor_row);
@@ -5768,41 +5768,41 @@ test "stability: feed/apply/reset interleavings preserve frozen boundaries" {
 
 test "stability: resetScreen clears cells without disrupting subsequent feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("BEFORE");
-    engine.apply();
-    var snap_before = try engine.snapshot();
+    vt_core.feedSlice("BEFORE");
+    vt_core.apply();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
     try std.testing.expectEqual(@as(u16, 6), snap_before.cursor_col);
 
-    engine.resetScreen();
-    var snap_cleared = try engine.snapshot();
+    vt_core.resetScreen();
+    var snap_cleared = try vt_core.snapshot();
     defer snap_cleared.deinit();
     try std.testing.expectEqual(@as(u16, 0), snap_cleared.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), snap_cleared.cursor_col);
 
-    engine.feedSlice("AFTER");
-    engine.apply();
-    var snap_after = try engine.snapshot();
+    vt_core.feedSlice("AFTER");
+    vt_core.apply();
+    var snap_after = try vt_core.snapshot();
     defer snap_after.deinit();
     try std.testing.expectEqual(@as(u16, 5), snap_after.cursor_col);
 }
 
 test "stability: selection remains stable across feed/apply/reset cycles" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("0123456789");
-    engine.apply();
+    vt_core.feedSlice("0123456789");
+    vt_core.apply();
 
-    engine.selectionStart(0, 1);
-    engine.selectionUpdate(0, 5);
-    engine.selectionFinish();
+    vt_core.selectionStart(0, 1);
+    vt_core.selectionUpdate(0, 5);
+    vt_core.selectionFinish();
 
-    var snap_sel = try engine.snapshot();
+    var snap_sel = try vt_core.snapshot();
     defer snap_sel.deinit();
     try std.testing.expect(snap_sel.selection != null);
     if (snap_sel.selection) |sel| {
@@ -5810,68 +5810,68 @@ test "stability: selection remains stable across feed/apply/reset cycles" {
         try std.testing.expectEqual(@as(u16, 5), sel.end.col);
     }
 
-    engine.feedSlice("\x1b[H");
-    var snap_queued = try engine.snapshot();
+    vt_core.feedSlice("\x1b[H");
+    var snap_queued = try vt_core.snapshot();
     defer snap_queued.deinit();
     try std.testing.expectEqual(snap_sel.selection, snap_queued.selection);
 
-    engine.apply();
-    var snap_applied = try engine.snapshot();
+    vt_core.apply();
+    var snap_applied = try vt_core.snapshot();
     defer snap_applied.deinit();
     try std.testing.expectEqual(snap_sel.selection, snap_applied.selection);
 
-    engine.reset();
-    var snap_reset = try engine.snapshot();
+    vt_core.reset();
+    var snap_reset = try vt_core.snapshot();
     defer snap_reset.deinit();
     try std.testing.expectEqual(snap_sel.selection, snap_reset.selection);
 }
 
 test "stability: history remains preserved across clear/reset cycles" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("A\r\nB\r\nC\r\nD");
-    engine.apply();
-    const hist_before = engine.historyCount();
-    var snap_before = try engine.snapshot();
+    vt_core.feedSlice("A\r\nB\r\nC\r\nD");
+    vt_core.apply();
+    const hist_before = vt_core.historyCount();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
 
-    engine.feedSlice("\x1b[H");
-    engine.clear();
-    var snap_after_clear = try engine.snapshot();
+    vt_core.feedSlice("\x1b[H");
+    vt_core.clear();
+    var snap_after_clear = try vt_core.snapshot();
     defer snap_after_clear.deinit();
     try std.testing.expectEqual(hist_before, snap_after_clear.history_count);
 
-    engine.feedSlice("\x1b[m");
-    engine.reset();
-    var snap_after_reset = try engine.snapshot();
+    vt_core.feedSlice("\x1b[m");
+    vt_core.reset();
+    var snap_after_reset = try vt_core.snapshot();
     defer snap_after_reset.deinit();
     try std.testing.expectEqual(hist_before, snap_after_reset.history_count);
 
-    engine.resetScreen();
-    var snap_after_screen_reset = try engine.snapshot();
+    vt_core.resetScreen();
+    var snap_after_screen_reset = try vt_core.snapshot();
     defer snap_after_screen_reset.deinit();
     try std.testing.expectEqual(hist_before, snap_after_screen_reset.history_count);
 }
 
 test "stability: encodeKey does not affect screen or queued events" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
-    var snap_before = try engine.snapshot();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
+    var snap_before = try vt_core.snapshot();
     defer snap_before.deinit();
 
-    _ = engine.encodeKey('A', 0);
-    _ = engine.encodeKey('B', 1);
-    _ = engine.encodeKey('C', 2);
+    _ = vt_core.encodeKey('A', 0);
+    _ = vt_core.encodeKey('B', 1);
+    _ = vt_core.encodeKey('C', 2);
 
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 
-    var snap_after = try engine.snapshot();
+    var snap_after = try vt_core.snapshot();
     defer snap_after.deinit();
     try std.testing.expectEqual(snap_before.cursor_row, snap_after.cursor_row);
     try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
@@ -5879,12 +5879,12 @@ test "stability: encodeKey does not affect screen or queued events" {
 
 test "stability: encodeMouse interleaved with mutations shows zero side effects" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("INITIAL\r\nLINE2");
-    engine.apply();
-    var snap1 = try engine.snapshot();
+    vt_core.feedSlice("INITIAL\r\nLINE2");
+    vt_core.apply();
+    var snap1 = try vt_core.snapshot();
     defer snap1.deinit();
 
     const mouse_move = model_mod.MouseEvent{
@@ -5897,11 +5897,11 @@ test "stability: encodeMouse interleaved with mutations shows zero side effects"
         .mod = 0,
         .buttons_down = 0,
     };
-    _ = engine.encodeMouse(mouse_move);
+    _ = vt_core.encodeMouse(mouse_move);
 
-    engine.feedSlice("X");
-    engine.apply();
-    var snap2 = try engine.snapshot();
+    vt_core.feedSlice("X");
+    vt_core.apply();
+    var snap2 = try vt_core.snapshot();
     defer snap2.deinit();
 
     const mouse_click = model_mod.MouseEvent{
@@ -5914,22 +5914,22 @@ test "stability: encodeMouse interleaved with mutations shows zero side effects"
         .mod = 0,
         .buttons_down = 1,
     };
-    _ = engine.encodeMouse(mouse_click);
-    var snap_after_encode = try engine.snapshot();
+    _ = vt_core.encodeMouse(mouse_click);
+    var snap_after_encode = try vt_core.snapshot();
     defer snap_after_encode.deinit();
     try std.testing.expectEqual(snap2.cursor_row, snap_after_encode.cursor_row);
     try std.testing.expectEqual(snap2.cursor_col, snap_after_encode.cursor_col);
     try std.testing.expectEqual(snap2.history_count, snap_after_encode.history_count);
 
-    engine.selectionStart(0, 1);
-    engine.selectionUpdate(0, 5);
-    var snap3 = try engine.snapshot();
+    vt_core.selectionStart(0, 1);
+    vt_core.selectionUpdate(0, 5);
+    var snap3 = try vt_core.snapshot();
     defer snap3.deinit();
 
-    _ = engine.encodeMouse(mouse_click);
+    _ = vt_core.encodeMouse(mouse_click);
 
-    engine.selectionFinish();
-    var snap4 = try engine.snapshot();
+    vt_core.selectionFinish();
+    var snap4 = try vt_core.snapshot();
     defer snap4.deinit();
 
     try std.testing.expectEqual(snap3.selection != null, snap4.selection != null);
@@ -5937,15 +5937,15 @@ test "stability: encodeMouse interleaved with mutations shows zero side effects"
 
 test "stability: queuedEventCount reflects feed only, not encode calls" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("A");
-    const queue_count_1 = engine.queuedEventCount();
+    vt_core.feedSlice("A");
+    const queue_count_1 = vt_core.queuedEventCount();
     try std.testing.expect(queue_count_1 > 0);
 
-    _ = engine.encodeKey('X', 0);
-    const queue_count_2 = engine.queuedEventCount();
+    _ = vt_core.encodeKey('X', 0);
+    const queue_count_2 = vt_core.queuedEventCount();
     try std.testing.expectEqual(queue_count_1, queue_count_2);
 
     const mouse_event = model_mod.MouseEvent{
@@ -5958,56 +5958,56 @@ test "stability: queuedEventCount reflects feed only, not encode calls" {
         .mod = 0,
         .buttons_down = 0,
     };
-    _ = engine.encodeMouse(mouse_event);
-    const queue_count_3 = engine.queuedEventCount();
+    _ = vt_core.encodeMouse(mouse_event);
+    const queue_count_3 = vt_core.queuedEventCount();
     try std.testing.expectEqual(queue_count_1, queue_count_3);
 
-    engine.apply();
-    try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
+    vt_core.apply();
+    try std.testing.expectEqual(@as(usize, 0), vt_core.queuedEventCount());
 }
 
 test "stability: history read boundary remains stable across concurrent selection operations" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("AAAAA\r\nBBBBB\r\nCCCCC\r\nDDDDD");
-    engine.apply();
+    vt_core.feedSlice("AAAAA\r\nBBBBB\r\nCCCCC\r\nDDDDD");
+    vt_core.apply();
 
-    const hist_cap = engine.historyCapacity();
-    const hist_count_before = engine.historyCount();
+    const hist_cap = vt_core.historyCapacity();
+    const hist_count_before = vt_core.historyCount();
 
-    engine.selectionStart(-1, 0);
-    engine.selectionUpdate(-1, 4);
-    const hist_count_during = engine.historyCount();
+    vt_core.selectionStart(-1, 0);
+    vt_core.selectionUpdate(-1, 4);
+    const hist_count_during = vt_core.historyCount();
     try std.testing.expectEqual(hist_count_before, hist_count_during);
 
-    const cell_val = engine.historyRowAt(0, 2);
+    const cell_val = vt_core.historyRowAt(0, 2);
     _ = cell_val;
-    const hist_count_after_read = engine.historyCount();
+    const hist_count_after_read = vt_core.historyCount();
     try std.testing.expectEqual(hist_count_before, hist_count_after_read);
 
-    engine.selectionFinish();
-    try std.testing.expectEqual(hist_count_before, engine.historyCount());
-    try std.testing.expectEqual(hist_cap, engine.historyCapacity());
+    vt_core.selectionFinish();
+    try std.testing.expectEqual(hist_count_before, vt_core.historyCount());
+    try std.testing.expectEqual(hist_cap, vt_core.historyCapacity());
 }
 
 test "stability: snapshot remains stable across mixed feed/encode/selection operations" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 4, 8, 15);
+    defer vt_core.deinit();
 
-    engine.feedSlice("LINE1\r\nLINE2");
-    engine.apply();
+    vt_core.feedSlice("LINE1\r\nLINE2");
+    vt_core.apply();
 
-    var snap_seq: [5]model_mod.EngineSnapshot = undefined;
-    snap_seq[0] = try engine.snapshot();
+    var snap_seq: [5]model_mod.VtCoreSnapshot = undefined;
+    snap_seq[0] = try vt_core.snapshot();
 
-    _ = engine.encodeKey('A', 0);
-    snap_seq[1] = try engine.snapshot();
+    _ = vt_core.encodeKey('A', 0);
+    snap_seq[1] = try vt_core.snapshot();
 
-    engine.selectionStart(0, 0);
-    snap_seq[2] = try engine.snapshot();
+    vt_core.selectionStart(0, 0);
+    snap_seq[2] = try vt_core.snapshot();
 
     const mouse = model_mod.MouseEvent{
         .kind = .move,
@@ -6019,11 +6019,11 @@ test "stability: snapshot remains stable across mixed feed/encode/selection oper
         .mod = 0,
         .buttons_down = 0,
     };
-    _ = engine.encodeMouse(mouse);
-    snap_seq[3] = try engine.snapshot();
+    _ = vt_core.encodeMouse(mouse);
+    snap_seq[3] = try vt_core.snapshot();
 
-    engine.selectionUpdate(0, 5);
-    snap_seq[4] = try engine.snapshot();
+    vt_core.selectionUpdate(0, 5);
+    snap_seq[4] = try vt_core.snapshot();
 
     for (0..4) |i| {
         try std.testing.expectEqual(snap_seq[i].rows, snap_seq[i + 1].rows);
@@ -6050,9 +6050,9 @@ const ConformanceCheckpoint = struct {
     selection: ?model_mod.TerminalSelection,
     queued_event_count: usize,
 
-    fn capture(_: std.mem.Allocator, engine: *const mod.Engine) !ConformanceCheckpoint {
-        const screen = engine.screen();
-        const selection_state = engine.selectionState();
+    fn capture(_: std.mem.Allocator, vt_core: *const mod.VtCore) !ConformanceCheckpoint {
+        const screen = vt_core.screen();
+        const selection_state = vt_core.selectionState();
         var selection: ?model_mod.TerminalSelection = null;
         if (selection_state) |sel| {
             selection = sel;
@@ -6076,10 +6076,10 @@ const ConformanceCheckpoint = struct {
             .cursor_visible = screen.cursor_visible,
             .auto_wrap = screen.auto_wrap,
             .visible_cells_hash = hasher.final(),
-            .history_count = engine.historyCount(),
-            .history_capacity = engine.historyCapacity(),
+            .history_count = vt_core.historyCount(),
+            .history_capacity = vt_core.historyCapacity(),
             .selection = selection,
-            .queued_event_count = engine.queuedEventCount(),
+            .queued_event_count = vt_core.queuedEventCount(),
         };
     }
 
@@ -6113,13 +6113,13 @@ const ConformanceCheckpoint = struct {
 
 test "conformance checkpoint: captures api-visible fields" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expectEqual(@as(u16, 5), cp.rows);
     try std.testing.expectEqual(@as(u16, 10), cp.cols);
@@ -6133,30 +6133,30 @@ test "conformance checkpoint: captures api-visible fields" {
 
 test "conformance checkpoint: determinism across repeated captures" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
 
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expect(cp1.eql(cp2));
 }
 
 test "conformance checkpoint: encode calls do not alter checkpoint state" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("DATA");
-    engine.apply();
+    vt_core.feedSlice("DATA");
+    vt_core.apply();
 
-    const cp_before = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_before = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    _ = engine.encodeKey('A', 0);
-    _ = engine.encodeKey('B', 1);
+    _ = vt_core.encodeKey('A', 0);
+    _ = vt_core.encodeKey('B', 1);
 
     const mouse = model_mod.MouseEvent{
         .kind = .move,
@@ -6168,207 +6168,207 @@ test "conformance checkpoint: encode calls do not alter checkpoint state" {
         .mod = 0,
         .buttons_down = 0,
     };
-    _ = engine.encodeMouse(mouse);
+    _ = vt_core.encodeMouse(mouse);
 
-    const cp_after = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_after = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expect(cp_before.eql(cp_after));
 }
 
 test "conformance checkpoint: feed/apply boundaries are captured correctly" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    const cp_initial = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_initial = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(usize, 0), cp_initial.queued_event_count);
 
-    engine.feedSlice("ABC");
-    const cp_after_feed = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.feedSlice("ABC");
+    const cp_after_feed = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp_after_feed.queued_event_count > 0);
 
-    engine.apply();
-    const cp_after_apply = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.apply();
+    const cp_after_apply = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(usize, 0), cp_after_apply.queued_event_count);
 }
 
 test "text baseline: ASCII writes and cursor progression" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("Hello");
-    engine.apply();
+    vt_core.feedSlice("Hello");
+    vt_core.apply();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 5), cp.cursor_col);
 
-    engine.feedSlice("World");
-    engine.apply();
+    vt_core.feedSlice("World");
+    vt_core.apply();
 
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 9), cp2.cursor_col);
 }
 
 test "text baseline: CR/LF line wrapping" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 3, 5);
+    defer vt_core.deinit();
 
-    engine.feedSlice("12345\r\n");
-    engine.apply();
+    vt_core.feedSlice("12345\r\n");
+    vt_core.apply();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 1), cp.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), cp.cursor_col);
 }
 
 test "text baseline: UTF-8 mixed codepoints" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("Hello \xC3\xA9 \xE2\x82\xAC");
-    engine.apply();
+    vt_core.feedSlice("Hello \xC3\xA9 \xE2\x82\xAC");
+    vt_core.apply();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 9), cp.cursor_col);
 }
 
 test "cursor baseline: CSI H cursor movement" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC");
-    engine.apply();
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.feedSlice("ABC");
+    vt_core.apply();
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 0), cp1.cursor_row);
 
-    engine.feedSlice("\x1b[2;3H");
-    engine.apply();
+    vt_core.feedSlice("\x1b[2;3H");
+    vt_core.apply();
 
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 1), cp2.cursor_row);
     try std.testing.expectEqual(@as(u16, 2), cp2.cursor_col);
 }
 
 test "cursor baseline: ED erase display" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 3, 5);
+    defer vt_core.deinit();
 
-    engine.feedSlice("12345\r\n67890\r\nABCDE");
-    engine.apply();
+    vt_core.feedSlice("12345\r\n67890\r\nABCDE");
+    vt_core.apply();
 
-    const cp_before = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_before = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.feedSlice("\x1b[2J");
-    engine.apply();
+    vt_core.feedSlice("\x1b[2J");
+    vt_core.apply();
 
-    const cp_after = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_after = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(cp_before.cursor_row, cp_after.cursor_row);
     try std.testing.expectEqual(cp_before.cursor_col, cp_after.cursor_col);
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
-    try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(2, 4));
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 0), vt_core.screen().cellAt(2, 4));
 }
 
 test "mode baseline: DEC private mode ?25 cursor visibility" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
 
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(true, cp1.cursor_visible);
 
-    engine.feedSlice("\x1b[?25l");
-    engine.apply();
+    vt_core.feedSlice("\x1b[?25l");
+    vt_core.apply();
 
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(false, cp2.cursor_visible);
 
-    engine.feedSlice("\x1b[?25h");
-    engine.apply();
+    vt_core.feedSlice("\x1b[?25h");
+    vt_core.apply();
 
-    const cp3 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp3 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(true, cp3.cursor_visible);
 }
 
 test "mode baseline: DEC private mode ?7 auto wrap" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 3, 5);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
 
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(true, cp1.auto_wrap);
 
-    engine.feedSlice("\x1b[?7l");
-    engine.apply();
+    vt_core.feedSlice("\x1b[?7l");
+    vt_core.apply();
 
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(false, cp2.auto_wrap);
 }
 
 test "history baseline: scroll-producing stream" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("L1\r\nL2\r\nL3\r\nL4");
-    engine.apply();
+    vt_core.feedSlice("L1\r\nL2\r\nL3\r\nL4");
+    vt_core.apply();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp.history_count > 0);
     try std.testing.expectEqual(@as(u16, 10), cp.history_capacity);
 }
 
 test "selection baseline: start/update/finish/clear" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("0123456789");
-    engine.apply();
+    vt_core.feedSlice("0123456789");
+    vt_core.apply();
 
-    engine.selectionStart(0, 1);
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionStart(0, 1);
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp1.selection != null);
 
-    engine.selectionUpdate(0, 5);
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionUpdate(0, 5);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     if (cp2.selection) |sel| {
         try std.testing.expectEqual(@as(u16, 5), sel.end.col);
     }
 
-    engine.selectionFinish();
-    const cp3 = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionFinish();
+    const cp3 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp3.selection != null);
 
-    engine.selectionClear();
-    const cp4 = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionClear();
+    const cp4 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp4.selection == null);
 }
 
 test "reset baseline: clear does not change screen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEXT");
-    engine.apply();
+    vt_core.feedSlice("TEXT");
+    vt_core.apply();
 
-    const cp_before = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_before = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.feedSlice("\x1b[H");
-    engine.clear();
+    vt_core.feedSlice("\x1b[H");
+    vt_core.clear();
 
-    const cp_after = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_after = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expectEqual(cp_before.cursor_row, cp_after.cursor_row);
     try std.testing.expectEqual(cp_before.cursor_col, cp_after.cursor_col);
@@ -6376,18 +6376,18 @@ test "reset baseline: clear does not change screen" {
 
 test "reset baseline: reset preserves screen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("HELLO");
-    engine.apply();
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
 
-    const cp_before = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_before = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.feedSlice("\x1b[H");
-    engine.reset();
+    vt_core.feedSlice("\x1b[H");
+    vt_core.reset();
 
-    const cp_after = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_after = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expectEqual(cp_before.cursor_row, cp_after.cursor_row);
     try std.testing.expectEqual(cp_before.cursor_col, cp_after.cursor_col);
@@ -6395,17 +6395,17 @@ test "reset baseline: reset preserves screen" {
 
 test "reset baseline: resetScreen clears screen" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 3, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("DATA\r\nMORE");
-    engine.apply();
+    vt_core.feedSlice("DATA\r\nMORE");
+    vt_core.apply();
 
-    const hist_before = engine.historyCount();
+    const hist_before = vt_core.historyCount();
 
-    engine.resetScreen();
+    vt_core.resetScreen();
 
-    const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(u16, 0), cp.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), cp.cursor_col);
     try std.testing.expectEqual(hist_before, cp.history_count);
@@ -6413,35 +6413,35 @@ test "reset baseline: resetScreen clears screen" {
 
 test "encode interleave: encodeKey mixed with feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("ABC");
-    engine.apply();
+    vt_core.feedSlice("ABC");
+    vt_core.apply();
 
-    const cp1 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp1 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(usize, 0), cp1.queued_event_count);
 
-    _ = engine.encodeKey('X', 0);
-    engine.feedSlice("D");
-    _ = engine.encodeKey('Y', 1);
+    _ = vt_core.encodeKey('X', 0);
+    vt_core.feedSlice("D");
+    _ = vt_core.encodeKey('Y', 1);
 
-    const cp2 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp2 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expect(cp2.queued_event_count > 0);
 
-    engine.apply();
+    vt_core.apply();
 
-    const cp3 = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp3 = try ConformanceCheckpoint.capture(gpa, &vt_core);
     try std.testing.expectEqual(@as(usize, 0), cp3.queued_event_count);
 }
 
 test "encode interleave: encodeMouse with state checks" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 5, 10, 20);
+    defer vt_core.deinit();
 
-    engine.feedSlice("INITIAL");
-    engine.apply();
+    vt_core.feedSlice("INITIAL");
+    vt_core.apply();
 
     const mouse = model_mod.MouseEvent{
         .kind = .press,
@@ -6454,29 +6454,29 @@ test "encode interleave: encodeMouse with state checks" {
         .buttons_down = 1,
     };
 
-    const cp_before = try ConformanceCheckpoint.capture(gpa, &engine);
-    _ = engine.encodeMouse(mouse);
-    const cp_after = try ConformanceCheckpoint.capture(gpa, &engine);
+    const cp_before = try ConformanceCheckpoint.capture(gpa, &vt_core);
+    _ = vt_core.encodeMouse(mouse);
+    const cp_after = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     try std.testing.expect(cp_before.eql(cp_after));
 }
 
 test "snapshot stability: repeated captures across mixed operations" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 4, 8, 15);
+    defer vt_core.deinit();
 
-    engine.feedSlice("LINE1\r\nLINE2");
-    engine.apply();
+    vt_core.feedSlice("LINE1\r\nLINE2");
+    vt_core.apply();
 
     var cp_seq: [5]ConformanceCheckpoint = undefined;
-    cp_seq[0] = try ConformanceCheckpoint.capture(gpa, &engine);
+    cp_seq[0] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    _ = engine.encodeKey('A', 0);
-    cp_seq[1] = try ConformanceCheckpoint.capture(gpa, &engine);
+    _ = vt_core.encodeKey('A', 0);
+    cp_seq[1] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.selectionStart(0, 0);
-    cp_seq[2] = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionStart(0, 0);
+    cp_seq[2] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     const mouse = model_mod.MouseEvent{
         .kind = .move,
@@ -6488,11 +6488,11 @@ test "snapshot stability: repeated captures across mixed operations" {
         .mod = 0,
         .buttons_down = 0,
     };
-    _ = engine.encodeMouse(mouse);
-    cp_seq[3] = try ConformanceCheckpoint.capture(gpa, &engine);
+    _ = vt_core.encodeMouse(mouse);
+    cp_seq[3] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.selectionUpdate(0, 5);
-    cp_seq[4] = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.selectionUpdate(0, 5);
+    cp_seq[4] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     for (0..4) |i| {
         try std.testing.expectEqual(cp_seq[i].rows, cp_seq[i + 1].rows);
@@ -6504,38 +6504,38 @@ test "snapshot stability: repeated captures across mixed operations" {
 
 test "stress loop: burst feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 10, 20);
+    defer vt_core.deinit();
 
     const bursts = 50;
     var iteration: usize = 0;
     while (iteration < bursts) : (iteration += 1) {
-        engine.feedSlice("BURST");
-        engine.apply();
-        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("BURST");
+        vt_core.apply();
+        const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(@as(usize, 0), cp.queued_event_count);
     }
 }
 
 test "stress loop: mixed reset boundary under load" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
     var iteration: usize = 0;
     while (iteration < 20) : (iteration += 1) {
-        engine.feedSlice("TEXT");
-        engine.apply();
+        vt_core.feedSlice("TEXT");
+        vt_core.apply();
 
-        engine.feedSlice("\x1b[H");
-        engine.clear();
+        vt_core.feedSlice("\x1b[H");
+        vt_core.clear();
 
-        engine.feedSlice("\x1b[m");
-        engine.reset();
+        vt_core.feedSlice("\x1b[m");
+        vt_core.reset();
 
-        engine.resetScreen();
+        vt_core.resetScreen();
 
-        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(@as(u16, 0), cp.cursor_row);
         try std.testing.expectEqual(@as(u16, 0), cp.cursor_col);
     }
@@ -6543,21 +6543,21 @@ test "stress loop: mixed reset boundary under load" {
 
 test "stress loop: selection and history drift" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 20);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 4, 8, 20);
+    defer vt_core.deinit();
 
     var checkpoints: [10]ConformanceCheckpoint = undefined;
 
     var iteration: usize = 0;
     while (iteration < 10) : (iteration += 1) {
-        engine.feedSlice("LINE");
-        engine.apply();
+        vt_core.feedSlice("LINE");
+        vt_core.apply();
 
-        engine.selectionStart(0, 0);
-        engine.selectionUpdate(0, 3);
-        engine.selectionFinish();
+        vt_core.selectionStart(0, 0);
+        vt_core.selectionUpdate(0, 3);
+        vt_core.selectionFinish();
 
-        checkpoints[iteration] = try ConformanceCheckpoint.capture(gpa, &engine);
+        checkpoints[iteration] = try ConformanceCheckpoint.capture(gpa, &vt_core);
     }
 
     for (0..9) |i| {
@@ -6569,15 +6569,15 @@ test "stress loop: selection and history drift" {
 
 test "stress loop: encode interleave" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
     var iteration: usize = 0;
     while (iteration < 30) : (iteration += 1) {
-        _ = engine.encodeKey('A', 0);
-        engine.feedSlice("X");
-        _ = engine.encodeKey('B', 1);
-        engine.apply();
+        _ = vt_core.encodeKey('A', 0);
+        vt_core.feedSlice("X");
+        _ = vt_core.encodeKey('B', 1);
+        vt_core.apply();
 
         const mouse = model_mod.MouseEvent{
             .kind = .move,
@@ -6589,29 +6589,29 @@ test "stress loop: encode interleave" {
             .mod = 0,
             .buttons_down = 0,
         };
-        _ = engine.encodeMouse(mouse);
+        _ = vt_core.encodeMouse(mouse);
 
-        const cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        const cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(@as(usize, 0), cp.queued_event_count);
     }
 }
 
 test "stress loop: snapshot drift" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    var snapshots: [8]model_mod.EngineSnapshot = undefined;
+    var snapshots: [8]model_mod.VtCoreSnapshot = undefined;
 
-    engine.feedSlice("INITIAL");
-    engine.apply();
+    vt_core.feedSlice("INITIAL");
+    vt_core.apply();
 
     var iteration: usize = 0;
     while (iteration < 8) : (iteration += 1) {
-        engine.feedSlice("X");
-        engine.apply();
+        vt_core.feedSlice("X");
+        vt_core.apply();
 
-        snapshots[iteration] = try engine.snapshot();
+        snapshots[iteration] = try vt_core.snapshot();
     }
 
     for (0..7) |i| {
@@ -6627,59 +6627,59 @@ test "stress loop: snapshot drift" {
 
 test "stress loop: mode toggle assertions" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("TEST");
-    engine.apply();
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
 
     var iteration: usize = 0;
     while (iteration < 15) : (iteration += 1) {
-        engine.feedSlice("\x1b[?25l");
-        engine.apply();
-        var cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("\x1b[?25l");
+        vt_core.apply();
+        var cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(false, cp.cursor_visible);
 
-        engine.feedSlice("\x1b[?7l");
-        engine.apply();
-        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("\x1b[?7l");
+        vt_core.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(false, cp.auto_wrap);
 
-        engine.feedSlice("\x1b[?25h");
-        engine.apply();
-        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("\x1b[?25h");
+        vt_core.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(true, cp.cursor_visible);
 
-        engine.feedSlice("\x1b[?7h");
-        engine.apply();
-        cp = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("\x1b[?7h");
+        vt_core.apply();
+        cp = try ConformanceCheckpoint.capture(gpa, &vt_core);
         try std.testing.expectEqual(true, cp.auto_wrap);
     }
 }
 
 test "drift detection: mixed selection and history operations" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 16);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 4, 8, 16);
+    defer vt_core.deinit();
 
     var checkpoints: [12]ConformanceCheckpoint = undefined;
 
     var idx: usize = 0;
     while (idx < 3) : (idx += 1) {
-        engine.feedSlice("ABC\r\n");
-        engine.apply();
+        vt_core.feedSlice("ABC\r\n");
+        vt_core.apply();
 
-        engine.selectionStart(0, 0);
-        checkpoints[idx * 4] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.selectionStart(0, 0);
+        checkpoints[idx * 4] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-        engine.selectionUpdate(0, 2);
-        checkpoints[idx * 4 + 1] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.selectionUpdate(0, 2);
+        checkpoints[idx * 4 + 1] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-        engine.selectionFinish();
-        checkpoints[idx * 4 + 2] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.selectionFinish();
+        checkpoints[idx * 4 + 2] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-        engine.selectionClear();
-        checkpoints[idx * 4 + 3] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.selectionClear();
+        checkpoints[idx * 4 + 3] = try ConformanceCheckpoint.capture(gpa, &vt_core);
     }
 
     for (0..11) |i| {
@@ -6690,22 +6690,22 @@ test "drift detection: mixed selection and history operations" {
 
 test "drift detection: encode operations preserve state invariants" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCells(gpa, 5, 10);
+    defer vt_core.deinit();
 
-    engine.feedSlice("DATA");
-    engine.apply();
+    vt_core.feedSlice("DATA");
+    vt_core.apply();
 
     var checkpoints: [6]ConformanceCheckpoint = undefined;
 
-    checkpoints[0] = try ConformanceCheckpoint.capture(gpa, &engine);
+    checkpoints[0] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    _ = engine.encodeKey('X', 0);
-    checkpoints[1] = try ConformanceCheckpoint.capture(gpa, &engine);
+    _ = vt_core.encodeKey('X', 0);
+    checkpoints[1] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    _ = engine.encodeKey('Y', 1);
-    _ = engine.encodeKey('Z', 2);
-    checkpoints[2] = try ConformanceCheckpoint.capture(gpa, &engine);
+    _ = vt_core.encodeKey('Y', 1);
+    _ = vt_core.encodeKey('Z', 2);
+    checkpoints[2] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     const mouse = model_mod.MouseEvent{
         .kind = .press,
@@ -6717,14 +6717,14 @@ test "drift detection: encode operations preserve state invariants" {
         .mod = 0,
         .buttons_down = 1,
     };
-    _ = engine.encodeMouse(mouse);
-    checkpoints[3] = try ConformanceCheckpoint.capture(gpa, &engine);
+    _ = vt_core.encodeMouse(mouse);
+    checkpoints[3] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.feedSlice("E");
-    checkpoints[4] = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.feedSlice("E");
+    checkpoints[4] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-    engine.apply();
-    checkpoints[5] = try ConformanceCheckpoint.capture(gpa, &engine);
+    vt_core.apply();
+    checkpoints[5] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
     for (0..5) |i| {
         try std.testing.expectEqual(checkpoints[i].cursor_visible, checkpoints[i + 1].cursor_visible);
@@ -6734,22 +6734,22 @@ test "drift detection: encode operations preserve state invariants" {
 
 test "drift detection: reset boundary invariants" {
     const gpa = std.testing.allocator;
-    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 12);
-    defer engine.deinit();
+    var vt_core = try mod.VtCore.initWithCellsAndHistory(gpa, 4, 8, 12);
+    defer vt_core.deinit();
 
     var checkpoints: [9]ConformanceCheckpoint = undefined;
 
     var iteration: usize = 0;
     while (iteration < 3) : (iteration += 1) {
-        engine.feedSlice("DATA\r\nMORE");
-        engine.apply();
-        checkpoints[iteration * 3] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.feedSlice("DATA\r\nMORE");
+        vt_core.apply();
+        checkpoints[iteration * 3] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-        engine.reset();
-        checkpoints[iteration * 3 + 1] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.reset();
+        checkpoints[iteration * 3 + 1] = try ConformanceCheckpoint.capture(gpa, &vt_core);
 
-        engine.resetScreen();
-        checkpoints[iteration * 3 + 2] = try ConformanceCheckpoint.capture(gpa, &engine);
+        vt_core.resetScreen();
+        checkpoints[iteration * 3 + 2] = try ConformanceCheckpoint.capture(gpa, &vt_core);
     }
 
     for (0..8) |i| {

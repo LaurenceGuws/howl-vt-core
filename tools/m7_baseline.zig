@@ -197,18 +197,18 @@ fn runFeedApplyWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.Engine.initWithCellsAndHistory(
+        var vt_core = try terminal.VtCore.initWithCellsAndHistory(
             counting.allocator(),
             rows,
             cols,
             history_capacity,
         );
-        defer engine.deinit();
+        defer vt_core.deinit();
         counting.resetWindow();
         const start = timer.read();
-        engine.feedSlice(fixture);
-        const max_queue_depth = engine.queuedEventCount();
-        engine.apply();
+        vt_core.feedSlice(fixture);
+        const max_queue_depth = vt_core.queuedEventCount();
+        vt_core.apply();
         const end = timer.read();
         observations[i] = .{
             .ns = end - start,
@@ -264,21 +264,21 @@ fn runMixedInteractiveWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.Engine.initWithCellsAndHistory(
+        var vt_core = try terminal.VtCore.initWithCellsAndHistory(
             counting.allocator(),
             40,
             120,
             1_000,
         );
-        defer engine.deinit();
+        defer vt_core.deinit();
         counting.resetWindow();
         const start = timer.read();
         var j: usize = 0;
         var max_queue_depth: usize = 0;
         while (j < bursts_per_run) : (j += 1) {
-            engine.feedSlice(burst);
-            max_queue_depth = @max(max_queue_depth, engine.queuedEventCount());
-            engine.apply();
+            vt_core.feedSlice(burst);
+            max_queue_depth = @max(max_queue_depth, vt_core.queuedEventCount());
+            vt_core.apply();
         }
         const end = timer.read();
         observations[i] = .{
@@ -335,20 +335,20 @@ fn runSnapshotWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.Engine.initWithCellsAndHistory(
+        var vt_core = try terminal.VtCore.initWithCellsAndHistory(
             counting.allocator(),
             40,
             120,
             1_000,
         );
-        defer engine.deinit();
-        engine.feedSlice(fixture);
-        engine.apply();
+        defer vt_core.deinit();
+        vt_core.feedSlice(fixture);
+        vt_core.apply();
         counting.resetWindow();
         const start = timer.read();
         var j: usize = 0;
         while (j < snapshot_calls_per_run) : (j += 1) {
-            var snap = try engine.snapshot();
+            var snap = try vt_core.snapshot();
             snap.deinit();
         }
         const end = timer.read();
@@ -410,13 +410,13 @@ fn runQueueGrowthChunkedWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.Engine.initWithCellsAndHistory(
+        var vt_core = try terminal.VtCore.initWithCellsAndHistory(
             counting.allocator(),
             rows,
             cols,
             history_capacity,
         );
-        defer engine.deinit();
+        defer vt_core.deinit();
 
         counting.resetWindow();
         var offset: usize = 0;
@@ -424,11 +424,11 @@ fn runQueueGrowthChunkedWorkload(
         const start = timer.read();
         while (offset < fixture.len) {
             const next = @min(offset + chunk_size, fixture.len);
-            engine.feedSlice(fixture[offset..next]);
-            max_queue_depth = @max(max_queue_depth, engine.queuedEventCount());
+            vt_core.feedSlice(fixture[offset..next]);
+            max_queue_depth = @max(max_queue_depth, vt_core.queuedEventCount());
             offset = next;
         }
-        engine.apply();
+        vt_core.apply();
         const end = timer.read();
         observations[i] = .{
             .ns = end - start,

@@ -19,10 +19,9 @@ pub const screen = @import("screen/state.zig");
 /// Shared model module export.
 pub const model = @import("model.zig");
 
-/// Engine module export.
-pub const engine = @import("runtime/engine.zig");
-pub const VtCore = engine.Engine;
-pub const Engine = VtCore;
+/// VtCore module export.
+pub const vt_core = @import("runtime/vt_core.zig");
+pub const VtCore = vt_core.VtCore;
 
 pub const ControlSignal = enum {
     hangup,
@@ -121,5 +120,5 @@ test "root: exposes host-neutral module surface" {
     try std.testing.expect(@hasDecl(@This(), "semantic"));
     try std.testing.expect(@hasDecl(@This(), "screen"));
     try std.testing.expect(@hasDecl(@This(), "model"));
-    try std.testing.expect(@hasDecl(@This(), "engine"));
+    try std.testing.expect(@hasDecl(@This(), "vt_core"));
 }
