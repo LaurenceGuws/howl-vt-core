@@ -1,6 +1,6 @@
 //! Responsibility: run integration and parity tests across terminal lanes.
 //! Ownership: cross-module behavioral validation surface.
-//! Reason: enforce deterministic contract evidence for parser/runtime/screen flow.
+//! Reason: enforce deterministic api evidence for parser/runtime/screen flow.
 
 const std = @import("std");
 const parser_mod = @import("../parser/parser.zig");
@@ -5083,7 +5083,7 @@ test "input encoding: function keys with modifiers" {
     try std.testing.expectEqualSlices(u8, "\x1b[23;3~", alt_f11);
 }
 
-test "runtime contract: clear() empties queue without mutating parser or screen" {
+test "runtime api: clear() empties queue without mutating parser or screen" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
@@ -5100,7 +5100,7 @@ test "runtime contract: clear() empties queue without mutating parser or screen"
     try std.testing.expectEqual(screen_before.cursor_col, engine.screen().cursor_col);
 }
 
-test "runtime contract: reset() clears parser and queue while preserving screen modes" {
+test "runtime api: reset() clears parser and queue while preserving screen modes" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
@@ -5121,7 +5121,7 @@ test "runtime contract: reset() clears parser and queue while preserving screen 
     try std.testing.expectEqual(auto_wrap, engine.screen().auto_wrap);
 }
 
-test "runtime contract: resetScreen() clears screen while preserving parser and queue" {
+test "runtime api: resetScreen() clears screen while preserving parser and queue" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
@@ -5141,7 +5141,7 @@ test "runtime contract: resetScreen() clears screen while preserving parser and 
     try std.testing.expectEqual(queued_before, engine.queuedEventCount());
 }
 
-test "runtime contract: repeated apply() calls without feed are no-ops" {
+test "runtime api: repeated apply() calls without feed are no-ops" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
@@ -5157,7 +5157,7 @@ test "runtime contract: repeated apply() calls without feed are no-ops" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime contract: feed operations queue events before apply" {
+test "runtime api: feed operations queue events before apply" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
@@ -5177,7 +5177,7 @@ test "runtime contract: feed operations queue events before apply" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
-test "runtime contract: encode operations have no observable state effects" {
+test "runtime api: encode operations have no observable state effects" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
@@ -5203,7 +5203,7 @@ test "runtime contract: encode operations have no observable state effects" {
     try std.testing.expectEqual(queued_count, engine.queuedEventCount());
 }
 
-test "runtime contract: screen() returns a const reference" {
+test "runtime api: screen() returns a const reference" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
@@ -5218,7 +5218,7 @@ test "runtime contract: screen() returns a const reference" {
     try std.testing.expectEqual(screen_ref.cursor_row, screen_ref2.cursor_row);
 }
 
-test "runtime contract: feed/apply/reset ordering" {
+test "runtime api: feed/apply/reset ordering" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
@@ -6087,11 +6087,11 @@ const ConformanceCheckpoint = struct {
         const selection_equal = if (self.selection) |sel_self|
             if (other.selection) |sel_other|
                 sel_self.start.row == sel_other.start.row and
-                sel_self.start.col == sel_other.start.col and
-                sel_self.end.row == sel_other.end.row and
-                sel_self.end.col == sel_other.end.col and
-                sel_self.active == sel_other.active and
-                sel_self.selecting == sel_other.selecting
+                    sel_self.start.col == sel_other.start.col and
+                    sel_self.end.row == sel_other.end.row and
+                    sel_self.end.col == sel_other.end.col and
+                    sel_self.active == sel_other.active and
+                    sel_self.selecting == sel_other.selecting
             else
                 false
         else
@@ -6111,7 +6111,7 @@ const ConformanceCheckpoint = struct {
     }
 };
 
-test "conformance checkpoint: captures contract-visible fields" {
+test "conformance checkpoint: captures api-visible fields" {
     const gpa = std.testing.allocator;
     var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();

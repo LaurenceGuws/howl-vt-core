@@ -24,7 +24,7 @@ pub const runtime = @import("runtime/engine.zig");
 
 comptime {
     _ = @import("test/relay.zig");
-    _ = @import("test/api_contract.zig");
+    _ = @import("test/api_api.zig");
 }
 
 test "root: exposes host-neutral module surface" {

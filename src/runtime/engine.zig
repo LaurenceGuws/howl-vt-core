@@ -516,7 +516,7 @@ pub const Engine = struct {
         return self.encode_buf[0..0];
     }
 
-    /// Capture deterministic snapshot of engine observable state (SNAPSHOT_REPLAY contract).
+    /// Capture deterministic snapshot of engine observable state (SNAPSHOT_REPLAY api).
     ///
     /// Returns an EngineSnapshot containing visible cells, cursor, modes, history,
     /// and selection state at the time of the call. Snapshots are host-neutral and

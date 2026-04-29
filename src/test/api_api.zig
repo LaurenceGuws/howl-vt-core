@@ -1,4 +1,4 @@
-//! Responsibility: verify the stable public API contract for vt-core consumers.
+//! Responsibility: verify the stable public API api for vt-core consumers.
 //! Ownership: API conformance test surface.
 //! Reason: keep non-trivial facade/signature checks out of the root export file.
 

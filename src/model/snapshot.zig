@@ -1,9 +1,9 @@
 //! Responsibility: capture and represent engine observable state snapshots.
-//! Ownership: snapshot contract authority.
+//! Ownership: snapshot api authority.
 //! Reason: provide host-neutral read-only snapshots for replay and diagnostic access.
 //!
 //! EngineSnapshot is a deterministic, read-only capture of engine observable state
-//! at a point in time, aligned to SNAPSHOT_REPLAY contract requirements.
+//! at a point in time, aligned to SNAPSHOT_REPLAY api requirements.
 //! Snapshots are host-neutral data structures without persistence format or
 //! cross-version guarantees.
 
@@ -11,7 +11,7 @@ const std = @import("std");
 const model_mod = @import("../model.zig");
 const screen_mod = @import("../screen/state.zig");
 
-/// Deterministic snapshot of engine observable state (SNAPSHOT_REPLAY contract).
+/// Deterministic snapshot of engine observable state (SNAPSHOT_REPLAY api).
 ///
 /// Captures visible screen cells, cursor position, modes, history buffer, and
 /// selection state. Does NOT capture parser state, queued events, or encode buffers.
@@ -62,7 +62,7 @@ pub const EngineSnapshot = struct {
     /// Active selection state snapshot (null if inactive).
     selection: ?model_mod.TerminalSelection,
 
-    /// Capture snapshot from engine observable state; allocates owned buffers (SNAPSHOT_REPLAY contract).
+    /// Capture snapshot from engine observable state; allocates owned buffers (SNAPSHOT_REPLAY api).
     ///
     /// This method extracts the observable state from a ScreenState and optional
     /// selection state, allocating owned copies of cell and history buffers.
