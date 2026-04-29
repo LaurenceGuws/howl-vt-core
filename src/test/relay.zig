@@ -1,6 +1,6 @@
 //! Responsibility: run integration and parity tests across terminal lanes.
 //! Ownership: cross-module behavioral validation surface.
-//! Reason: enforce deterministic api evidence for parser/runtime/screen flow.
+//! Reason: enforce deterministic api evidence for parser/screen flow.
 
 const std = @import("std");
 const parser_mod = @import("../parser/parser.zig");
@@ -9,7 +9,7 @@ const csi_mod = @import("../parser/csi.zig");
 const bridge_mod = @import("../event/bridge.zig");
 const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
-const runtime_mod = @import("../runtime/engine.zig");
+const mod = @import("../runtime/engine.zig");
 const model_mod = @import("../model.zig");
 
 const Event = union(enum) {
@@ -1853,39 +1853,39 @@ fn runParityScenario(gpa: std.mem.Allocator, scenario: ParityScenario) !void {
         screen_mod.ScreenState.init(scenario.rows, scenario.cols);
     defer if (scenario.with_cells) direct_screen.deinit(gpa);
 
-    var runtime_engine = if (scenario.with_cells)
-        try runtime_mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    var engine = if (scenario.with_cells)
+        try mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
     else
-        try runtime_mod.Engine.init(gpa, scenario.rows, scenario.cols);
-    defer runtime_engine.deinit();
+        try mod.Engine.init(gpa, scenario.rows, scenario.cols);
+    defer engine.deinit();
 
     direct_pl.feedSlice(scenario.input);
     direct_pl.applyToScreen(&direct_screen);
 
-    runtime_engine.feedSlice(scenario.input);
-    runtime_engine.apply();
+    engine.feedSlice(scenario.input);
+    engine.apply();
 
     try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
-    try std.testing.expectEqual(scenario.expected_row, runtime_engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, engine.screen().cursor_row);
     try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
-    try std.testing.expectEqual(scenario.expected_col, runtime_engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, engine.screen().cursor_col);
     try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
-    try std.testing.expectEqual(scenario.expected_queue_depth, runtime_engine.queuedEventCount());
+    try std.testing.expectEqual(scenario.expected_queue_depth, engine.queuedEventCount());
     if (scenario.check_cursor_visible) {
         try std.testing.expectEqual(scenario.expected_cursor_visible, direct_screen.cursor_visible);
-        try std.testing.expectEqual(scenario.expected_cursor_visible, runtime_engine.screen().cursor_visible);
+        try std.testing.expectEqual(scenario.expected_cursor_visible, engine.screen().cursor_visible);
     }
     if (scenario.check_auto_wrap) {
         try std.testing.expectEqual(scenario.expected_auto_wrap, direct_screen.auto_wrap);
-        try std.testing.expectEqual(scenario.expected_auto_wrap, runtime_engine.screen().auto_wrap);
+        try std.testing.expectEqual(scenario.expected_auto_wrap, engine.screen().auto_wrap);
     }
 
     if (scenario.check_cells) {
         for (scenario.cell_checks) |check| {
             const direct_cell = direct_screen.cellAt(check.row, check.col);
-            const runtime_cell = runtime_engine.screen().cellAt(check.row, check.col);
+            const cell = engine.screen().cellAt(check.row, check.col);
             try std.testing.expectEqual(direct_cell, check.codepoint);
-            try std.testing.expectEqual(runtime_cell, check.codepoint);
+            try std.testing.expectEqual(cell, check.codepoint);
         }
     }
 }
@@ -1899,40 +1899,40 @@ fn runParityChunkScenario(gpa: std.mem.Allocator, scenario: ParityChunkScenario)
         screen_mod.ScreenState.init(scenario.rows, scenario.cols);
     defer if (scenario.with_cells) direct_screen.deinit(gpa);
 
-    var runtime_engine = if (scenario.with_cells)
-        try runtime_mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
+    var engine = if (scenario.with_cells)
+        try mod.Engine.initWithCells(gpa, scenario.rows, scenario.cols)
     else
-        try runtime_mod.Engine.init(gpa, scenario.rows, scenario.cols);
-    defer runtime_engine.deinit();
+        try mod.Engine.init(gpa, scenario.rows, scenario.cols);
+    defer engine.deinit();
 
     for (scenario.chunks) |chunk| {
         direct_pl.feedSlice(chunk);
-        runtime_engine.feedSlice(chunk);
+        engine.feedSlice(chunk);
     }
     direct_pl.applyToScreen(&direct_screen);
-    runtime_engine.apply();
+    engine.apply();
 
     try std.testing.expectEqual(scenario.expected_row, direct_screen.cursor_row);
-    try std.testing.expectEqual(scenario.expected_row, runtime_engine.screen().cursor_row);
+    try std.testing.expectEqual(scenario.expected_row, engine.screen().cursor_row);
     try std.testing.expectEqual(scenario.expected_col, direct_screen.cursor_col);
-    try std.testing.expectEqual(scenario.expected_col, runtime_engine.screen().cursor_col);
+    try std.testing.expectEqual(scenario.expected_col, engine.screen().cursor_col);
     try std.testing.expectEqual(scenario.expected_queue_depth, direct_pl.len());
-    try std.testing.expectEqual(scenario.expected_queue_depth, runtime_engine.queuedEventCount());
+    try std.testing.expectEqual(scenario.expected_queue_depth, engine.queuedEventCount());
     if (scenario.check_cursor_visible) {
         try std.testing.expectEqual(scenario.expected_cursor_visible, direct_screen.cursor_visible);
-        try std.testing.expectEqual(scenario.expected_cursor_visible, runtime_engine.screen().cursor_visible);
+        try std.testing.expectEqual(scenario.expected_cursor_visible, engine.screen().cursor_visible);
     }
     if (scenario.check_auto_wrap) {
         try std.testing.expectEqual(scenario.expected_auto_wrap, direct_screen.auto_wrap);
-        try std.testing.expectEqual(scenario.expected_auto_wrap, runtime_engine.screen().auto_wrap);
+        try std.testing.expectEqual(scenario.expected_auto_wrap, engine.screen().auto_wrap);
     }
 
     if (scenario.check_cells) {
         for (scenario.cell_checks) |check| {
             const direct_cell = direct_screen.cellAt(check.row, check.col);
-            const runtime_cell = runtime_engine.screen().cellAt(check.row, check.col);
+            const cell = engine.screen().cellAt(check.row, check.col);
             try std.testing.expectEqual(direct_cell, check.codepoint);
-            try std.testing.expectEqual(runtime_cell, check.codepoint);
+            try std.testing.expectEqual(cell, check.codepoint);
         }
     }
 }
@@ -2449,20 +2449,20 @@ test "parity: split CSI across feeds identically" {
     defer direct_pl.deinit();
     var direct_screen = screen_mod.ScreenState.init(24, 80);
 
-    var runtime_engine = try runtime_mod.Engine.init(gpa, 24, 80);
-    defer runtime_engine.deinit();
+    var engine = try mod.Engine.init(gpa, 24, 80);
+    defer engine.deinit();
 
     direct_pl.feedSlice("\x1b[");
     direct_pl.feedSlice("5");
     direct_pl.feedSlice("C");
     direct_pl.applyToScreen(&direct_screen);
 
-    runtime_engine.feedSlice("\x1b[");
-    runtime_engine.feedSlice("5");
-    runtime_engine.feedSlice("C");
-    runtime_engine.apply();
+    engine.feedSlice("\x1b[");
+    engine.feedSlice("5");
+    engine.feedSlice("C");
+    engine.apply();
 
-    try std.testing.expectEqual(direct_screen.cursor_col, runtime_engine.screen().cursor_col);
+    try std.testing.expectEqual(direct_screen.cursor_col, engine.screen().cursor_col);
 }
 
 test "parity: text write with cells identically" {
@@ -3694,9 +3694,9 @@ test "parity-chunked: interrupted split private auto-wrap mode remains identical
     });
 }
 
-test "runtime: init and deinit lifecycle" {
+test "init and deinit lifecycle" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     try std.testing.expectEqual(@as(u16, 24), engine.screen().rows);
     try std.testing.expectEqual(@as(u16, 80), engine.screen().cols);
@@ -3705,9 +3705,9 @@ test "runtime: init and deinit lifecycle" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: initWithCells and deinit with allocated cells" {
+test "initWithCells and deinit with allocated cells" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
     defer engine.deinit();
     try std.testing.expectEqual(@as(u16, 4), engine.screen().rows);
     try std.testing.expectEqual(@as(u16, 20), engine.screen().cols);
@@ -3715,9 +3715,9 @@ test "runtime: initWithCells and deinit with allocated cells" {
     try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
 }
 
-test "runtime: feedByte and feedSlice accumulate in queue" {
+test "feedByte and feedSlice accumulate in queue" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
     engine.feedByte('A');
@@ -3726,9 +3726,9 @@ test "runtime: feedByte and feedSlice accumulate in queue" {
     try std.testing.expectEqual(@as(usize, 2), engine.queuedEventCount());
 }
 
-test "runtime: apply drains queue and updates screen" {
+test "apply drains queue and updates screen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
     defer engine.deinit();
     engine.feedSlice("hello");
     try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
@@ -3739,9 +3739,9 @@ test "runtime: apply drains queue and updates screen" {
     try std.testing.expectEqual(@as(u16, 5), engine.screen().cursor_col);
 }
 
-test "runtime: clear drops pending events" {
+test "clear drops pending events" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("text\x1b[5A");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -3750,9 +3750,9 @@ test "runtime: clear drops pending events" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_row);
 }
 
-test "runtime: clear drops pending HT/CHT/CBT before apply" {
+test "clear drops pending HT/CHT/CBT before apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("a\x09b\x1b[2I\x1b[Z");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -3763,9 +3763,9 @@ test "runtime: clear drops pending HT/CHT/CBT before apply" {
     try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 0));
 }
 
-test "runtime: reset clears queue and parser state" {
+test "reset clears queue and parser state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("abc\x1b[");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -3775,9 +3775,9 @@ test "runtime: reset clears queue and parser state" {
     try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
 }
 
-test "runtime: reset clears partial CHT parser state and queued tab work" {
+test "reset clears partial CHT parser state and queued tab work" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("a\x1b[2");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -3790,9 +3790,9 @@ test "runtime: reset clears partial CHT parser state and queued tab work" {
     try std.testing.expectEqual(@as(u21, 'b'), engine.screen().cellAt(0, 1));
 }
 
-test "runtime: resetScreen clears screen without clearing queued parser events" {
+test "resetScreen clears screen without clearing queued parser events" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 5);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 5);
     defer engine.deinit();
     engine.feedSlice("abcde");
     engine.apply();
@@ -3815,9 +3815,9 @@ test "runtime: resetScreen clears screen without clearing queued parser events" 
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: resetScreen preserves queued HT/CHT application from cleared origin" {
+test "resetScreen preserves queued HT/CHT application from cleared origin" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("xxxxx");
     engine.apply();
@@ -3832,9 +3832,9 @@ test "runtime: resetScreen preserves queued HT/CHT application from cleared orig
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: resetScreen preserves split CHT and queued mode change" {
+test "resetScreen preserves split CHT and queued mode change" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -3852,9 +3852,9 @@ test "runtime: resetScreen preserves split CHT and queued mode change" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: resetScreen preserves partial CHT parser state with empty queue" {
+test "resetScreen preserves partial CHT parser state with empty queue" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -3869,9 +3869,9 @@ test "runtime: resetScreen preserves partial CHT parser state with empty queue" 
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: resetScreen preserves split CBT and queued cursor visibility change" {
+test "resetScreen preserves split CBT and queued cursor visibility change" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("a\x1b[2I");
     engine.apply();
@@ -3889,9 +3889,9 @@ test "runtime: resetScreen preserves split CBT and queued cursor visibility chan
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: reset clears queue/parser without mutating screen modes" {
+test "reset clears queue/parser without mutating screen modes" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 5);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 5);
     defer engine.deinit();
     engine.feedSlice("\x1b[?25l\x1b[?7l");
     engine.apply();
@@ -3905,9 +3905,9 @@ test "runtime: reset clears queue/parser without mutating screen modes" {
     try std.testing.expect(!engine.screen().auto_wrap);
 }
 
-test "runtime: reset clears queued mode event and split CHT parser state" {
+test "reset clears queued mode event and split CHT parser state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("\x1b[?7l\x1b[2");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -3921,9 +3921,9 @@ test "runtime: reset clears queued mode event and split CHT parser state" {
     try std.testing.expectEqual(@as(u21, 'u'), engine.screen().cellAt(0, 1));
 }
 
-test "runtime: cursor move via apply matches direct pipeline" {
+test "cursor move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[5;10H");
     engine.apply();
@@ -3931,9 +3931,9 @@ test "runtime: cursor move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
-test "runtime: CNL move via apply matches direct pipeline" {
+test "CNL move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[3E");
     engine.apply();
@@ -3941,9 +3941,9 @@ test "runtime: CNL move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: CPL move via apply matches direct pipeline" {
+test "CPL move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[3F");
     engine.apply();
@@ -3951,9 +3951,9 @@ test "runtime: CPL move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: split CNL interrupted by DECSTR bytes remains deterministic" {
+test "split CNL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -3967,9 +3967,9 @@ test "runtime: split CNL interrupted by DECSTR bytes remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: split CNL after DECSTR applies from reset origin" {
+test "split CNL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -3982,9 +3982,9 @@ test "runtime: split CNL after DECSTR applies from reset origin" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(7, 0));
 }
 
-test "runtime: split CPL interrupted by DECSTR bytes remains deterministic" {
+test "split CPL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -3998,9 +3998,9 @@ test "runtime: split CPL interrupted by DECSTR bytes remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: split CPL after DECSTR applies from reset origin" {
+test "split CPL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4013,9 +4013,9 @@ test "runtime: split CPL after DECSTR applies from reset origin" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 0));
 }
 
-test "runtime: CHA move via apply matches direct pipeline" {
+test "CHA move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[9G");
     engine.apply();
@@ -4023,9 +4023,9 @@ test "runtime: CHA move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_col);
 }
 
-test "runtime: VPA move via apply matches direct pipeline" {
+test "VPA move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[9d");
     engine.apply();
@@ -4033,9 +4033,9 @@ test "runtime: VPA move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: VPA clamp via apply matches direct pipeline" {
+test "VPA clamp via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 5, 20);
+    var engine = try mod.Engine.init(gpa, 5, 20);
     defer engine.deinit();
     engine.feedSlice("\x1b[999d");
     engine.apply();
@@ -4043,9 +4043,9 @@ test "runtime: VPA clamp via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: CUD alias 'e' move via apply matches direct pipeline" {
+test "CUD alias 'e' move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[5e");
     engine.apply();
@@ -4053,9 +4053,9 @@ test "runtime: CUD alias 'e' move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: CUF alias 'a' move via apply matches direct pipeline" {
+test "CUF alias 'a' move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[9a");
     engine.apply();
@@ -4063,9 +4063,9 @@ test "runtime: CUF alias 'a' move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
-test "runtime: CHA alias backtick move via apply matches direct pipeline" {
+test "CHA alias backtick move via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[9`");
     engine.apply();
@@ -4073,9 +4073,9 @@ test "runtime: CHA alias backtick move via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 8), engine.screen().cursor_col);
 }
 
-test "runtime: split VPA interrupted by DECSTR bytes remains deterministic" {
+test "split VPA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4089,9 +4089,9 @@ test "runtime: split VPA interrupted by DECSTR bytes remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: split VPA after DECSTR applies from reset origin" {
+test "split VPA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4104,9 +4104,9 @@ test "runtime: split VPA after DECSTR applies from reset origin" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(6, 0));
 }
 
-test "runtime: CHA clamp via apply matches direct pipeline" {
+test "CHA clamp via apply matches direct pipeline" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 2, 20);
+    var engine = try mod.Engine.init(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("\x1b[999G");
     engine.apply();
@@ -4114,9 +4114,9 @@ test "runtime: CHA clamp via apply matches direct pipeline" {
     try std.testing.expectEqual(@as(u16, 19), engine.screen().cursor_col);
 }
 
-test "runtime: split CHA interrupted by DECSTR bytes remains deterministic" {
+test "split CHA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4129,9 +4129,9 @@ test "runtime: split CHA interrupted by DECSTR bytes remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: split CHA after DECSTR applies from reset origin" {
+test "split CHA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4143,9 +4143,9 @@ test "runtime: split CHA after DECSTR applies from reset origin" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: CHT and CBT tab navigation via apply" {
+test "CHT and CBT tab navigation via apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("a\x1b[2I\x1b[Zb");
     engine.apply();
@@ -4155,9 +4155,9 @@ test "runtime: CHT and CBT tab navigation via apply" {
     try std.testing.expectEqual(@as(u21, 'b'), engine.screen().cellAt(0, 8));
 }
 
-test "runtime: DECSTR restores mode defaults before tab navigation" {
+test "DECSTR restores mode defaults before tab navigation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("\x1b[?7l\x1b[?25l\x1b[!p\x1b[2Ic");
     engine.apply();
@@ -4168,9 +4168,9 @@ test "runtime: DECSTR restores mode defaults before tab navigation" {
     try std.testing.expectEqual(@as(u21, 'c'), engine.screen().cellAt(0, 16));
 }
 
-test "runtime: interrupted split CHT stream remains deterministic" {
+test "interrupted split CHT stream remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4185,9 +4185,9 @@ test "runtime: interrupted split CHT stream remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'x'), engine.screen().cellAt(0, 6));
 }
 
-test "runtime: interrupted split private cursor mode remains deterministic" {
+test "interrupted split private cursor mode remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     try std.testing.expect(engine.screen().cursor_visible);
     engine.feedSlice("x");
@@ -4202,9 +4202,9 @@ test "runtime: interrupted split private cursor mode remains deterministic" {
     try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
 }
 
-test "runtime: interrupted split CBT stream remains deterministic" {
+test "interrupted split CBT stream remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     engine.feedSlice("a\x1b[2I");
     engine.apply();
@@ -4218,9 +4218,9 @@ test "runtime: interrupted split CBT stream remains deterministic" {
     try std.testing.expectEqual(@as(u21, 'y'), engine.screen().cellAt(0, 19));
 }
 
-test "runtime: interrupted split private auto-wrap mode remains deterministic" {
+test "interrupted split private auto-wrap mode remains deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 2, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 2, 20);
     defer engine.deinit();
     try std.testing.expect(engine.screen().auto_wrap);
     engine.feedSlice("x");
@@ -4235,9 +4235,9 @@ test "runtime: interrupted split private auto-wrap mode remains deterministic" {
     try std.testing.expectEqual(@as(u21, '!'), engine.screen().cellAt(0, 1));
 }
 
-test "runtime: text write and erase via apply" {
+test "text write and erase via apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
     defer engine.deinit();
     engine.feedSlice("hello");
     engine.apply();
@@ -4248,9 +4248,9 @@ test "runtime: text write and erase via apply" {
     try std.testing.expectEqual(@as(u21, 0), engine.screen().cellAt(0, 5));
 }
 
-test "runtime: repeated apply without feed is no-op" {
+test "repeated apply without feed is no-op" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 4, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 4, 20);
     defer engine.deinit();
     engine.feedSlice("test");
     engine.apply();
@@ -4261,9 +4261,9 @@ test "runtime: repeated apply without feed is no-op" {
     try std.testing.expectEqual(col1, engine.screen().cursor_col);
 }
 
-test "runtime: zero-dimension init is safe" {
+test "zero-dimension init is safe" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 0, 0);
+    var engine = try mod.Engine.init(gpa, 0, 0);
     defer engine.deinit();
     engine.feedSlice("text\x1b[5A\x1b[999C\x1b[J");
     engine.apply();
@@ -4271,9 +4271,9 @@ test "runtime: zero-dimension init is safe" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime: zero-dimension tab commands are safe and deterministic" {
+test "zero-dimension tab commands are safe and deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 0, 8);
+    var engine = try mod.Engine.init(gpa, 0, 8);
     defer engine.deinit();
     engine.feedSlice("\x09\x1b[2I\x1b[3Z");
     engine.apply();
@@ -4282,9 +4282,9 @@ test "runtime: zero-dimension tab commands are safe and deterministic" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: queuedEventCount after clear is zero" {
+test "queuedEventCount after clear is zero" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("\x1b[1m\x1b[31mtext");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -4292,9 +4292,9 @@ test "runtime: queuedEventCount after clear is zero" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: queuedEventCount after reset is zero" {
+test "queuedEventCount after reset is zero" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("abc\x1b[31m");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -4302,9 +4302,9 @@ test "runtime: queuedEventCount after reset is zero" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: queuedEventCount after apply is zero" {
+test "queuedEventCount after apply is zero" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("hello\x1b[5A");
     try std.testing.expect(engine.queuedEventCount() > 0);
@@ -4312,9 +4312,9 @@ test "runtime: queuedEventCount after apply is zero" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime: feed after clear accumulates new events" {
+test "feed after clear accumulates new events" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 24, 80);
+    var engine = try mod.Engine.init(gpa, 24, 80);
     defer engine.deinit();
     engine.feedSlice("old");
     engine.clear();
@@ -4323,9 +4323,9 @@ test "runtime: feed after clear accumulates new events" {
     try std.testing.expectEqual(@as(usize, 1), engine.queuedEventCount());
 }
 
-test "runtime: complex sequence with cursor/text/erase" {
+test "complex sequence with cursor/text/erase" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 15);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 15);
     defer engine.deinit();
     engine.feedSlice("line0");
     engine.apply();
@@ -4338,17 +4338,17 @@ test "runtime: complex sequence with cursor/text/erase" {
     try std.testing.expectEqual(@as(u21, 'l'), engine.screen().cellAt(1, 0));
 }
 
-test "runtime: initWithCellsAndHistory creates history" {
+test "initWithCellsAndHistory creates history" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
     defer engine.deinit();
     try std.testing.expectEqual(@as(u16, 50), engine.historyCapacity());
     try std.testing.expectEqual(@as(u16, 0), engine.historyCount());
 }
 
-test "runtime: history accumulates via scroll" {
+test "history accumulates via scroll" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4360,9 +4360,9 @@ test "runtime: history accumulates via scroll" {
     try std.testing.expectEqual(@as(u21, 'c'), engine.historyRowAt(0, 2));
 }
 
-test "runtime: history read returns zero for out-of-bounds" {
+test "history read returns zero for out-of-bounds" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 10, 50);
     defer engine.deinit();
     engine.feedSlice("abc");
     engine.apply();
@@ -4372,9 +4372,9 @@ test "runtime: history read returns zero for out-of-bounds" {
     try std.testing.expectEqual(@as(u21, 0), engine.historyRowAt(0, 10));
 }
 
-test "runtime: direct screen and engine history states match" {
+test "direct screen and engine history states match" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 10);
     defer engine.deinit();
     engine.feedSlice("test");
     engine.apply();
@@ -4392,9 +4392,9 @@ test "runtime: direct screen and engine history states match" {
     }
 }
 
-test "runtime: history accessor ordering remains stable after wraparound" {
+test "history accessor ordering remains stable after wraparound" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 2, 2);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 2, 2);
     defer engine.deinit();
 
     var row_num: u21 = '1';
@@ -4476,9 +4476,9 @@ test "selection: finish stops selecting but keeps active" {
     try std.testing.expect(!state.selecting);
 }
 
-test "runtime: selection state integrated into engine cursor-only mode" {
+test "selection state integrated into engine cursor-only mode" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
@@ -4488,9 +4488,9 @@ test "runtime: selection state integrated into engine cursor-only mode" {
     try std.testing.expectEqual(@as(u16, 5), sel.start.col);
 }
 
-test "runtime: selection state integrated into engine with cells" {
+test "selection state integrated into engine with cells" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
 
     engine.selectionStart(2, 10);
@@ -4500,9 +4500,9 @@ test "runtime: selection state integrated into engine with cells" {
     try std.testing.expectEqual(@as(i32, 5), sel.end.row);
 }
 
-test "runtime: selection state survives reset" {
+test "selection state survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("hello");
@@ -4518,9 +4518,9 @@ test "runtime: selection state survives reset" {
     try std.testing.expect(!sel.selecting);
 }
 
-test "runtime: selection survives resetScreen" {
+test "selection survives resetScreen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("text\n");
@@ -4536,9 +4536,9 @@ test "runtime: selection survives resetScreen" {
     try std.testing.expect(post_reset.active);
 }
 
-test "runtime: selection clear deactivates through engine" {
+test "selection clear deactivates through engine" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     engine.selectionStart(5, 7);
@@ -4548,9 +4548,9 @@ test "runtime: selection clear deactivates through engine" {
     try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
 }
 
-test "runtime: selection cleared when referencing out-of-bounds history index" {
+test "selection cleared when referencing out-of-bounds history index" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
     defer engine.deinit();
 
     engine.feedSlice("1\x0A2\x0A3\x0A");
@@ -4565,9 +4565,9 @@ test "runtime: selection cleared when referencing out-of-bounds history index" {
     try std.testing.expectEqual(@as(?model_mod.TerminalSelection, null), engine.selectionState());
 }
 
-test "runtime: selection not cleared by reset operation" {
+test "selection not cleared by reset operation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
     defer engine.deinit();
 
     engine.feedSlice("test\x1b[H");
@@ -4584,9 +4584,9 @@ test "runtime: selection not cleared by reset operation" {
     try std.testing.expectEqual(@as(i32, 0), sel_after.start.row);
 }
 
-test "runtime: selection not cleared by resetScreen operation" {
+test "selection not cleared by resetScreen operation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 3);
     defer engine.deinit();
 
     engine.feedSlice("test");
@@ -4606,9 +4606,9 @@ test "runtime: selection not cleared by resetScreen operation" {
     try std.testing.expectEqual(@as(i32, -1), sel_after.start.row);
 }
 
-test "runtime: encodeKey handles printable ASCII" {
+test "encodeKey handles printable ASCII" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const bytes = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
@@ -4616,9 +4616,9 @@ test "runtime: encodeKey handles printable ASCII" {
     try std.testing.expectEqual(@as(u8, 'A'), bytes[0]);
 }
 
-test "runtime: encodeKey handles special keys" {
+test "encodeKey handles special keys" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const enter_bytes = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
@@ -4634,9 +4634,9 @@ test "runtime: encodeKey handles special keys" {
     try std.testing.expectEqual(@as(u8, '\t'), tab_bytes[0]);
 }
 
-test "runtime: encodeKey handles cursor keys" {
+test "encodeKey handles cursor keys" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const up_bytes = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_NONE);
@@ -4646,9 +4646,9 @@ test "runtime: encodeKey handles cursor keys" {
     try std.testing.expectEqual(@as(u8, 'A'), up_bytes[2]);
 }
 
-test "runtime: encodeMouse returns empty when not enabled" {
+test "encodeMouse returns empty when not enabled" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const event = model_mod.MouseEvent{
@@ -4666,9 +4666,9 @@ test "runtime: encodeMouse returns empty when not enabled" {
     try std.testing.expectEqual(@as(usize, 0), bytes.len);
 }
 
-test "runtime: mouse event supports history row indices" {
+test "mouse event supports history row indices" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const history_event = model_mod.MouseEvent{
@@ -4697,9 +4697,9 @@ test "runtime: mouse event supports history row indices" {
     try std.testing.expect(viewport_event.row >= 0);
 }
 
-test "runtime: encodeKey handles extended keys (HOME, END, INS, DEL)" {
+test "encodeKey handles extended keys (HOME, END, INS, DEL)" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const home_bytes = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_NONE);
@@ -4717,9 +4717,9 @@ test "runtime: encodeKey handles extended keys (HOME, END, INS, DEL)" {
     try std.testing.expectEqualSlices(u8, "\x1b[3~", del_bytes);
 }
 
-test "runtime: encodeKey handles page keys (PAGEUP, PAGEDOWN)" {
+test "encodeKey handles page keys (PAGEUP, PAGEDOWN)" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const pageup_bytes = engine.encodeKey(model_mod.VTERM_KEY_PAGEUP, model_mod.VTERM_MOD_NONE);
@@ -4731,9 +4731,9 @@ test "runtime: encodeKey handles page keys (PAGEUP, PAGEDOWN)" {
     try std.testing.expectEqualSlices(u8, "\x1b[6~", pagedown_bytes);
 }
 
-test "runtime: extended key encoding with modifiers" {
+test "extended key encoding with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const shift_home = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
@@ -4745,9 +4745,9 @@ test "runtime: extended key encoding with modifiers" {
     try std.testing.expectEqual(@as(u8, '5'), ctrl_del[4]);
 }
 
-test "runtime: extended key encoding survives reset" {
+test "extended key encoding survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     const before_reset = engine.encodeKey(model_mod.VTERM_KEY_INS, model_mod.VTERM_MOD_NONE);
@@ -4763,9 +4763,9 @@ test "runtime: extended key encoding survives reset" {
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
 }
 
-test "runtime: extended key encoding deterministic for repeated calls" {
+test "extended key encoding deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const call1 = engine.encodeKey(model_mod.VTERM_KEY_END, model_mod.VTERM_MOD_ALT);
@@ -4778,9 +4778,9 @@ test "runtime: extended key encoding deterministic for repeated calls" {
     try std.testing.expectEqualSlices(u8, buf1[0..call1.len], call2);
 }
 
-test "runtime: encodeKey handles function keys F1-F4" {
+test "encodeKey handles function keys F1-F4" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const f1_bytes = engine.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_NONE);
@@ -4797,9 +4797,9 @@ test "runtime: encodeKey handles function keys F1-F4" {
     try std.testing.expectEqualSlices(u8, "\x1b[S", f4_bytes);
 }
 
-test "runtime: encodeKey handles function keys F5-F12" {
+test "encodeKey handles function keys F5-F12" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const f5_bytes = engine.encodeKey(model_mod.VTERM_KEY_F5, model_mod.VTERM_MOD_NONE);
@@ -4813,9 +4813,9 @@ test "runtime: encodeKey handles function keys F5-F12" {
     try std.testing.expectEqualSlices(u8, "\x1b[24~", f12_bytes);
 }
 
-test "runtime: function key encoding with modifiers" {
+test "function key encoding with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const shift_f1 = engine.encodeKey(model_mod.VTERM_KEY_F1, model_mod.VTERM_MOD_SHIFT);
@@ -4831,9 +4831,9 @@ test "runtime: function key encoding with modifiers" {
     try std.testing.expectEqual(@as(u8, '3'), alt_f12[5]);
 }
 
-test "runtime: function key encoding survives reset" {
+test "function key encoding survives reset" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     const before_reset = engine.encodeKey(model_mod.VTERM_KEY_F6, model_mod.VTERM_MOD_NONE);
@@ -4849,9 +4849,9 @@ test "runtime: function key encoding survives reset" {
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
 }
 
-test "runtime: function key encoding deterministic for repeated calls" {
+test "function key encoding deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const call1 = engine.encodeKey(model_mod.VTERM_KEY_F11, model_mod.VTERM_MOD_SHIFT);
@@ -4864,9 +4864,9 @@ test "runtime: function key encoding deterministic for repeated calls" {
     try std.testing.expectEqualSlices(u8, buf1[0..call1.len], call2);
 }
 
-test "runtime: input encoding is deterministic for repeated calls" {
+test "input encoding is deterministic for repeated calls" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const bytes1 = engine.encodeKey('X', model_mod.VTERM_MOD_SHIFT);
@@ -4879,9 +4879,9 @@ test "runtime: input encoding is deterministic for repeated calls" {
     try std.testing.expectEqualSlices(u8, buf1[0..bytes1.len], bytes2);
 }
 
-test "runtime: input encoding survives reset operation" {
+test "input encoding survives reset operation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     const before_reset = engine.encodeKey(model_mod.VTERM_KEY_ENTER, model_mod.VTERM_MOD_NONE);
@@ -4897,9 +4897,9 @@ test "runtime: input encoding survives reset operation" {
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
 }
 
-test "runtime: input encoding survives resetScreen operation" {
+test "input encoding survives resetScreen operation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("test");
@@ -4918,9 +4918,9 @@ test "runtime: input encoding survives resetScreen operation" {
     try std.testing.expectEqualSlices(u8, buf1[0..before_len], after_reset);
 }
 
-test "runtime: input does not affect selection state" {
+test "input does not affect selection state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     engine.selectionStart(2, 5);
@@ -4934,9 +4934,9 @@ test "runtime: input does not affect selection state" {
     try std.testing.expectEqual(before_sel.start.col, after_sel.start.col);
 }
 
-test "runtime: input encoding output is not mutable from caller" {
+test "input encoding output is not mutable from caller" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const bytes = engine.encodeKey('B', model_mod.VTERM_MOD_NONE);
@@ -4946,7 +4946,7 @@ test "runtime: input encoding output is not mutable from caller" {
 
 test "input encoding: keyboard coverage across printable, control, cursor, and function keys" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const ascii = engine.encodeKey('A', model_mod.VTERM_MOD_NONE);
@@ -4983,7 +4983,7 @@ test "input encoding: keyboard coverage across printable, control, cursor, and f
 
 test "input encoding: modifier combinations are deterministic" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const shift_up = engine.encodeKey(model_mod.VTERM_KEY_UP, model_mod.VTERM_MOD_SHIFT);
@@ -5008,7 +5008,7 @@ test "input encoding: modifier combinations are deterministic" {
 
 test "input encoding: encoding survives reset and screen reset" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("\x1b[2J");
@@ -5030,7 +5030,7 @@ test "input encoding: encoding survives reset and screen reset" {
 
 test "input encoding: encoding does not mutate state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("hello");
@@ -5052,7 +5052,7 @@ test "input encoding: encoding does not mutate state" {
 
 test "input encoding: extended keys with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const shift_home = engine.encodeKey(model_mod.VTERM_KEY_HOME, model_mod.VTERM_MOD_SHIFT);
@@ -5070,7 +5070,7 @@ test "input encoding: extended keys with modifiers" {
 
 test "input encoding: function keys with modifiers" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     const shift_f2 = engine.encodeKey(model_mod.VTERM_KEY_F2, model_mod.VTERM_MOD_SHIFT);
@@ -5083,9 +5083,9 @@ test "input encoding: function keys with modifiers" {
     try std.testing.expectEqualSlices(u8, "\x1b[23;3~", alt_f11);
 }
 
-test "runtime api: clear() empties queue without mutating parser or screen" {
+test "api: clear() empties queue without mutating parser or screen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC\x1b[2J");
@@ -5100,9 +5100,9 @@ test "runtime api: clear() empties queue without mutating parser or screen" {
     try std.testing.expectEqual(screen_before.cursor_col, engine.screen().cursor_col);
 }
 
-test "runtime api: reset() clears parser and queue while preserving screen modes" {
+test "api: reset() clears parser and queue while preserving screen modes" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    var engine = try mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("\x1b[?25l\x1b[?7h");
@@ -5121,9 +5121,9 @@ test "runtime api: reset() clears parser and queue while preserving screen modes
     try std.testing.expectEqual(auto_wrap, engine.screen().auto_wrap);
 }
 
-test "runtime api: resetScreen() clears screen while preserving parser and queue" {
+test "api: resetScreen() clears screen while preserving parser and queue" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("Hello");
@@ -5141,9 +5141,9 @@ test "runtime api: resetScreen() clears screen while preserving parser and queue
     try std.testing.expectEqual(queued_before, engine.queuedEventCount());
 }
 
-test "runtime api: repeated apply() calls without feed are no-ops" {
+test "api: repeated apply() calls without feed are no-ops" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    var engine = try mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("X");
@@ -5157,9 +5157,9 @@ test "runtime api: repeated apply() calls without feed are no-ops" {
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime api: feed operations queue events before apply" {
+test "api: feed operations queue events before apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    var engine = try mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedByte('A');
@@ -5177,9 +5177,9 @@ test "runtime api: feed operations queue events before apply" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
-test "runtime api: encode operations have no observable state effects" {
+test "api: encode operations have no observable state effects" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("DATA");
@@ -5203,9 +5203,9 @@ test "runtime api: encode operations have no observable state effects" {
     try std.testing.expectEqual(queued_count, engine.queuedEventCount());
 }
 
-test "runtime api: screen() returns a const reference" {
+test "api: screen() returns a const reference" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 5, 10);
+    var engine = try mod.Engine.init(gpa, 5, 10);
     defer engine.deinit();
 
     const screen_ref = engine.screen();
@@ -5218,9 +5218,9 @@ test "runtime api: screen() returns a const reference" {
     try std.testing.expectEqual(screen_ref.cursor_row, screen_ref2.cursor_row);
 }
 
-test "runtime api: feed/apply/reset ordering" {
+test "api: feed/apply/reset ordering" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("First");
@@ -5242,9 +5242,9 @@ test "runtime api: feed/apply/reset ordering" {
     try std.testing.expectEqual(@as(u16, 0), engine.screen().cursor_col);
 }
 
-test "runtime parity: split-feed at CSI boundary preserves queue semantics" {
+test "parity: split-feed at CSI boundary preserves queue semantics" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.init(gpa, 10, 20);
+    var engine = try mod.Engine.init(gpa, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("\x1b[5;1");
@@ -5259,9 +5259,9 @@ test "runtime parity: split-feed at CSI boundary preserves queue semantics" {
     try std.testing.expectEqual(@as(u16, 9), engine.screen().cursor_col);
 }
 
-test "runtime parity: feed/apply/reset/feed/apply preserves state isolation" {
+test "parity: feed/apply/reset/feed/apply preserves state isolation" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -5281,9 +5281,9 @@ test "runtime parity: feed/apply/reset/feed/apply preserves state isolation" {
     try std.testing.expectEqual(@as(u16, 10), engine.screen().cursor_col);
 }
 
-test "runtime parity: selection and history remain stable during apply" {
+test "parity: selection and history remain stable during apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("LINE1\nLINE2\nLINE3");
@@ -5301,9 +5301,9 @@ test "runtime parity: selection and history remain stable during apply" {
     try std.testing.expectEqual(sel_before.start.row, sel_after.?.start.row);
 }
 
-test "runtime parity: encode interleaved with feed/apply does not mutate state" {
+test "parity: encode interleaved with feed/apply does not mutate state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC");
@@ -5323,9 +5323,9 @@ test "runtime parity: encode interleaved with feed/apply does not mutate state" 
     try std.testing.expectEqual(col_after_abc + 3, engine.screen().cursor_col);
 }
 
-test "runtime parity: complex state machine sequence" {
+test "parity: complex state machine sequence" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 10);
     defer engine.deinit();
 
     engine.feedSlice("A");
@@ -5353,7 +5353,7 @@ test "runtime parity: complex state machine sequence" {
 
 test "snapshot: capture from simple text" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -5378,14 +5378,14 @@ test "snapshot: capture from simple text" {
 test "snapshot: determinism across identical state" {
     const gpa = std.testing.allocator;
 
-    var engine1 = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine1 = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine1.deinit();
     engine1.feedSlice("TEST");
     engine1.apply();
     var snap1 = try engine1.snapshot();
     defer snap1.deinit();
 
-    var engine2 = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine2 = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine2.deinit();
     engine2.feedSlice("TEST");
     engine2.apply();
@@ -5406,14 +5406,14 @@ test "snapshot: determinism across identical state" {
 test "snapshot: split-feed replay equivalence" {
     const gpa = std.testing.allocator;
 
-    var engine_atomic = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine_atomic = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine_atomic.deinit();
     engine_atomic.feedSlice("ABCDEFGHIJ");
     engine_atomic.apply();
     var snap_atomic = try engine_atomic.snapshot();
     defer snap_atomic.deinit();
 
-    var engine_chunked = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine_chunked = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine_chunked.deinit();
     engine_chunked.feedByte('A');
     engine_chunked.feedByte('B');
@@ -5434,7 +5434,7 @@ test "snapshot: split-feed replay equivalence" {
 
 test "snapshot: history capture when history is enabled" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("AAA\nBBB\nCCC\nDDD");
@@ -5455,7 +5455,7 @@ test "snapshot: history capture when history is enabled" {
 
 test "snapshot: historyRowAt matches engine after wraparound" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 3, 2);
     defer engine.deinit();
 
     // Force history ring-buffer wraparound (capacity 2, scroll more than 2 rows).
@@ -5479,7 +5479,7 @@ test "snapshot: historyRowAt matches engine after wraparound" {
 
 test "snapshot: selection state is included" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -5504,7 +5504,7 @@ test "snapshot: selection state is included" {
 
 test "snapshot: parity with direct screen state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -5524,7 +5524,7 @@ test "snapshot: parity with direct screen state" {
 
 test "replay: clear leaves snapshot unchanged" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC");
@@ -5544,7 +5544,7 @@ test "replay: clear leaves snapshot unchanged" {
 
 test "replay: reset preserves snapshot state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -5568,7 +5568,7 @@ test "replay: reset preserves snapshot state" {
 
 test "replay: resetScreen clears cells while preserving history" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("LINE1\nLINE2\nLINE3\nLINE4");
@@ -5597,7 +5597,7 @@ test "replay: resetScreen clears cells while preserving history" {
 test "replay: snapshot determinism across feed sequence variations" {
     const gpa = std.testing.allocator;
 
-    var engine1 = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine1 = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine1.deinit();
     engine1.feedSlice("\x1b[2J");
     engine1.feedSlice("Line1\nLine2");
@@ -5605,7 +5605,7 @@ test "replay: snapshot determinism across feed sequence variations" {
     var snap1 = try engine1.snapshot();
     defer snap1.deinit();
 
-    var engine2 = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine2 = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine2.deinit();
     engine2.feedByte('\x1b');
     engine2.feedByte('[');
@@ -5628,7 +5628,7 @@ test "replay: snapshot determinism across feed sequence variations" {
 
 test "replay: snapshot reflects mode changes" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -5652,7 +5652,7 @@ test "replay: snapshot reflects mode changes" {
 
 test "replay: snapshot includes active selection endpoints" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("0123456789");
@@ -5675,7 +5675,7 @@ test "replay: snapshot includes active selection endpoints" {
     }
 }
 
-test "replay: snapshot parity across direct pipeline and runtime" {
+test "replay: snapshot parity across direct pipeline" {
     const gpa = std.testing.allocator;
     const test_bytes = "ABC\x1b[1;5HXY";
 
@@ -5687,7 +5687,7 @@ test "replay: snapshot parity across direct pipeline and runtime" {
     pl.feedSlice(test_bytes);
     pl.applyToScreen(&screen);
 
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
     engine.feedSlice(test_bytes);
     engine.apply();
@@ -5710,7 +5710,7 @@ test "replay: snapshot parity across direct pipeline and runtime" {
 
 test "replay: snapshot wraparound history indices after eviction" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 3);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 2, 5, 3);
     defer engine.deinit();
 
     engine.feedSlice("A\r\nB\r\nC\r\nD\r\nE");
@@ -5738,9 +5738,9 @@ test "replay: snapshot wraparound history indices after eviction" {
     }
 }
 
-test "runtime stability: feed/apply/reset interleavings preserve frozen boundaries" {
+test "stability: feed/apply/reset interleavings preserve frozen boundaries" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC");
@@ -5766,9 +5766,9 @@ test "runtime stability: feed/apply/reset interleavings preserve frozen boundari
     try std.testing.expectEqual(snap3.cursor_col, snap4.cursor_col);
 }
 
-test "runtime stability: resetScreen clears cells without disrupting subsequent feed/apply" {
+test "stability: resetScreen clears cells without disrupting subsequent feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("BEFORE");
@@ -5790,9 +5790,9 @@ test "runtime stability: resetScreen clears cells without disrupting subsequent 
     try std.testing.expectEqual(@as(u16, 5), snap_after.cursor_col);
 }
 
-test "runtime stability: selection remains stable across feed/apply/reset cycles" {
+test "stability: selection remains stable across feed/apply/reset cycles" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("0123456789");
@@ -5826,9 +5826,9 @@ test "runtime stability: selection remains stable across feed/apply/reset cycles
     try std.testing.expectEqual(snap_sel.selection, snap_reset.selection);
 }
 
-test "runtime stability: history remains preserved across clear/reset cycles" {
+test "stability: history remains preserved across clear/reset cycles" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("A\r\nB\r\nC\r\nD");
@@ -5855,9 +5855,9 @@ test "runtime stability: history remains preserved across clear/reset cycles" {
     try std.testing.expectEqual(hist_before, snap_after_screen_reset.history_count);
 }
 
-test "runtime stability: encodeKey does not affect screen or queued events" {
+test "stability: encodeKey does not affect screen or queued events" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -5877,9 +5877,9 @@ test "runtime stability: encodeKey does not affect screen or queued events" {
     try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
 }
 
-test "runtime stability: encodeMouse interleaved with mutations shows zero side effects" {
+test "stability: encodeMouse interleaved with mutations shows zero side effects" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("INITIAL\r\nLINE2");
@@ -5935,9 +5935,9 @@ test "runtime stability: encodeMouse interleaved with mutations shows zero side 
     try std.testing.expectEqual(snap3.selection != null, snap4.selection != null);
 }
 
-test "runtime stability: queuedEventCount reflects feed only, not encode calls" {
+test "stability: queuedEventCount reflects feed only, not encode calls" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("A");
@@ -5966,9 +5966,9 @@ test "runtime stability: queuedEventCount reflects feed only, not encode calls" 
     try std.testing.expectEqual(@as(usize, 0), engine.queuedEventCount());
 }
 
-test "runtime stability: history read boundary remains stable across concurrent selection operations" {
+test "stability: history read boundary remains stable across concurrent selection operations" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("AAAAA\r\nBBBBB\r\nCCCCC\r\nDDDDD");
@@ -5992,9 +5992,9 @@ test "runtime stability: history read boundary remains stable across concurrent 
     try std.testing.expectEqual(hist_cap, engine.historyCapacity());
 }
 
-test "runtime stability: snapshot remains stable across mixed feed/encode/selection operations" {
+test "stability: snapshot remains stable across mixed feed/encode/selection operations" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
     defer engine.deinit();
 
     engine.feedSlice("LINE1\r\nLINE2");
@@ -6050,7 +6050,7 @@ const ConformanceCheckpoint = struct {
     selection: ?model_mod.TerminalSelection,
     queued_event_count: usize,
 
-    fn capture(_: std.mem.Allocator, engine: *const runtime_mod.Engine) !ConformanceCheckpoint {
+    fn capture(_: std.mem.Allocator, engine: *const mod.Engine) !ConformanceCheckpoint {
         const screen = engine.screen();
         const selection_state = engine.selectionState();
         var selection: ?model_mod.TerminalSelection = null;
@@ -6113,7 +6113,7 @@ const ConformanceCheckpoint = struct {
 
 test "conformance checkpoint: captures api-visible fields" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -6133,7 +6133,7 @@ test "conformance checkpoint: captures api-visible fields" {
 
 test "conformance checkpoint: determinism across repeated captures" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -6147,7 +6147,7 @@ test "conformance checkpoint: determinism across repeated captures" {
 
 test "conformance checkpoint: encode calls do not alter checkpoint state" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("DATA");
@@ -6177,7 +6177,7 @@ test "conformance checkpoint: encode calls do not alter checkpoint state" {
 
 test "conformance checkpoint: feed/apply boundaries are captured correctly" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     const cp_initial = try ConformanceCheckpoint.capture(gpa, &engine);
@@ -6194,7 +6194,7 @@ test "conformance checkpoint: feed/apply boundaries are captured correctly" {
 
 test "text baseline: ASCII writes and cursor progression" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("Hello");
@@ -6212,7 +6212,7 @@ test "text baseline: ASCII writes and cursor progression" {
 
 test "text baseline: CR/LF line wrapping" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 3, 5);
+    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
     defer engine.deinit();
 
     engine.feedSlice("12345\r\n");
@@ -6225,7 +6225,7 @@ test "text baseline: CR/LF line wrapping" {
 
 test "text baseline: UTF-8 mixed codepoints" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 20);
     defer engine.deinit();
 
     engine.feedSlice("Hello \xC3\xA9 \xE2\x82\xAC");
@@ -6237,7 +6237,7 @@ test "text baseline: UTF-8 mixed codepoints" {
 
 test "cursor baseline: CSI H cursor movement" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC");
@@ -6255,7 +6255,7 @@ test "cursor baseline: CSI H cursor movement" {
 
 test "cursor baseline: ED erase display" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 3, 5);
+    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
     defer engine.deinit();
 
     engine.feedSlice("12345\r\n67890\r\nABCDE");
@@ -6275,7 +6275,7 @@ test "cursor baseline: ED erase display" {
 
 test "mode baseline: DEC private mode ?25 cursor visibility" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -6299,7 +6299,7 @@ test "mode baseline: DEC private mode ?25 cursor visibility" {
 
 test "mode baseline: DEC private mode ?7 auto wrap" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 3, 5);
+    var engine = try mod.Engine.initWithCells(gpa, 3, 5);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -6317,7 +6317,7 @@ test "mode baseline: DEC private mode ?7 auto wrap" {
 
 test "history baseline: scroll-producing stream" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("L1\r\nL2\r\nL3\r\nL4");
@@ -6330,7 +6330,7 @@ test "history baseline: scroll-producing stream" {
 
 test "selection baseline: start/update/finish/clear" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("0123456789");
@@ -6357,7 +6357,7 @@ test "selection baseline: start/update/finish/clear" {
 
 test "reset baseline: clear does not change screen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEXT");
@@ -6376,7 +6376,7 @@ test "reset baseline: clear does not change screen" {
 
 test "reset baseline: reset preserves screen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("HELLO");
@@ -6395,7 +6395,7 @@ test "reset baseline: reset preserves screen" {
 
 test "reset baseline: resetScreen clears screen" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 3, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("DATA\r\nMORE");
@@ -6413,7 +6413,7 @@ test "reset baseline: resetScreen clears screen" {
 
 test "encode interleave: encodeKey mixed with feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("ABC");
@@ -6437,7 +6437,7 @@ test "encode interleave: encodeKey mixed with feed/apply" {
 
 test "encode interleave: encodeMouse with state checks" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 5, 10, 20);
     defer engine.deinit();
 
     engine.feedSlice("INITIAL");
@@ -6463,7 +6463,7 @@ test "encode interleave: encodeMouse with state checks" {
 
 test "snapshot stability: repeated captures across mixed operations" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 15);
     defer engine.deinit();
 
     engine.feedSlice("LINE1\r\nLINE2");
@@ -6504,7 +6504,7 @@ test "snapshot stability: repeated captures across mixed operations" {
 
 test "stress loop: burst feed/apply" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 10, 20);
+    var engine = try mod.Engine.initWithCells(gpa, 10, 20);
     defer engine.deinit();
 
     const bursts = 50;
@@ -6519,7 +6519,7 @@ test "stress loop: burst feed/apply" {
 
 test "stress loop: mixed reset boundary under load" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     var iteration: usize = 0;
@@ -6543,7 +6543,7 @@ test "stress loop: mixed reset boundary under load" {
 
 test "stress loop: selection and history drift" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 20);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 20);
     defer engine.deinit();
 
     var checkpoints: [10]ConformanceCheckpoint = undefined;
@@ -6569,7 +6569,7 @@ test "stress loop: selection and history drift" {
 
 test "stress loop: encode interleave" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     var iteration: usize = 0;
@@ -6598,7 +6598,7 @@ test "stress loop: encode interleave" {
 
 test "stress loop: snapshot drift" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     var snapshots: [8]model_mod.EngineSnapshot = undefined;
@@ -6627,7 +6627,7 @@ test "stress loop: snapshot drift" {
 
 test "stress loop: mode toggle assertions" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("TEST");
@@ -6659,7 +6659,7 @@ test "stress loop: mode toggle assertions" {
 
 test "drift detection: mixed selection and history operations" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 16);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 16);
     defer engine.deinit();
 
     var checkpoints: [12]ConformanceCheckpoint = undefined;
@@ -6690,7 +6690,7 @@ test "drift detection: mixed selection and history operations" {
 
 test "drift detection: encode operations preserve state invariants" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCells(gpa, 5, 10);
+    var engine = try mod.Engine.initWithCells(gpa, 5, 10);
     defer engine.deinit();
 
     engine.feedSlice("DATA");
@@ -6734,7 +6734,7 @@ test "drift detection: encode operations preserve state invariants" {
 
 test "drift detection: reset boundary invariants" {
     const gpa = std.testing.allocator;
-    var engine = try runtime_mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 12);
+    var engine = try mod.Engine.initWithCellsAndHistory(gpa, 4, 8, 12);
     defer engine.deinit();
 
     var checkpoints: [9]ConformanceCheckpoint = undefined;

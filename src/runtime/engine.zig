@@ -1,5 +1,5 @@
-//! Responsibility: provide host-neutral runtime facade over parser/pipeline/screen.
-//! Ownership: runtime interface boundary.
+//! Responsibility: provide host-neutral facade over parser/pipeline/screen.
+//! Ownership: interface boundary.
 //! Reason: compose feed/apply/state-access operations in one deterministic surface.
 
 const std = @import("std");
@@ -7,7 +7,7 @@ const pipeline_mod = @import("../event/pipeline.zig");
 const screen_mod = @import("../screen/state.zig");
 const model_mod = @import("../model.zig");
 
-/// Host-neutral terminal runtime facade.
+/// Host-neutral terminal facade.
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,

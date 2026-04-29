@@ -1,10 +1,10 @@
-//! Responsibility: track lightweight runtime metrics state.
+//! Responsibility: track lightweight metrics state.
 //! Ownership: model metrics primitive.
 //! Reason: provide bounded counters and rolling timing summaries.
 
 const std = @import("std");
 
-/// Runtime metrics accumulator.
+/// metrics accumulator.
 pub const Metrics = struct {
     frames: u64,
     redraws: u64,

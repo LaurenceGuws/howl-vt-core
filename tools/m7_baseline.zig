@@ -1,4 +1,4 @@
-//! Responsibility: run deterministic M7 runtime-mode baseline measurements.
+//! Responsibility: run deterministic M7 baseline measurements.
 //! Ownership: architect performance protocol tooling.
 //! Reason: provide reproducible local latency/throughput/allocation evidence.
 
@@ -197,7 +197,7 @@ fn runFeedApplyWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.runtime.Engine.initWithCellsAndHistory(
+        var engine = try terminal.Engine.initWithCellsAndHistory(
             counting.allocator(),
             rows,
             cols,
@@ -264,7 +264,7 @@ fn runMixedInteractiveWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.runtime.Engine.initWithCellsAndHistory(
+        var engine = try terminal.Engine.initWithCellsAndHistory(
             counting.allocator(),
             40,
             120,
@@ -335,7 +335,7 @@ fn runSnapshotWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.runtime.Engine.initWithCellsAndHistory(
+        var engine = try terminal.Engine.initWithCellsAndHistory(
             counting.allocator(),
             40,
             120,
@@ -410,7 +410,7 @@ fn runQueueGrowthChunkedWorkload(
     var i: usize = 0;
     while (i < runs) : (i += 1) {
         var counting = CountingAllocator.init(base_allocator);
-        var engine = try terminal.runtime.Engine.initWithCellsAndHistory(
+        var engine = try terminal.Engine.initWithCellsAndHistory(
             counting.allocator(),
             rows,
             cols,

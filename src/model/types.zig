@@ -1,6 +1,6 @@
 //! Responsibility: define model value types and constants.
 //! Ownership: model core data-shape authority.
-//! Reason: keep runtime/parser shared representations deterministic.
+//! Reason: keep parser shared representations deterministic.
 
 /// Cursor position value type.
 pub const CursorPos = struct {
