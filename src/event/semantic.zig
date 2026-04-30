@@ -6,7 +6,7 @@ const std = @import("std");
 const bridge_mod = @import("bridge.zig");
 
 /// Bridge event alias for semantic mapping.
-pub const Event = bridge_mod.Event;
+const Event = bridge_mod.Event;
 
 /// Screen-directed semantic event union.
 pub const SemanticEvent = union(enum) {

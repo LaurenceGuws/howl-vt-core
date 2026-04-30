@@ -6,7 +6,7 @@ const std = @import("std");
 const semantic_mod = @import("../event/semantic.zig");
 
 /// Semantic event alias for screen application.
-pub const SemanticEvent = semantic_mod.SemanticEvent;
+const SemanticEvent = semantic_mod.SemanticEvent;
 
 /// Screen state container for cursor/cell/history behavior.
 pub const ScreenState = struct {

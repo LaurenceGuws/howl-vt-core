@@ -3,16 +3,61 @@
 //! Reason: compose feed/apply/state-access operations in one deterministic surface.
 
 const std = @import("std");
-const pipeline_mod = @import("../event/pipeline.zig");
-const screen_mod = @import("../screen/state.zig");
-const model_mod = @import("../model.zig");
+const pipeline_mod = @import("event/pipeline.zig");
+const screen_mod = @import("screen/state.zig");
+const keymap = @import("input/keymap.zig");
+const mouse = @import("input/mouse.zig");
+const model_selection = @import("state/selection.zig");
+const model_snapshot = @import("state/snapshot.zig");
 
 /// Host-neutral terminal facade.
 pub const VtCore = struct {
+    pub const ControlSignal = enum {
+        hangup,
+        interrupt,
+        terminate,
+        resize_notify,
+    };
+
+    pub const Key = keymap.Key;
+    pub const Modifier = keymap.Modifier;
+
+    pub const mod_none: Modifier = keymap.VTERM_MOD_NONE;
+    pub const mod_shift: Modifier = keymap.VTERM_MOD_SHIFT;
+    pub const mod_alt: Modifier = keymap.VTERM_MOD_ALT;
+    pub const mod_ctrl: Modifier = keymap.VTERM_MOD_CTRL;
+
+    pub const key_enter: Key = keymap.VTERM_KEY_ENTER;
+    pub const key_tab: Key = keymap.VTERM_KEY_TAB;
+    pub const key_backspace: Key = keymap.VTERM_KEY_BACKSPACE;
+    pub const key_escape: Key = keymap.VTERM_KEY_ESCAPE;
+    pub const key_up: Key = keymap.VTERM_KEY_UP;
+    pub const key_down: Key = keymap.VTERM_KEY_DOWN;
+    pub const key_left: Key = keymap.VTERM_KEY_LEFT;
+    pub const key_right: Key = keymap.VTERM_KEY_RIGHT;
+    pub const key_insert: Key = keymap.VTERM_KEY_INS;
+    pub const key_delete: Key = keymap.VTERM_KEY_DEL;
+    pub const key_home: Key = keymap.VTERM_KEY_HOME;
+    pub const key_end: Key = keymap.VTERM_KEY_END;
+    pub const key_pageup: Key = keymap.VTERM_KEY_PAGEUP;
+    pub const key_pagedown: Key = keymap.VTERM_KEY_PAGEDOWN;
+    pub const key_f1: Key = keymap.VTERM_KEY_F1;
+    pub const key_f2: Key = keymap.VTERM_KEY_F2;
+    pub const key_f3: Key = keymap.VTERM_KEY_F3;
+    pub const key_f4: Key = keymap.VTERM_KEY_F4;
+    pub const key_f5: Key = keymap.VTERM_KEY_F5;
+    pub const key_f6: Key = keymap.VTERM_KEY_F6;
+    pub const key_f7: Key = keymap.VTERM_KEY_F7;
+    pub const key_f8: Key = keymap.VTERM_KEY_F8;
+    pub const key_f9: Key = keymap.VTERM_KEY_F9;
+    pub const key_f10: Key = keymap.VTERM_KEY_F10;
+    pub const key_f11: Key = keymap.VTERM_KEY_F11;
+    pub const key_f12: Key = keymap.VTERM_KEY_F12;
+
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,
     state: screen_mod.ScreenState,
-    selection: model_mod.SelectionState,
+    selection: model_selection.SelectionState,
     encode_buf: [64]u8 = undefined,
     encode_len: usize = 0,
 
@@ -25,7 +70,7 @@ pub const VtCore = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
-            .selection = model_mod.SelectionState.init(),
+            .selection = model_selection.SelectionState.init(),
         };
     }
 
@@ -39,7 +84,7 @@ pub const VtCore = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
-            .selection = model_mod.SelectionState.init(),
+            .selection = model_selection.SelectionState.init(),
         };
     }
 
@@ -53,7 +98,7 @@ pub const VtCore = struct {
             .allocator = allocator,
             .pipeline = pipeline,
             .state = state,
-            .selection = model_mod.SelectionState.init(),
+            .selection = model_selection.SelectionState.init(),
         };
     }
 
@@ -126,7 +171,7 @@ pub const VtCore = struct {
     }
 
     /// Return active selection snapshot or null.
-    pub fn selectionState(self: *const VtCore) ?model_mod.TerminalSelection {
+    pub fn selectionState(self: *const VtCore) ?model_selection.TerminalSelection {
         return self.selection.state();
     }
 
@@ -151,17 +196,17 @@ pub const VtCore = struct {
     }
 
     /// Encode logical key and modifiers.
-    pub fn encodeKey(self: *VtCore, key: model_mod.Key, mod: model_mod.Modifier) []const u8 {
+    pub fn encodeKey(self: *VtCore, key: keymap.Key, mod: keymap.Modifier) []const u8 {
         var len: usize = 0;
 
-        const shift_active = (mod & model_mod.VTERM_MOD_SHIFT) != 0;
+        const shift_active = (mod & keymap.VTERM_MOD_SHIFT) != 0;
 
         switch (key) {
-            model_mod.VTERM_KEY_ENTER => {
+            keymap.VTERM_KEY_ENTER => {
                 self.encode_buf[0] = '\r';
                 len = 1;
             },
-            model_mod.VTERM_KEY_TAB => {
+            keymap.VTERM_KEY_TAB => {
                 if (shift_active) {
                     self.encode_buf[0] = '\x1b';
                     self.encode_buf[1] = '[';
@@ -172,18 +217,18 @@ pub const VtCore = struct {
                     len = 1;
                 }
             },
-            model_mod.VTERM_KEY_BACKSPACE => {
+            keymap.VTERM_KEY_BACKSPACE => {
                 self.encode_buf[0] = '\x7f';
                 len = 1;
             },
-            model_mod.VTERM_KEY_ESCAPE => {
+            keymap.VTERM_KEY_ESCAPE => {
                 self.encode_buf[0] = '\x1b';
                 len = 1;
             },
-            model_mod.VTERM_KEY_UP => {
+            keymap.VTERM_KEY_UP => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -194,10 +239,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_DOWN => {
+            keymap.VTERM_KEY_DOWN => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -208,10 +253,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_RIGHT => {
+            keymap.VTERM_KEY_RIGHT => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -222,10 +267,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_LEFT => {
+            keymap.VTERM_KEY_LEFT => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -236,10 +281,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_HOME => {
+            keymap.VTERM_KEY_HOME => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -250,10 +295,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_END => {
+            keymap.VTERM_KEY_END => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -264,11 +309,11 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_INS => {
+            keymap.VTERM_KEY_INS => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '2';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
                     self.encode_buf[5] = '~';
@@ -278,11 +323,11 @@ pub const VtCore = struct {
                     len = 4;
                 }
             },
-            model_mod.VTERM_KEY_DEL => {
+            keymap.VTERM_KEY_DEL => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '3';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
                     self.encode_buf[5] = '~';
@@ -292,11 +337,11 @@ pub const VtCore = struct {
                     len = 4;
                 }
             },
-            model_mod.VTERM_KEY_PAGEUP => {
+            keymap.VTERM_KEY_PAGEUP => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '5';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
                     self.encode_buf[5] = '~';
@@ -306,11 +351,11 @@ pub const VtCore = struct {
                     len = 4;
                 }
             },
-            model_mod.VTERM_KEY_PAGEDOWN => {
+            keymap.VTERM_KEY_PAGEDOWN => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '6';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
                     self.encode_buf[5] = '~';
@@ -320,10 +365,10 @@ pub const VtCore = struct {
                     len = 4;
                 }
             },
-            model_mod.VTERM_KEY_F1 => {
+            keymap.VTERM_KEY_F1 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -334,10 +379,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_F2 => {
+            keymap.VTERM_KEY_F2 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -348,10 +393,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_F3 => {
+            keymap.VTERM_KEY_F3 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -362,10 +407,10 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_F4 => {
+            keymap.VTERM_KEY_F4 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[2] = '1';
                     self.encode_buf[3] = ';';
                     self.encode_buf[4] = '0' + (1 + mod);
@@ -376,12 +421,12 @@ pub const VtCore = struct {
                     len = 3;
                 }
             },
-            model_mod.VTERM_KEY_F5 => {
+            keymap.VTERM_KEY_F5 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '1';
                 self.encode_buf[3] = '5';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -391,12 +436,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F6 => {
+            keymap.VTERM_KEY_F6 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '1';
                 self.encode_buf[3] = '7';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -406,12 +451,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F7 => {
+            keymap.VTERM_KEY_F7 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '1';
                 self.encode_buf[3] = '8';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -421,12 +466,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F8 => {
+            keymap.VTERM_KEY_F8 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '1';
                 self.encode_buf[3] = '9';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -436,12 +481,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F9 => {
+            keymap.VTERM_KEY_F9 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '2';
                 self.encode_buf[3] = '0';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -451,12 +496,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F10 => {
+            keymap.VTERM_KEY_F10 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '2';
                 self.encode_buf[3] = '1';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -466,12 +511,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F11 => {
+            keymap.VTERM_KEY_F11 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '2';
                 self.encode_buf[3] = '3';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -481,12 +526,12 @@ pub const VtCore = struct {
                     len = 5;
                 }
             },
-            model_mod.VTERM_KEY_F12 => {
+            keymap.VTERM_KEY_F12 => {
                 self.encode_buf[0] = '\x1b';
                 self.encode_buf[1] = '[';
                 self.encode_buf[2] = '2';
                 self.encode_buf[3] = '4';
-                if (mod != model_mod.VTERM_MOD_NONE) {
+                if (mod != keymap.VTERM_MOD_NONE) {
                     self.encode_buf[4] = ';';
                     self.encode_buf[5] = '0' + (1 + mod);
                     self.encode_buf[6] = '~';
@@ -511,9 +556,53 @@ pub const VtCore = struct {
     }
 
     /// Encode mouse event payload (placeholder surface).
-    pub fn encodeMouse(self: *VtCore, event: model_mod.MouseEvent) []const u8 {
+    pub fn encodeMouse(self: *VtCore, event: mouse.MouseEvent) []const u8 {
         _ = event;
         return self.encode_buf[0..0];
+    }
+
+    pub fn parseKeyToken(name: []const u8) ?Key {
+        if (std.mem.eql(u8, name, "KEYCODE_ENTER")) return key_enter;
+        if (std.mem.eql(u8, name, "KEYCODE_TAB")) return key_tab;
+        if (std.mem.eql(u8, name, "KEYCODE_DEL")) return key_backspace;
+        if (std.mem.eql(u8, name, "KEYCODE_ESCAPE")) return key_escape;
+        if (std.mem.eql(u8, name, "KEYCODE_DPAD_UP")) return key_up;
+        if (std.mem.eql(u8, name, "KEYCODE_DPAD_DOWN")) return key_down;
+        if (std.mem.eql(u8, name, "KEYCODE_DPAD_LEFT")) return key_left;
+        if (std.mem.eql(u8, name, "KEYCODE_DPAD_RIGHT")) return key_right;
+        if (std.mem.eql(u8, name, "KEYCODE_INSERT")) return key_insert;
+        if (std.mem.eql(u8, name, "KEYCODE_FORWARD_DEL")) return key_delete;
+        if (std.mem.eql(u8, name, "KEYCODE_MOVE_HOME")) return key_home;
+        if (std.mem.eql(u8, name, "KEYCODE_MOVE_END")) return key_end;
+        if (std.mem.eql(u8, name, "KEYCODE_PAGE_UP")) return key_pageup;
+        if (std.mem.eql(u8, name, "KEYCODE_PAGE_DOWN")) return key_pagedown;
+        if (std.mem.eql(u8, name, "KEYCODE_F1")) return key_f1;
+        if (std.mem.eql(u8, name, "KEYCODE_F2")) return key_f2;
+        if (std.mem.eql(u8, name, "KEYCODE_F3")) return key_f3;
+        if (std.mem.eql(u8, name, "KEYCODE_F4")) return key_f4;
+        if (std.mem.eql(u8, name, "KEYCODE_F5")) return key_f5;
+        if (std.mem.eql(u8, name, "KEYCODE_F6")) return key_f6;
+        if (std.mem.eql(u8, name, "KEYCODE_F7")) return key_f7;
+        if (std.mem.eql(u8, name, "KEYCODE_F8")) return key_f8;
+        if (std.mem.eql(u8, name, "KEYCODE_F9")) return key_f9;
+        if (std.mem.eql(u8, name, "KEYCODE_F10")) return key_f10;
+        if (std.mem.eql(u8, name, "KEYCODE_F11")) return key_f11;
+        if (std.mem.eql(u8, name, "KEYCODE_F12")) return key_f12;
+        return null;
+    }
+
+    pub fn parseModifierBits(mods: i32) Modifier {
+        var out: Modifier = mod_none;
+        if ((mods & 0x01) != 0) out |= mod_ctrl;
+        if ((mods & 0x02) != 0) out |= mod_alt;
+        if ((mods & 0x04) != 0) out |= mod_shift;
+        return out;
+    }
+
+    pub fn parseControlToken(name: []const u8) ?ControlSignal {
+        if (std.mem.eql(u8, name, "interrupt")) return .interrupt;
+        if (std.mem.eql(u8, name, "terminate")) return .terminate;
+        return null;
     }
 
     /// Capture deterministic snapshot of vt_core observable state (SNAPSHOT_REPLAY api).
@@ -530,11 +619,156 @@ pub const VtCore = struct {
     /// call snapshot.deinit() to release them when done.
     ///
     /// Error: returns allocation error if owned buffer allocation fails.
-    pub fn snapshot(self: *const VtCore) !model_mod.VtCoreSnapshot {
-        return model_mod.snapshot.VtCoreSnapshot.captureFromScreen(
+    pub fn snapshot(self: *const VtCore) !model_snapshot.VtCoreSnapshot {
+        return model_snapshot.VtCoreSnapshot.captureFromScreen(
             self.allocator,
             &self.state,
             self.selection.state(),
         );
     }
 };
+
+test "VtCore facade methods remain available" {
+    try std.testing.expect(@hasDecl(VtCore, "init"));
+    try std.testing.expect(@hasDecl(VtCore, "initWithCells"));
+    try std.testing.expect(@hasDecl(VtCore, "deinit"));
+    try std.testing.expect(@hasDecl(VtCore, "feedByte"));
+    try std.testing.expect(@hasDecl(VtCore, "feedSlice"));
+    try std.testing.expect(@hasDecl(VtCore, "apply"));
+    try std.testing.expect(@hasDecl(VtCore, "clear"));
+    try std.testing.expect(@hasDecl(VtCore, "reset"));
+    try std.testing.expect(@hasDecl(VtCore, "resetScreen"));
+    try std.testing.expect(@hasDecl(VtCore, "screen"));
+    try std.testing.expect(@hasDecl(VtCore, "queuedEventCount"));
+}
+
+test "VtCore method signatures remain host-facing" {
+    const Allocator = std.mem.Allocator;
+    const ScreenState = screen_mod.ScreenState;
+    const init_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.init;
+    const init_cells_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.initWithCells;
+    const deinit_fn: fn (*VtCore) void = VtCore.deinit;
+    const feed_byte_fn: fn (*VtCore, u8) void = VtCore.feedByte;
+    const feed_slice_fn: fn (*VtCore, []const u8) void = VtCore.feedSlice;
+    const apply_fn: fn (*VtCore) void = VtCore.apply;
+    const clear_fn: fn (*VtCore) void = VtCore.clear;
+    const reset_fn: fn (*VtCore) void = VtCore.reset;
+    const reset_screen_fn: fn (*VtCore) void = VtCore.resetScreen;
+    const screen_fn: fn (*const VtCore) *const ScreenState = VtCore.screen;
+    const queue_fn: fn (*const VtCore) usize = VtCore.queuedEventCount;
+    _ = .{ init_fn, init_cells_fn, deinit_fn, feed_byte_fn, feed_slice_fn, apply_fn, clear_fn, reset_fn, reset_screen_fn, screen_fn, queue_fn };
+}
+
+test "const-read history and selection accessors stay stable" {
+    const history_row_fn: fn (*const VtCore, u16, u16) u21 = VtCore.historyRowAt;
+    const history_count_fn: fn (*const VtCore) u16 = VtCore.historyCount;
+    const history_capacity_fn: fn (*const VtCore) u16 = VtCore.historyCapacity;
+    const selection_state_fn: fn (*const VtCore) ?model_selection.TerminalSelection = VtCore.selectionState;
+    _ = .{ history_row_fn, history_count_fn, history_capacity_fn, selection_state_fn };
+}
+
+test "lifecycle extension methods stay stable" {
+    const init_cells_history_fn: fn (std.mem.Allocator, u16, u16, u16) anyerror!VtCore = VtCore.initWithCellsAndHistory;
+    const selection_start_fn: fn (*VtCore, i32, u16) void = VtCore.selectionStart;
+    const selection_update_fn: fn (*VtCore, i32, u16) void = VtCore.selectionUpdate;
+    const selection_finish_fn: fn (*VtCore) void = VtCore.selectionFinish;
+    const selection_clear_fn: fn (*VtCore) void = VtCore.selectionClear;
+    _ = .{ init_cells_history_fn, selection_start_fn, selection_update_fn, selection_finish_fn, selection_clear_fn };
+}
+
+test "snapshot surface remains deterministic" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 5, 10);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
+
+    var snap1 = try vt_core.snapshot();
+    defer snap1.deinit();
+
+    var snap2 = try vt_core.snapshot();
+    defer snap2.deinit();
+
+    try std.testing.expectEqual(snap1.rows, snap2.rows);
+    try std.testing.expectEqual(snap1.cols, snap2.cols);
+    try std.testing.expectEqual(snap1.cursor_row, snap2.cursor_row);
+    try std.testing.expectEqual(snap1.cursor_col, snap2.cursor_col);
+}
+
+test "encodeKey and encodeMouse methods are callable" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 5, 10);
+    defer vt_core.deinit();
+
+    const encode_key_fn: fn (*VtCore, keymap.Key, keymap.Modifier) []const u8 = VtCore.encodeKey;
+    const encode_mouse_fn: fn (*VtCore, mouse.MouseEvent) []const u8 = VtCore.encodeMouse;
+    _ = .{ encode_key_fn, encode_mouse_fn };
+
+    vt_core.feedSlice("TEST");
+    vt_core.apply();
+
+    var snap_before = try vt_core.snapshot();
+    defer snap_before.deinit();
+
+    _ = vt_core.encodeKey('A', 0);
+    _ = vt_core.encodeKey('B', 0);
+
+    var snap_after = try vt_core.snapshot();
+    defer snap_after.deinit();
+
+    try std.testing.expectEqual(snap_before.cursor_row, snap_after.cursor_row);
+    try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
+    try std.testing.expectEqual(snap_before.history_count, snap_after.history_count);
+    try std.testing.expectEqual(snap_before.selection, snap_after.selection);
+}
+
+test "encodeMouse returns empty output and does not mutate state" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 5, 10);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("HELLO");
+    vt_core.apply();
+
+    var snap_before = try vt_core.snapshot();
+    defer snap_before.deinit();
+
+    const mouse_event = mouse.MouseEvent{
+        .kind = .press,
+        .button = .left,
+        .row = 2,
+        .col = 3,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 1,
+    };
+
+    const output = vt_core.encodeMouse(mouse_event);
+    try std.testing.expectEqual(@as(usize, 0), output.len);
+    try std.testing.expectEqualSlices(u8, "", output);
+
+    var snap_after = try vt_core.snapshot();
+    defer snap_after.deinit();
+
+    try std.testing.expectEqual(snap_before.cursor_row, snap_after.cursor_row);
+    try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
+    try std.testing.expectEqual(snap_before.selection, snap_after.selection);
+    try std.testing.expectEqual(snap_before.history_count, snap_after.history_count);
+}
+
+test "VtCore exposes key and modifier constants" {
+    _ = VtCore.mod_none;
+    _ = VtCore.mod_shift;
+    _ = VtCore.mod_alt;
+    _ = VtCore.mod_ctrl;
+    _ = VtCore.key_enter;
+    _ = VtCore.key_tab;
+    _ = VtCore.key_backspace;
+    _ = VtCore.key_escape;
+    _ = VtCore.key_up;
+    _ = VtCore.key_down;
+    _ = VtCore.key_left;
+    _ = VtCore.key_right;
+}
