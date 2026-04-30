@@ -4,6 +4,7 @@
 
 const keymap = @import("keymap.zig");
 
+/// Mouse button vocabulary.
 pub const MouseButton = enum(u8) {
     none = 0,
     left = 1,
@@ -13,6 +14,7 @@ pub const MouseButton = enum(u8) {
     wheel_down = 5,
 };
 
+/// Mouse event kind vocabulary.
 pub const MouseEventKind = enum(u8) {
     press,
     release,
@@ -20,6 +22,7 @@ pub const MouseEventKind = enum(u8) {
     wheel,
 };
 
+/// Host mouse event payload.
 pub const MouseEvent = struct {
     kind: MouseEventKind,
     button: MouseButton,

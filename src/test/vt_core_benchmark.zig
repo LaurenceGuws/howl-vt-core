@@ -493,6 +493,7 @@ fn printResult(result: WorkloadResult) void {
     std.debug.print("---\n", .{});
 }
 
+/// Benchmark entrypoint.
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
     const runs: usize = 10;

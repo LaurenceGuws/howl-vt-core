@@ -12,6 +12,7 @@ const model_snapshot = @import("state/snapshot.zig");
 
 /// Host-neutral terminal facade.
 pub const VtCore = struct {
+    /// Host control signals routed to transport/runtime owner.
     pub const ControlSignal = enum {
         hangup,
         interrupt,
@@ -19,39 +20,71 @@ pub const VtCore = struct {
         resize_notify,
     };
 
+    /// Key type alias exported by vt-core facade.
     pub const Key = keymap.Key;
+    /// Modifier type alias exported by vt-core facade.
     pub const Modifier = keymap.Modifier;
 
+    /// No modifiers set.
     pub const mod_none: Modifier = keymap.VTERM_MOD_NONE;
+    /// Shift modifier bit.
     pub const mod_shift: Modifier = keymap.VTERM_MOD_SHIFT;
+    /// Alt modifier bit.
     pub const mod_alt: Modifier = keymap.VTERM_MOD_ALT;
+    /// Control modifier bit.
     pub const mod_ctrl: Modifier = keymap.VTERM_MOD_CTRL;
 
+    /// Enter key alias.
     pub const key_enter: Key = keymap.VTERM_KEY_ENTER;
+    /// Tab key alias.
     pub const key_tab: Key = keymap.VTERM_KEY_TAB;
+    /// Backspace key alias.
     pub const key_backspace: Key = keymap.VTERM_KEY_BACKSPACE;
+    /// Escape key alias.
     pub const key_escape: Key = keymap.VTERM_KEY_ESCAPE;
+    /// Arrow up key alias.
     pub const key_up: Key = keymap.VTERM_KEY_UP;
+    /// Arrow down key alias.
     pub const key_down: Key = keymap.VTERM_KEY_DOWN;
+    /// Arrow left key alias.
     pub const key_left: Key = keymap.VTERM_KEY_LEFT;
+    /// Arrow right key alias.
     pub const key_right: Key = keymap.VTERM_KEY_RIGHT;
+    /// Insert key alias.
     pub const key_insert: Key = keymap.VTERM_KEY_INS;
+    /// Delete key alias.
     pub const key_delete: Key = keymap.VTERM_KEY_DEL;
+    /// Home key alias.
     pub const key_home: Key = keymap.VTERM_KEY_HOME;
+    /// End key alias.
     pub const key_end: Key = keymap.VTERM_KEY_END;
+    /// Page-up key alias.
     pub const key_pageup: Key = keymap.VTERM_KEY_PAGEUP;
+    /// Page-down key alias.
     pub const key_pagedown: Key = keymap.VTERM_KEY_PAGEDOWN;
+    /// F1 key alias.
     pub const key_f1: Key = keymap.VTERM_KEY_F1;
+    /// F2 key alias.
     pub const key_f2: Key = keymap.VTERM_KEY_F2;
+    /// F3 key alias.
     pub const key_f3: Key = keymap.VTERM_KEY_F3;
+    /// F4 key alias.
     pub const key_f4: Key = keymap.VTERM_KEY_F4;
+    /// F5 key alias.
     pub const key_f5: Key = keymap.VTERM_KEY_F5;
+    /// F6 key alias.
     pub const key_f6: Key = keymap.VTERM_KEY_F6;
+    /// F7 key alias.
     pub const key_f7: Key = keymap.VTERM_KEY_F7;
+    /// F8 key alias.
     pub const key_f8: Key = keymap.VTERM_KEY_F8;
+    /// F9 key alias.
     pub const key_f9: Key = keymap.VTERM_KEY_F9;
+    /// F10 key alias.
     pub const key_f10: Key = keymap.VTERM_KEY_F10;
+    /// F11 key alias.
     pub const key_f11: Key = keymap.VTERM_KEY_F11;
+    /// F12 key alias.
     pub const key_f12: Key = keymap.VTERM_KEY_F12;
 
     allocator: std.mem.Allocator,
@@ -561,6 +594,7 @@ pub const VtCore = struct {
         return self.encode_buf[0..0];
     }
 
+    /// Parse host key token into vt-core key constant.
     pub fn parseKeyToken(name: []const u8) ?Key {
         if (std.mem.eql(u8, name, "KEYCODE_ENTER")) return key_enter;
         if (std.mem.eql(u8, name, "KEYCODE_TAB")) return key_tab;
@@ -591,6 +625,7 @@ pub const VtCore = struct {
         return null;
     }
 
+    /// Parse host modifier bitfield into vt-core modifier mask.
     pub fn parseModifierBits(mods: i32) Modifier {
         var out: Modifier = mod_none;
         if ((mods & 0x01) != 0) out |= mod_ctrl;
@@ -599,6 +634,7 @@ pub const VtCore = struct {
         return out;
     }
 
+    /// Parse host control token into control signal.
     pub fn parseControlToken(name: []const u8) ?ControlSignal {
         if (std.mem.eql(u8, name, "interrupt")) return .interrupt;
         if (std.mem.eql(u8, name, "terminate")) return .terminate;
