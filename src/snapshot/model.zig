@@ -65,7 +65,7 @@ pub const VtCoreSnapshot = struct {
 
     /// Capture snapshot from vt_core observable state; allocates owned buffers (SNAPSHOT_REPLAY api).
     ///
-    /// This method extracts the observable state from a ScreenState and optional
+    /// This method extracts the observable state from a GridModel and optional
     /// selection state, allocating owned copies of cell and history buffers.
     ///
     /// Determinism: identical screen and selection state produce identical snapshots.
@@ -150,7 +150,7 @@ pub const VtCoreSnapshot = struct {
     /// History Selection coordinate model), history_idx=1 is next older, etc.
     ///
     /// Respects circular buffer wraparound via history_write_idx, matching
-    /// ScreenState semantics exactly. Returns 0 if history_idx >= history_count,
+    /// GridModel semantics exactly. Returns 0 if history_idx >= history_count,
     /// col >= cols, or history not configured.
     ///
     /// Determinism: identical history buffer and indices produce identical results.

@@ -316,7 +316,7 @@ pub const GridModel = struct {
         if (old_history_wraps) |buf| allocator.free(buf);
     }
 
-    fn resizeWithReflow(self: *ScreenState, allocator: std.mem.Allocator, rows: u16, cols: u16) !void {
+    fn resizeWithReflow(self: *GridModel, allocator: std.mem.Allocator, rows: u16, cols: u16) !void {
         const old_cells = self.cells;
         const old_row_wraps = self.row_wraps;
         const old_history = self.history;
@@ -540,7 +540,7 @@ pub const GridModel = struct {
     }
 
     fn appendSourceRowToLogicalLines(
-        self: *const ScreenState,
+        self: *const GridModel,
         allocator: std.mem.Allocator,
         logical_lines: *std.ArrayListUnmanaged(LogicalLine),
         current_line: *LogicalLine,
@@ -576,7 +576,7 @@ pub const GridModel = struct {
         }
     }
 
-    fn sourceRowContentLen(self: *const ScreenState, row_index: u16, is_history: bool, cols: u16, include_cursor: bool) u16 {
+    fn sourceRowContentLen(self: *const GridModel, row_index: u16, is_history: bool, cols: u16, include_cursor: bool) u16 {
         var last_non_zero: u16 = 0;
         var has_content = false;
         var col: u16 = 0;
@@ -598,7 +598,7 @@ pub const GridModel = struct {
         return len;
     }
 
-    fn cursorOffsetInRow(self: *const ScreenState, cols: u16) usize {
+    fn cursorOffsetInRow(self: *const GridModel, cols: u16) usize {
         if (cols == 0) return 0;
         if (self.wrap_pending and self.cursor_col == cols - 1) {
             return cols;
@@ -613,7 +613,7 @@ pub const GridModel = struct {
     }
 
     /// Reset visible screen state to defaults.
-    pub fn reset(self: *ScreenState) void {
+    pub fn reset(self: *GridModel) void {
         self.cursor_row = 0;
         self.cursor_col = 0;
         self.wrap_pending = false;
@@ -625,7 +625,7 @@ pub const GridModel = struct {
     }
 
     /// Read visible cell value by row and column.
-    pub fn cellAt(self: *const ScreenState, row: u16, col: u16) u21 {
+    pub fn cellAt(self: *const GridModel, row: u16, col: u16) u21 {
         const c = self.cells orelse return 0;
         if (row >= self.rows or col >= self.cols) return 0;
         const start = self.rowStart(row);
@@ -633,7 +633,7 @@ pub const GridModel = struct {
     }
 
     /// Read history cell by recency index and column.
-    pub fn historyRowAt(self: *const ScreenState, history_idx: u16, col: u16) u21 {
+    pub fn historyRowAt(self: *const GridModel, history_idx: u16, col: u16) u21 {
         const h = self.history orelse return 0;
         if (history_idx >= self.history_count or col >= self.cols) return 0;
         const slot = self.historySlotForRecency(history_idx) orelse return 0;
@@ -641,17 +641,17 @@ pub const GridModel = struct {
     }
 
     /// Return retained history row count.
-    pub fn historyCount(self: *const ScreenState) u16 {
+    pub fn historyCount(self: *const GridModel) u16 {
         return self.history_count;
     }
 
     /// Return configured history capacity.
-    pub fn historyCapacity(self: *const ScreenState) u16 {
+    pub fn historyCapacity(self: *const GridModel) u16 {
         return self.history_capacity;
     }
 
     /// Report whether selection endpoint should be invalidated.
-    pub fn shouldInvalidateSelectionEndpoint(self: *const ScreenState, endpoint_row: i32) bool {
+    pub fn shouldInvalidateSelectionEndpoint(self: *const GridModel, endpoint_row: i32) bool {
         if (self.history == null or self.history_count < self.history_capacity) {
             return false;
         }
@@ -662,7 +662,7 @@ pub const GridModel = struct {
     }
 
     /// Apply one semantic event to screen state.
-    pub fn apply(self: *ScreenState, event: SemanticEvent) void {
+    pub fn apply(self: *GridModel, event: SemanticEvent) void {
         switch (event) {
             .cursor_up => |n| {
                 self.wrap_pending = false;
@@ -751,7 +751,7 @@ pub const GridModel = struct {
         }
     }
 
-    fn eraseDisplay(self: *ScreenState, mode: u2) void {
+    fn eraseDisplay(self: *GridModel, mode: u2) void {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         switch (mode) {
@@ -781,7 +781,7 @@ pub const GridModel = struct {
         }
     }
 
-    fn eraseLine(self: *ScreenState, mode: u2) void {
+    fn eraseLine(self: *GridModel, mode: u2) void {
         _ = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         switch (mode) {
@@ -795,7 +795,7 @@ pub const GridModel = struct {
         }
     }
 
-    fn writeCell(self: *ScreenState, cp: u21) void {
+    fn writeCell(self: *GridModel, cp: u21) void {
         if (self.cols == 0 or self.rows == 0) return;
         if (self.wrap_pending) {
             self.wrap_pending = false;
@@ -816,13 +816,13 @@ pub const GridModel = struct {
         }
     }
 
-    fn horizontalTabForward(self: *ScreenState, count: u16) void {
+    fn horizontalTabForward(self: *GridModel, count: u16) void {
         if (self.cols == 0) return;
         const stop = (@as(usize, self.cursor_col / 8) + @as(usize, count)) * 8;
         self.cursor_col = @intCast(@min(stop, @as(usize, self.cols - 1)));
     }
 
-    fn horizontalTabBack(self: *ScreenState, count: u16) void {
+    fn horizontalTabBack(self: *GridModel, count: u16) void {
         var remaining = count;
         while (remaining > 0) : (remaining -= 1) {
             if (self.cursor_col == 0) break;
@@ -831,7 +831,7 @@ pub const GridModel = struct {
         }
     }
 
-    fn lineFeed(self: *ScreenState) void {
+    fn lineFeed(self: *GridModel) void {
         if (self.rows == 0) return;
         if (self.cursor_row < self.rows - 1) {
             self.cursor_row += 1;
@@ -840,7 +840,7 @@ pub const GridModel = struct {
         self.scrollUp();
     }
 
-    fn scrollUp(self: *ScreenState) void {
+    fn scrollUp(self: *GridModel) void {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
         const row_len = @as(usize, self.cols);
@@ -863,47 +863,46 @@ pub const GridModel = struct {
         self.setRowWrapped(self.rows - 1, false);
     }
 
-    fn rowStart(self: *const ScreenState, logical_row: u16) usize {
+    fn rowStart(self: *const GridModel, logical_row: u16) usize {
         const physical_row = (@as(usize, self.row_origin) + @as(usize, logical_row)) % @as(usize, self.rows);
         return physical_row * @as(usize, self.cols);
     }
 
-    fn rowWrapIndex(self: *const ScreenState, logical_row: u16) ?usize {
+    fn rowWrapIndex(self: *const GridModel, logical_row: u16) ?usize {
         _ = self.row_wraps orelse return null;
         if (self.rows == 0 or logical_row >= self.rows) return null;
         return (@as(usize, self.row_origin) + @as(usize, logical_row)) % @as(usize, self.rows);
     }
 
-    fn rowWrapped(self: *const ScreenState, logical_row: u16) bool {
+    fn rowWrapped(self: *const GridModel, logical_row: u16) bool {
         const wraps = self.row_wraps orelse return false;
         const idx = self.rowWrapIndex(logical_row) orelse return false;
         return wraps[idx];
     }
 
-    fn setRowWrapped(self: *ScreenState, logical_row: u16, wrapped: bool) void {
+    fn setRowWrapped(self: *GridModel, logical_row: u16, wrapped: bool) void {
         const wraps = self.row_wraps orelse return;
         const idx = self.rowWrapIndex(logical_row) orelse return;
         wraps[idx] = wrapped;
     }
 
-    fn historySlotForRecency(self: *const ScreenState, history_idx: u16) ?usize {
+    fn historySlotForRecency(self: *const GridModel, history_idx: u16) ?usize {
         if (history_idx >= self.history_count or self.history_capacity == 0) return null;
         const cap = @as(usize, self.history_capacity);
         const newest_slot = (@as(usize, self.history_write_idx) + cap - 1) % cap;
         return (newest_slot + cap - @as(usize, history_idx)) % cap;
     }
 
-    fn historyRowWrapped(self: *const ScreenState, history_idx: u16) bool {
+    fn historyRowWrapped(self: *const GridModel, history_idx: u16) bool {
         const wraps = self.history_wraps orelse return false;
         const slot = self.historySlotForRecency(history_idx) orelse return false;
         return wraps[slot];
     }
 
-    fn clearRowRange(self: *ScreenState, row: u16, start_col: u16, end_col_exclusive: u16) void {
+    fn clearRowRange(self: *GridModel, row: u16, start_col: u16, end_col_exclusive: u16) void {
         const c = self.cells orelse return;
         const start = self.rowStart(row);
         @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], 0);
     }
 };
 
-pub const ScreenState = GridModel;

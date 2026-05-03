@@ -165,7 +165,7 @@ pub const VtCore = struct {
         self.pipeline.feedSlice(bytes);
     }
 
-    /// Apply queued events to screen state.
+    /// Apply queued events to the grid model.
     pub fn apply(self: *VtCore) void {
         self.pipeline.applyToScreen(&self.state);
         if (self.selection.selection.active) {
@@ -187,7 +187,7 @@ pub const VtCore = struct {
         self.pipeline.reset();
     }
 
-    /// Reset visible screen state only.
+    /// Reset visible grid state only.
     pub fn resetScreen(self: *VtCore) void {
         self.state.reset();
     }
@@ -204,7 +204,7 @@ pub const VtCore = struct {
         }
     }
 
-    /// Return read-only screen state reference.
+    /// Return read-only grid model reference.
     pub fn screen(self: *const VtCore) *const grid_mod.GridModel {
         return &self.state;
     }
