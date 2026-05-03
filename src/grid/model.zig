@@ -1,9 +1,9 @@
-//! Responsibility: hold screen cursor/cell/history state and apply semantics.
-//! Ownership: screen state authority.
-//! Reason: centralize deterministic screen mutations behind semantic events.
+//! Responsibility: hold grid cursor/cell/history state and apply semantics.
+//! Ownership: terminal grid model authority.
+//! Reason: centralize deterministic grid mutations behind semantic operations.
 
 const std = @import("std");
-const semantic_mod = @import("../event/semantic.zig");
+const semantic_mod = @import("../interpret/semantic.zig");
 
 /// Semantic event alias for screen application.
 const SemanticEvent = semantic_mod.SemanticEvent;
@@ -19,8 +19,8 @@ const RewrappedRow = struct {
     wrapped: bool,
 };
 
-/// Screen state container for cursor/cell/history behavior.
-pub const ScreenState = struct {
+/// Terminal grid model for cursor/cell/history behavior.
+pub const GridModel = struct {
     rows: u16,
     cols: u16,
     cursor_row: u16,
@@ -38,7 +38,7 @@ pub const ScreenState = struct {
     history_write_idx: u16,
 
     /// Initialize cursor-only screen state.
-    pub fn init(rows: u16, cols: u16) ScreenState {
+    pub fn init(rows: u16, cols: u16) GridModel {
         return .{
             .rows = rows,
             .cols = cols,
@@ -59,7 +59,7 @@ pub const ScreenState = struct {
     }
 
     /// Initialize screen with owned cell storage.
-    pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !ScreenState {
+    pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !GridModel {
         const size = @as(usize, rows) * @as(usize, cols);
         const cells: ?[]u21 = if (size > 0) blk: {
             const buf = try allocator.alloc(u21, size);
@@ -92,7 +92,7 @@ pub const ScreenState = struct {
     }
 
     /// Initialize screen with cells and history storage.
-    pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !ScreenState {
+    pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !GridModel {
         const size = @as(usize, rows) * @as(usize, cols);
         const cells: ?[]u21 = if (size > 0) blk: {
             const buf = try allocator.alloc(u21, size);
@@ -138,7 +138,7 @@ pub const ScreenState = struct {
     }
 
     /// Release owned cell and history buffers.
-    pub fn deinit(self: *ScreenState, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *GridModel, allocator: std.mem.Allocator) void {
         if (self.cells) |c| allocator.free(c);
         self.cells = null;
         if (self.row_wraps) |buf| allocator.free(buf);
@@ -150,7 +150,7 @@ pub const ScreenState = struct {
     }
 
     /// Resize visible grid while preserving retained history rows.
-    pub fn resize(self: *ScreenState, allocator: std.mem.Allocator, rows: u16, cols: u16) !void {
+    pub fn resize(self: *GridModel, allocator: std.mem.Allocator, rows: u16, cols: u16) !void {
         if (cols != self.cols) {
             try self.resizeWithReflow(allocator, rows, cols);
             return;
@@ -905,3 +905,5 @@ pub const ScreenState = struct {
         @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], 0);
     }
 };
+
+pub const ScreenState = GridModel;

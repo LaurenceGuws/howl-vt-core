@@ -1,5 +1,5 @@
-//! Responsibility: collect parser callbacks into owned event records.
-//! Ownership: parser-event boundary between parser and semantic layers.
+//! Responsibility: collect parser callbacks into owned interpreted records.
+//! Ownership: parser-to-interpret boundary.
 //! Reason: isolate parser sink mechanics from downstream processing.
 
 const std = @import("std");
@@ -217,4 +217,3 @@ test "bridge: maps OSC to title_set event" {
     try std.testing.expect(bridge.events.items[0] == .title_set);
     try std.testing.expectEqualSlices(u8, "My Window", bridge.events.items[0].title_set);
 }
-

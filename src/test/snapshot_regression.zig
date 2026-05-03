@@ -1,6 +1,6 @@
-//! Responsibility: snapshot capture/replay determinism tests.
-//! Ownership: snapshot api behavioral verification.
-//! Reason: keep production snapshot module focused on runtime API.
+//! Responsibility: deterministic regression coverage for snapshot capture parity.
+//! Ownership: snapshot api correctness tests.
+//! Reason: lock capture, replay, history, and selection parity behind stable fixtures.
 
 const std = @import("std");
 const vt_mod = @import("../vt_core.zig");
@@ -174,4 +174,3 @@ test "snapshot: parity with direct screen state" {
     try std.testing.expectEqual(screen.cursor_visible, snap.cursor_visible);
     try std.testing.expectEqual(screen.auto_wrap, snap.auto_wrap);
 }
-

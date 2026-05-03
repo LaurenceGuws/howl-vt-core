@@ -1,10 +1,10 @@
-//! Responsibility: semantic mapping unit tests.
-//! Ownership: parser-event to semantic-event verification.
-//! Reason: keep production semantic mapper lean.
+//! Responsibility: mapping coverage from bridge events to semantic events.
+//! Ownership: parser-to-semantic translation correctness tests.
+//! Reason: make translation defaults, aliases, and private modes explicit.
 
 const std = @import("std");
-const semantic_mod = @import("../event/semantic.zig");
-const bridge_mod = @import("../event/bridge.zig");
+const semantic_mod = @import("../interpret/semantic.zig");
+const bridge_mod = @import("../interpret/bridge.zig");
 
 const Event = bridge_mod.Event;
 const SemanticEvent = semantic_mod.SemanticEvent;

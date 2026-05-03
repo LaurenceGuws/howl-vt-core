@@ -1,6 +1,6 @@
-//! Responsibility: define screen model value types and defaults.
-//! Ownership: screen-state data shape authority.
-//! Reason: keep visible cell/cursor/color schema near screen state.
+//! Responsibility: define terminal grid value types and defaults.
+//! Ownership: grid data shape authority.
+//! Reason: keep visible cell/cursor/color schema near the grid model.
 
 const selection_mod = @import("../state/selection.zig");
 

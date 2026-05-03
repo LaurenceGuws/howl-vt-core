@@ -1,6 +1,6 @@
-//! Responsibility: map parser/bridge events into semantic screen operations.
-//! Ownership: semantic translation layer.
-//! Reason: separate escape parsing from screen behavior intent.
+//! Responsibility: map parsed records into semantic grid operations.
+//! Ownership: interpret translation layer.
+//! Reason: separate escape parsing from grid behavior intent.
 
 const std = @import("std");
 const bridge_mod = @import("bridge.zig");
@@ -116,4 +116,3 @@ fn paramOrDefault1(v: i32) u16 {
     if (v > std.math.maxInt(u16)) return std.math.maxInt(u16);
     return @intCast(v);
 }
-

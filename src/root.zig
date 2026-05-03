@@ -6,9 +6,10 @@
 pub const VtCore = @import("vt_core.zig").VtCore;
 
 test {
-    _ = @import("test/pipeline.zig");
-    _ = @import("test/screen_state.zig");
-    _ = @import("test/semantic.zig");
-    _ = @import("test/snapshot.zig");
-    _ = @import("test/vt_core.zig");
+    _ = @import("test/pipeline_regression.zig");
+    _ = @import("test/scrollback_regression.zig");
+    _ = @import("test/screen_state_behavior.zig");
+    _ = @import("test/semantic_mapping.zig");
+    _ = @import("test/snapshot_regression.zig");
+    _ = @import("test/system_flows.zig");
 }

@@ -1,10 +1,10 @@
-//! Responsibility: pipeline replay and edge-case conformance tests.
-//! Ownership: vt-core event pipeline behavioral verification.
-//! Reason: keep heavy test coverage out of production pipeline module.
+//! Responsibility: deterministic regression coverage for pipeline replay semantics.
+//! Ownership: vt-core event pipeline correctness tests.
+//! Reason: guard parser and replay edge cases with replayable, build-gated coverage.
 
 const std = @import("std");
-const pipeline_mod = @import("../event/pipeline.zig");
-const screen_mod = @import("../screen/state.zig");
+const pipeline_mod = @import("../interpret/pipeline.zig");
+const screen_mod = @import("../grid/model.zig");
 const vt_mod = @import("../vt_core.zig");
 
 const Pipeline = pipeline_mod.Pipeline;

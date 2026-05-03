@@ -1,12 +1,12 @@
 //! Responsibility: orchestrate feed, queue, and apply flow.
-//! Ownership: event pipeline control surface.
+//! Ownership: interpret pipeline control surface.
 //! Reason: provide deterministic parser-to-screen event progression.
 
 const std = @import("std");
 const parser_mod = @import("../parser/parser.zig");
 const bridge_mod = @import("bridge.zig");
 const semantic_mod = @import("semantic.zig");
-const screen_mod = @import("../screen/state.zig");
+const grid_mod = @import("../grid/model.zig");
 const vt_mod = @import("../vt_core.zig");
 
 /// Pipeline event alias.
@@ -74,7 +74,7 @@ pub const Pipeline = struct {
     }
 
     /// Apply queued events to screen.
-    pub fn applyToScreen(self: *Pipeline, screen: *screen_mod.ScreenState) void {
+    pub fn applyToScreen(self: *Pipeline, screen: *grid_mod.GridModel) void {
         for (self.bridge.events.items) |ev| {
             if (semantic_mod.process(ev)) |sem_ev| {
                 screen.apply(sem_ev);
@@ -84,8 +84,7 @@ pub const Pipeline = struct {
     }
 };
 
-fn feed(pl: *Pipeline, screen: *screen_mod.ScreenState, bytes: []const u8) void {
+fn feed(pl: *Pipeline, screen: *grid_mod.GridModel, bytes: []const u8) void {
     pl.feedSlice(bytes);
     pl.applyToScreen(screen);
 }
-

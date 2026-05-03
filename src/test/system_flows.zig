@@ -1,6 +1,6 @@
-//! Responsibility: end-to-end vt-core system behavior tests.
-//! Ownership: cross-module test boundary.
-//! Reason: keep external test surface focused on system flows.
+//! Responsibility: end-to-end vt-core flow coverage across module boundaries.
+//! Ownership: top-level system integration tests.
+//! Reason: keep host-facing byte-to-screen flows explicit and deterministic.
 
 const std = @import("std");
 const vt = @import("../vt_core.zig");

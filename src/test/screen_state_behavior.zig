@@ -1,22 +1,23 @@
-//! Responsibility: screen state behavior and edge-case tests.
-//! Ownership: screen mutation conformance verification.
-//! Reason: keep production screen module free from test bulk.
+//! Responsibility: behavioral conformance coverage for screen state mutations.
+//! Ownership: screen state correctness tests.
+//! Reason: keep cursor, wrap, erase, and cell semantics explicit and build-gated.
 
 const std = @import("std");
-const screen_mod = @import("../screen/state.zig");
-const semantic_mod = @import("../event/semantic.zig");
+const grid_mod = @import("../grid/model.zig");
+const semantic_mod = @import("../interpret/semantic.zig");
 
-const ScreenState = screen_mod.ScreenState;
+const GridModel = grid_mod.GridModel;
+const ScreenState = GridModel;
 const SemanticEvent = semantic_mod.SemanticEvent;
 test "screen: initial cursor at origin" {
-    const s = ScreenState.init(24, 80);
+    const s = GridModel.init(24, 80);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_col);
 }
 
 test "screen: reset clears cursor wrap and cells" {
     const gpa = std.testing.allocator;
-    var s = try ScreenState.initWithCells(gpa, 2, 5);
+    var s = try GridModel.initWithCells(gpa, 2, 5);
     defer s.deinit(gpa);
     s.apply(SemanticEvent{ .write_text = "abcdef" });
     try std.testing.expectEqual(@as(u21, 'a'), s.cellAt(0, 0));
@@ -29,7 +30,7 @@ test "screen: reset clears cursor wrap and cells" {
 }
 
 test "screen: cursor_visible mode toggles without moving cursor" {
-    var s = ScreenState.init(2, 5);
+    var s = GridModel.init(2, 5);
     s.cursor_row = 1;
     s.cursor_col = 3;
     s.apply(SemanticEvent{ .cursor_visible = false });
@@ -43,7 +44,7 @@ test "screen: cursor_visible mode toggles without moving cursor" {
 }
 
 test "screen: auto_wrap mode toggles and does not move cursor" {
-    var s = ScreenState.init(2, 5);
+    var s = GridModel.init(2, 5);
     s.cursor_row = 1;
     s.cursor_col = 4;
     s.apply(SemanticEvent{ .auto_wrap = false });
@@ -57,7 +58,7 @@ test "screen: auto_wrap mode toggles and does not move cursor" {
 }
 
 test "screen: cursor_up moves row" {
-    var s = ScreenState.init(24, 80);
+    var s = GridModel.init(24, 80);
     s.cursor_row = 5;
     s.apply(SemanticEvent{ .cursor_up = 3 });
     try std.testing.expectEqual(@as(u16, 2), s.cursor_row);

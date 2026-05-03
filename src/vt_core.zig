@@ -3,8 +3,8 @@
 //! Reason: compose feed/apply/state-access operations in one deterministic surface.
 
 const std = @import("std");
-const pipeline_mod = @import("event/pipeline.zig");
-const screen_mod = @import("screen/state.zig");
+const pipeline_mod = @import("interpret/pipeline.zig");
+const grid_mod = @import("grid/model.zig");
 const keymap = @import("input/keymap.zig");
 const mouse = @import("input/mouse.zig");
 const model_selection = @import("state/selection.zig");
@@ -94,7 +94,7 @@ pub const VtCore = struct {
         cursor_row: u16,
         cursor_col: u16,
         cursor_visible: bool,
-        screen: *const screen_mod.ScreenState,
+        screen: *const grid_mod.GridModel,
 
         pub fn cellAt(self: RenderView, row: u16, col: u16) u21 {
             return self.screen.cellAt(row, col);
@@ -103,7 +103,7 @@ pub const VtCore = struct {
 
     allocator: std.mem.Allocator,
     pipeline: pipeline_mod.Pipeline,
-    state: screen_mod.ScreenState,
+    state: grid_mod.GridModel,
     selection: model_selection.SelectionState,
     encode_buf: [64]u8 = undefined,
     encode_len: usize = 0,
@@ -112,7 +112,7 @@ pub const VtCore = struct {
     pub fn init(allocator: std.mem.Allocator, rows: u16, cols: u16) !VtCore {
         var pipeline = try pipeline_mod.Pipeline.init(allocator);
         errdefer pipeline.deinit();
-        const state = screen_mod.ScreenState.init(rows, cols);
+        const state = grid_mod.GridModel.init(rows, cols);
         return VtCore{
             .allocator = allocator,
             .pipeline = pipeline,
@@ -125,7 +125,7 @@ pub const VtCore = struct {
     pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !VtCore {
         var pipeline = try pipeline_mod.Pipeline.init(allocator);
         errdefer pipeline.deinit();
-        var state = try screen_mod.ScreenState.initWithCells(allocator, rows, cols);
+        var state = try grid_mod.GridModel.initWithCells(allocator, rows, cols);
         errdefer state.deinit(allocator);
         return VtCore{
             .allocator = allocator,
@@ -139,7 +139,7 @@ pub const VtCore = struct {
     pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !VtCore {
         var pipeline = try pipeline_mod.Pipeline.init(allocator);
         errdefer pipeline.deinit();
-        var state = try screen_mod.ScreenState.initWithCellsAndHistory(allocator, rows, cols, history_capacity);
+        var state = try grid_mod.GridModel.initWithCellsAndHistory(allocator, rows, cols, history_capacity);
         errdefer state.deinit(allocator);
         return VtCore{
             .allocator = allocator,
@@ -205,7 +205,7 @@ pub const VtCore = struct {
     }
 
     /// Return read-only screen state reference.
-    pub fn screen(self: *const VtCore) *const screen_mod.ScreenState {
+    pub fn screen(self: *const VtCore) *const grid_mod.GridModel {
         return &self.state;
     }
 
@@ -719,7 +719,7 @@ test "VtCore facade methods remain available" {
 
 test "VtCore method signatures remain host-facing" {
     const Allocator = std.mem.Allocator;
-    const ScreenState = screen_mod.ScreenState;
+    const GridModel = grid_mod.GridModel;
     const init_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.init;
     const init_cells_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.initWithCells;
     const deinit_fn: fn (*VtCore) void = VtCore.deinit;
@@ -730,7 +730,7 @@ test "VtCore method signatures remain host-facing" {
     const reset_fn: fn (*VtCore) void = VtCore.reset;
     const reset_screen_fn: fn (*VtCore) void = VtCore.resetScreen;
     const resize_fn: fn (*VtCore, u16, u16) anyerror!void = VtCore.resize;
-    const screen_fn: fn (*const VtCore) *const ScreenState = VtCore.screen;
+    const screen_fn: fn (*const VtCore) *const GridModel = VtCore.screen;
     const queue_fn: fn (*const VtCore) usize = VtCore.queuedEventCount;
     _ = .{ init_fn, init_cells_fn, deinit_fn, feed_byte_fn, feed_slice_fn, apply_fn, clear_fn, reset_fn, reset_screen_fn, resize_fn, screen_fn, queue_fn };
 }

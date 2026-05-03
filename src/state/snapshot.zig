@@ -9,7 +9,7 @@
 
 const std = @import("std");
 const selection_mod = @import("selection.zig");
-const screen_mod = @import("../screen/state.zig");
+const grid_mod = @import("../grid/model.zig");
 const vt_mod = @import("../vt_core.zig");
 
 /// Deterministic snapshot of vt_core observable state (SNAPSHOT_REPLAY api).
@@ -75,7 +75,7 @@ pub const VtCoreSnapshot = struct {
     /// Memory: allocated cells and history buffers are owned by the returned snapshot.
     /// Caller must call snapshot.deinit() to release them. If allocation fails,
     /// the error is returned and no partial allocation is left outstanding.
-    pub fn captureFromScreen(allocator: std.mem.Allocator, screen: *const screen_mod.ScreenState, selection: ?selection_mod.TerminalSelection) !VtCoreSnapshot {
+    pub fn captureFromScreen(allocator: std.mem.Allocator, screen: *const grid_mod.GridModel, selection: ?selection_mod.TerminalSelection) !VtCoreSnapshot {
         var snapshot = VtCoreSnapshot{
             .allocator = allocator,
             .rows = screen.rows,
@@ -164,4 +164,3 @@ pub const VtCoreSnapshot = struct {
         return h[logical_slot * @as(usize, self.cols) + @as(usize, col)];
     }
 };
-
