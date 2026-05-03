@@ -1,5 +1,5 @@
 //! Responsibility: capture and represent vt_core observable state snapshots.
-//! Ownership: snapshot api authority.
+//! Ownership: snapshot model authority.
 //! Reason: provide host-neutral read-only snapshots for replay and diagnostic access.
 //!
 //! VtCoreSnapshot is a deterministic, read-only capture of vt_core observable state
@@ -8,7 +8,7 @@
 //! cross-version guarantees.
 
 const std = @import("std");
-const selection_mod = @import("selection.zig");
+const selection_mod = @import("../selection/model.zig");
 const grid_mod = @import("../grid/model.zig");
 const vt_mod = @import("../vt_core.zig");
 

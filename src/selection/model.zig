@@ -1,5 +1,5 @@
 //! Responsibility: implement selection state and lifecycle transitions.
-//! Ownership: model selection primitive.
+//! Ownership: selection model authority.
 //! Reason: keep selection behavior explicit and host-independent.
 
 const std = @import("std");
@@ -160,4 +160,3 @@ test "selection: finish stops selecting but keeps active" {
     try std.testing.expect(state.active);
     try std.testing.expect(!state.selecting);
 }
-

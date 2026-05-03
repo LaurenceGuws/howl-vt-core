@@ -2,7 +2,7 @@
 //! Ownership: grid data shape authority.
 //! Reason: keep visible cell/cursor/color schema near the grid model.
 
-const selection_mod = @import("../state/selection.zig");
+const selection_mod = @import("../selection/model.zig");
 
 const CursorPos = struct {
     row: usize,

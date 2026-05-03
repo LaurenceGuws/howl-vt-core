@@ -7,8 +7,8 @@ const pipeline_mod = @import("interpret/pipeline.zig");
 const grid_mod = @import("grid/model.zig");
 const keymap = @import("input/keymap.zig");
 const mouse = @import("input/mouse.zig");
-const model_selection = @import("state/selection.zig");
-const model_snapshot = @import("state/snapshot.zig");
+const model_selection = @import("selection/model.zig");
+const model_snapshot = @import("snapshot/model.zig");
 
 /// Host-neutral terminal facade.
 pub const VtCore = struct {
