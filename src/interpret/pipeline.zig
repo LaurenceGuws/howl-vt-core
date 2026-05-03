@@ -3,11 +3,13 @@
 //! Reason: provide deterministic parser-to-screen event progression.
 
 const std = @import("std");
-const parser_mod = @import("../parser/parser.zig");
+const grid_owner = @import("../grid.zig");
+const parser_owner = @import("../parser.zig");
 const bridge_mod = @import("bridge.zig");
 const semantic_mod = @import("semantic.zig");
-const grid_mod = @import("../grid/model.zig");
-const vt_mod = @import("../vt_core.zig");
+
+const Grid = grid_owner.Grid;
+const ParserApi = parser_owner.ParserApi;
 
 /// Pipeline event alias.
 const Event = bridge_mod.Event;
@@ -16,7 +18,7 @@ const Event = bridge_mod.Event;
 pub const Pipeline = struct {
     allocator: std.mem.Allocator,
     bridge: *bridge_mod.Bridge,
-    parser: parser_mod.Parser,
+    parser: ParserApi.Parser,
 
     /// Initialize pipeline resources.
     pub fn init(allocator: std.mem.Allocator) !Pipeline {
@@ -26,7 +28,7 @@ pub const Pipeline = struct {
             bridge.deinit();
             allocator.destroy(bridge);
         }
-        const p = try parser_mod.Parser.init(allocator, bridge.toSink());
+        const p = try ParserApi.Parser.init(allocator, bridge.toSink());
         return .{ .allocator = allocator, .bridge = bridge, .parser = p };
     }
 
@@ -74,7 +76,7 @@ pub const Pipeline = struct {
     }
 
     /// Apply queued events to screen.
-    pub fn applyToScreen(self: *Pipeline, screen: *grid_mod.GridModel) void {
+    pub fn applyToScreen(self: *Pipeline, screen: *Grid.GridModel) void {
         for (self.bridge.events.items) |ev| {
             if (semantic_mod.process(ev)) |sem_ev| {
                 screen.apply(sem_ev);
@@ -84,7 +86,7 @@ pub const Pipeline = struct {
     }
 };
 
-fn feed(pl: *Pipeline, screen: *grid_mod.GridModel, bytes: []const u8) void {
+fn feed(pl: *Pipeline, screen: *Grid.GridModel, bytes: []const u8) void {
     pl.feedSlice(bytes);
     pl.applyToScreen(screen);
 }

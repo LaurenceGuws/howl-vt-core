@@ -12,6 +12,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    mod.addImport("vt_core", mod);
     const fuzz_scrollback_mod = b.createModule(.{
         .root_source_file = b.path("fuzz/scrollback.zig"),
         .target = target,

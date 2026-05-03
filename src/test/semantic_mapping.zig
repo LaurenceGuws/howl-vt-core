@@ -3,12 +3,12 @@
 //! Reason: make translation defaults, aliases, and private modes explicit.
 
 const std = @import("std");
-const semantic_mod = @import("../interpret/semantic.zig");
-const bridge_mod = @import("../interpret/bridge.zig");
+const interpret_owner = @import("../interpret.zig");
 
-const Event = bridge_mod.Event;
-const SemanticEvent = semantic_mod.SemanticEvent;
-const process = semantic_mod.process;
+const Interpret = interpret_owner.Interpret;
+const Event = Interpret.Event;
+const SemanticEvent = Interpret.SemanticEvent;
+const process = Interpret.process;
 fn makeStyleChange(final: u8, p0: i32, p1: i32, count: u8) Event {
     var params = [_]i32{0} ** 16;
     params[0] = p0;

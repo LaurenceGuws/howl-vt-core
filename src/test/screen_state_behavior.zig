@@ -1,13 +1,13 @@
-//! Responsibility: behavioral conformance coverage for screen state mutations.
-//! Ownership: screen state correctness tests.
+//! Responsibility: behavioral conformance coverage for grid model mutations.
+//! Ownership: grid model correctness tests.
 //! Reason: keep cursor, wrap, erase, and cell semantics explicit and build-gated.
 
 const std = @import("std");
-const grid_mod = @import("../grid/model.zig");
-const semantic_mod = @import("../interpret/semantic.zig");
+const grid_owner = @import("../grid.zig");
+const interpret_owner = @import("../interpret.zig");
 
-const GridModel = grid_mod.GridModel;
-const SemanticEvent = semantic_mod.SemanticEvent;
+const GridModel = grid_owner.Grid.GridModel;
+const SemanticEvent = interpret_owner.Interpret.SemanticEvent;
 test "screen: initial cursor at origin" {
     const s = GridModel.init(24, 80);
     try std.testing.expectEqual(@as(u16, 0), s.cursor_row);

@@ -3,9 +3,9 @@
 //! Reason: isolate parser sink mechanics from downstream processing.
 
 const std = @import("std");
-const parser_mod = @import("../parser/parser.zig");
-const stream_mod = @import("../parser/stream.zig");
-const csi_mod = @import("../parser/csi.zig");
+const parser_owner = @import("../parser.zig");
+
+const ParserApi = parser_owner.ParserApi;
 
 /// Parser-facing bridge event union.
 pub const Event = union(enum) {
@@ -18,7 +18,7 @@ pub const Event = union(enum) {
         param_count: u8,
         leader: u8,
         private: bool,
-        intermediates: [csi_mod.max_intermediates]u8,
+        intermediates: [ParserApi.max_intermediates]u8,
         intermediates_len: u8,
     },
     title_set: []const u8,
@@ -71,7 +71,7 @@ pub const Bridge = struct {
     }
 
     /// Build parser sink bound to this bridge.
-    pub fn toSink(self: *Bridge) parser_mod.Sink {
+    pub fn toSink(self: *Bridge) ParserApi.Sink {
         return .{
             .ptr = self,
             .onStreamEventFn = onStreamEvent,
@@ -84,7 +84,7 @@ pub const Bridge = struct {
         };
     }
 
-    fn onStreamEvent(ptr: *anyopaque, event: stream_mod.StreamEvent) void {
+    fn onStreamEvent(ptr: *anyopaque, event: ParserApi.StreamEvent) void {
         const self: *Bridge = @ptrCast(@alignCast(ptr));
         const ce = switch (event) {
             .codepoint => |cp| Event{ .codepoint = cp },
@@ -111,7 +111,7 @@ pub const Bridge = struct {
         self.events.append(self.allocator, Event{ .text = owned }) catch {};
     }
 
-    fn onCsi(ptr: *anyopaque, action: csi_mod.CsiAction) void {
+    fn onCsi(ptr: *anyopaque, action: ParserApi.CsiAction) void {
         const self: *Bridge = @ptrCast(@alignCast(ptr));
         self.events.append(self.allocator, Event{
             .style_change = .{
@@ -126,7 +126,7 @@ pub const Bridge = struct {
         }) catch {};
     }
 
-    fn onOsc(ptr: *anyopaque, data: []const u8, term: parser_mod.OscTerminator) void {
+    fn onOsc(ptr: *anyopaque, data: []const u8, term: ParserApi.OscTerminator) void {
         const self: *Bridge = @ptrCast(@alignCast(ptr));
         _ = term;
         const owned = self.arena.allocator().dupe(u8, data) catch return;
@@ -143,7 +143,7 @@ test "bridge: maps ASCII text to text event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleSlice("hello");
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
@@ -155,7 +155,7 @@ test "bridge: maps UTF-8 codepoint to codepoint event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleSlice("\xC3\xA9");
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
@@ -167,7 +167,7 @@ test "bridge: maps control byte to control event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleByte(0x07);
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
@@ -179,7 +179,7 @@ test "bridge: maps CSI sequence to style_change event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleSlice("\x1b[31m");
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
@@ -192,7 +192,7 @@ test "bridge: preserves CSI leader private and intermediates" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleSlice("\x1b[?25h\x1b[!p");
     try std.testing.expectEqual(@as(usize, 2), bridge.events.items.len);
@@ -210,7 +210,7 @@ test "bridge: maps OSC to title_set event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
-    var parser = try parser_mod.Parser.init(gpa, bridge.toSink());
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
     parser.handleSlice("\x1b]My Window\x07");
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);

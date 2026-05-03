@@ -3,16 +3,18 @@
 //! Reason: provide host-neutral read-only snapshots for replay and diagnostic access.
 //!
 //! VtCoreSnapshot is a deterministic, read-only capture of vt_core observable state
-//! at a point in time, aligned to SNAPSHOT_REPLAY api requirements.
+//! at a point in time, aligned to the snapshot replay contract.
 //! Snapshots are host-neutral data structures without persistence format or
 //! cross-version guarantees.
 
 const std = @import("std");
-const selection_mod = @import("../selection/model.zig");
-const grid_mod = @import("../grid/model.zig");
-const vt_mod = @import("../vt_core.zig");
+const selection_owner = @import("../selection.zig");
+const grid_owner = @import("../grid.zig");
 
-/// Deterministic snapshot of vt_core observable state (SNAPSHOT_REPLAY api).
+const Selection = selection_owner.Selection;
+const Grid = grid_owner.Grid;
+
+/// Deterministic snapshot of vt_core observable state.
 ///
 /// Captures visible screen cells, cursor position, modes, history buffer, and
 /// selection state. Does NOT capture parser state, queued events, or encode buffers.
@@ -61,9 +63,9 @@ pub const VtCoreSnapshot = struct {
     history_write_idx: u16,
 
     /// Active selection state snapshot (null if inactive).
-    selection: ?selection_mod.TerminalSelection,
+    selection: ?Selection.TerminalSelection,
 
-    /// Capture snapshot from vt_core observable state; allocates owned buffers (SNAPSHOT_REPLAY api).
+    /// Capture snapshot from vt_core observable state; allocates owned buffers.
     ///
     /// This method extracts the observable state from a GridModel and optional
     /// selection state, allocating owned copies of cell and history buffers.
@@ -75,7 +77,7 @@ pub const VtCoreSnapshot = struct {
     /// Memory: allocated cells and history buffers are owned by the returned snapshot.
     /// Caller must call snapshot.deinit() to release them. If allocation fails,
     /// the error is returned and no partial allocation is left outstanding.
-    pub fn captureFromScreen(allocator: std.mem.Allocator, screen: *const grid_mod.GridModel, selection: ?selection_mod.TerminalSelection) !VtCoreSnapshot {
+    pub fn captureFromScreen(allocator: std.mem.Allocator, screen: *const Grid.GridModel, selection: ?Selection.TerminalSelection) !VtCoreSnapshot {
         var snapshot = VtCoreSnapshot{
             .allocator = allocator,
             .rows = screen.rows,

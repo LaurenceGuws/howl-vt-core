@@ -1,9 +1,9 @@
 //! Responsibility: deterministic regression coverage for snapshot capture parity.
-//! Ownership: snapshot api correctness tests.
+//! Ownership: snapshot contract correctness tests.
 //! Reason: lock capture, replay, history, and selection parity behind stable fixtures.
 
 const std = @import("std");
-const vt_mod = @import("../vt_core.zig");
+const vt_mod = @import("vt_core");
 test "snapshot: capture from simple text" {
     const gpa = std.testing.allocator;
     var vt_core = try vt_mod.VtCore.initWithCells(gpa, 5, 10);
@@ -155,7 +155,7 @@ test "snapshot: selection state is included" {
     }
 }
 
-test "snapshot: parity with direct screen state" {
+test "snapshot: parity with direct grid model" {
     const gpa = std.testing.allocator;
     var vt_core = try vt_mod.VtCore.initWithCells(gpa, 5, 10);
     defer vt_core.deinit();

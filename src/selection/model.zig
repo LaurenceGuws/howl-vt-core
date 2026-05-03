@@ -3,6 +3,9 @@
 //! Reason: keep selection behavior explicit and host-independent.
 
 const std = @import("std");
+const grid_owner = @import("../grid.zig");
+
+const Grid = grid_owner.Grid;
 
 /// Selection endpoint coordinate.
 pub const SelectionPos = struct {
@@ -58,6 +61,16 @@ pub const SelectionState = struct {
     pub fn finish(self: *SelectionState) void {
         if (!self.selection.active) return;
         self.selection.selecting = false;
+    }
+
+    /// Clear the selection when grid changes invalidate either endpoint.
+    pub fn clearIfInvalidatedByGrid(self: *SelectionState, grid: *const Grid.GridModel) void {
+        if (!self.selection.active) return;
+        if (grid.shouldInvalidateSelectionEndpoint(self.selection.start.row) or
+            grid.shouldInvalidateSelectionEndpoint(self.selection.end.row))
+        {
+            self.clear();
+        }
     }
 
     /// Return active selection snapshot or null.

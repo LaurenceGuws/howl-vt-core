@@ -3,10 +3,10 @@
 //! Reason: centralize deterministic grid mutations behind semantic operations.
 
 const std = @import("std");
-const semantic_mod = @import("../interpret/semantic.zig");
+const interpret_owner = @import("../interpret.zig");
 
-/// Semantic event alias for screen application.
-const SemanticEvent = semantic_mod.SemanticEvent;
+/// Semantic event alias for grid application.
+const SemanticEvent = interpret_owner.Interpret.SemanticEvent;
 
 const LogicalLine = struct {
     cells: std.ArrayListUnmanaged(u21) = .empty,
@@ -37,7 +37,7 @@ pub const GridModel = struct {
     history_count: u16,
     history_write_idx: u16,
 
-    /// Initialize cursor-only screen state.
+    /// Initialize cursor-only grid state.
     pub fn init(rows: u16, cols: u16) GridModel {
         return .{
             .rows = rows,
@@ -612,7 +612,7 @@ pub const GridModel = struct {
         if (count.* < capacity) count.* += 1;
     }
 
-    /// Reset visible screen state to defaults.
+    /// Reset visible grid state to defaults.
     pub fn reset(self: *GridModel) void {
         self.cursor_row = 0;
         self.cursor_col = 0;
@@ -661,7 +661,7 @@ pub const GridModel = struct {
         return false;
     }
 
-    /// Apply one semantic event to screen state.
+    /// Apply one semantic event to grid state.
     pub fn apply(self: *GridModel, event: SemanticEvent) void {
         switch (event) {
             .cursor_up => |n| {
@@ -905,4 +905,3 @@ pub const GridModel = struct {
         @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], 0);
     }
 };
-

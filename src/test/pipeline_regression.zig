@@ -3,13 +3,15 @@
 //! Reason: guard parser and replay edge cases with replayable, build-gated coverage.
 
 const std = @import("std");
-const pipeline_mod = @import("../interpret/pipeline.zig");
-const grid_mod = @import("../grid/model.zig");
-const vt_mod = @import("../vt_core.zig");
+const grid_owner = @import("../grid.zig");
+const interpret_owner = @import("../interpret.zig");
+const vt_mod = @import("vt_core");
 
-const Pipeline = pipeline_mod.Pipeline;
+const Grid = grid_owner.Grid;
+const Interpret = interpret_owner.Interpret;
+const Pipeline = Interpret.Pipeline;
 
-fn feed(pl: *Pipeline, screen: *grid_mod.GridModel, bytes: []const u8) void {
+fn feed(pl: *Pipeline, screen: *Grid.GridModel, bytes: []const u8) void {
     pl.feedSlice(bytes);
     pl.applyToScreen(screen);
 }
@@ -64,7 +66,7 @@ test "replay: pipeline clear drops pending bridge events before apply" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 8);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 8);
     defer screen.deinit(gpa);
     pl.feedSlice("dropped");
     try std.testing.expect(pl.len() > 0);
@@ -79,7 +81,7 @@ test "replay: pipeline reset clears queued events and partial CSI" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 12, 40);
+    var screen = try Grid.GridModel.initWithCells(gpa, 12, 40);
     defer screen.deinit(gpa);
     screen.cursor_row = 10;
     screen.cursor_col = 0;
@@ -99,7 +101,7 @@ test "replay: pipeline clear preserves partial CHT parser state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     pl.feedSlice("abc");
     pl.applyToScreen(&screen);
@@ -118,7 +120,7 @@ test "replay: pipeline clear preserves partial CBT parser state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     pl.feedSlice("a\x1b[2I");
     pl.applyToScreen(&screen);
@@ -137,7 +139,7 @@ test "replay: pipeline reset drops partial CHT parser state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     pl.feedSlice("\x1b[2");
     pl.reset();
@@ -153,7 +155,7 @@ test "replay: pipeline reset drops partial CBT parser state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     pl.feedSlice("a\x1b[2I");
     pl.applyToScreen(&screen);
@@ -171,7 +173,7 @@ test "replay: applyToScreen drains bridge once repeat apply is no-op" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 8);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 8);
     defer screen.deinit(gpa);
     pl.feedSlice("\x1b[4C");
     pl.applyToScreen(&screen);
@@ -189,7 +191,7 @@ test "replay: CUU moves cursor up" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 10;
     feed(&pl, &screen, "\x1b[3A");
     try std.testing.expectEqual(@as(u16, 7), screen.cursor_row);
@@ -199,7 +201,7 @@ test "replay: CUD moves cursor down" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 5;
     feed(&pl, &screen, "\x1b[4B");
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_row);
@@ -209,7 +211,7 @@ test "replay: CUF moves cursor forward" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[5C");
     try std.testing.expectEqual(@as(u16, 15), screen.cursor_col);
@@ -219,7 +221,7 @@ test "replay: CUB moves cursor back" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 20;
     feed(&pl, &screen, "\x1b[6D");
     try std.testing.expectEqual(@as(u16, 14), screen.cursor_col);
@@ -229,7 +231,7 @@ test "replay: CUD alias 'e' moves cursor down" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 5;
     feed(&pl, &screen, "\x1b[4e");
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_row);
@@ -239,7 +241,7 @@ test "replay: CUD alias 'e' zero param defaults to 1" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 5;
     feed(&pl, &screen, "\x1b[e");
     try std.testing.expectEqual(@as(u16, 6), screen.cursor_row);
@@ -249,7 +251,7 @@ test "replay: CUF alias 'a' moves cursor forward" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[5a");
     try std.testing.expectEqual(@as(u16, 15), screen.cursor_col);
@@ -259,7 +261,7 @@ test "replay: CUF alias 'a' zero param defaults to 1" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[a");
     try std.testing.expectEqual(@as(u16, 11), screen.cursor_col);
@@ -269,7 +271,7 @@ test "replay: CHA alias backtick moves cursor to absolute column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[7`");
     try std.testing.expectEqual(@as(u16, 6), screen.cursor_col);
@@ -279,7 +281,7 @@ test "replay: CHA alias backtick zero param defaults to column 0" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[`");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
@@ -289,7 +291,7 @@ test "replay: CUD alias 'e' clamps at last row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(5, 20);
+    var screen = Grid.GridModel.init(5, 20);
     screen.cursor_row = 2;
     feed(&pl, &screen, "\x1b[999e");
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
@@ -299,7 +301,7 @@ test "replay: CUF alias 'a' clamps at last column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(10, 5);
+    var screen = Grid.GridModel.init(10, 5);
     feed(&pl, &screen, "\x1b[999a");
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_col);
 }
@@ -308,7 +310,7 @@ test "replay: CHA alias backtick clamps at last column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(5, 20);
+    var screen = Grid.GridModel.init(5, 20);
     feed(&pl, &screen, "\x1b[999`");
     try std.testing.expectEqual(@as(u16, 19), screen.cursor_col);
 }
@@ -317,7 +319,7 @@ test "replay: CNL moves cursor down and resets column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 5;
     screen.cursor_col = 20;
     feed(&pl, &screen, "\x1b[3E");
@@ -329,7 +331,7 @@ test "replay: CPL moves cursor up and resets column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 8;
     screen.cursor_col = 20;
     feed(&pl, &screen, "\x1b[3F");
@@ -341,7 +343,7 @@ test "replay: split CNL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[7");
@@ -358,7 +360,7 @@ test "replay: split CNL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[!p");
@@ -374,7 +376,7 @@ test "replay: split CPL interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[7");
@@ -391,7 +393,7 @@ test "replay: split CPL after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[!p");
@@ -407,7 +409,7 @@ test "replay: CHA moves cursor to absolute column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 6;
     screen.cursor_col = 12;
     feed(&pl, &screen, "\x1b[5G");
@@ -419,7 +421,7 @@ test "replay: VPA moves cursor to absolute row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 12;
     screen.cursor_col = 9;
     feed(&pl, &screen, "\x1b[7d");
@@ -431,7 +433,7 @@ test "replay: VPA default param moves cursor to row zero" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 12;
     screen.cursor_col = 9;
     feed(&pl, &screen, "\x1b[d");
@@ -443,7 +445,7 @@ test "replay: VPA clamps at last row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(5, 20);
+    var screen = Grid.GridModel.init(5, 20);
     feed(&pl, &screen, "\x1b[999d");
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
@@ -453,7 +455,7 @@ test "replay: split VPA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[7");
@@ -471,7 +473,7 @@ test "replay: split VPA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 10, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 10, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[!p");
@@ -487,7 +489,7 @@ test "replay: CHA default param moves cursor to column zero" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 4;
     screen.cursor_col = 33;
     feed(&pl, &screen, "\x1b[G");
@@ -499,7 +501,7 @@ test "replay: CHA clamps at last column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(2, 20);
+    var screen = Grid.GridModel.init(2, 20);
     feed(&pl, &screen, "\x1b[999G");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 19), screen.cursor_col);
@@ -509,7 +511,7 @@ test "replay: split CHA interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[7");
@@ -526,7 +528,7 @@ test "replay: split CHA after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     pl.feedSlice("\x1b[!p");
@@ -541,7 +543,7 @@ test "replay: CUP absolute move" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     feed(&pl, &screen, "\x1b[5;20H");
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 19), screen.cursor_col);
@@ -551,7 +553,7 @@ test "replay: CUP no params moves to origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 10;
     screen.cursor_col = 40;
     feed(&pl, &screen, "\x1b[H");
@@ -563,7 +565,7 @@ test "replay: split CSI across multiple feeds" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 10;
     pl.feedSlice("\x1b[");
     pl.feedSlice("2");
@@ -576,7 +578,7 @@ test "replay: clamping at screen boundaries" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     feed(&pl, &screen, "\x1b[999A");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     feed(&pl, &screen, "\x1b[999B");
@@ -591,7 +593,7 @@ test "replay: plain text feed writes to screen cells" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "hello");
     try std.testing.expectEqual(@as(u21, 'h'), screen.cellAt(0, 0));
@@ -603,7 +605,7 @@ test "replay: mixed CSI cursor move then text write" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "\x1b[2;5Hhi");
     try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
@@ -615,7 +617,7 @@ test "replay: CR resets column leaving row unchanged" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc\x0Dxy");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
@@ -627,7 +629,7 @@ test "replay: LF advances row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "ab\x0Acd");
     try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
@@ -639,7 +641,7 @@ test "replay: CR+LF writes to start of next row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc\x0D\x0Adef");
     try std.testing.expectEqual(@as(u16, 1), screen.cursor_row);
@@ -651,7 +653,7 @@ test "replay: BS moves cursor left without erasing cell" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc\x08");
     try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
@@ -662,7 +664,7 @@ test "replay: CSI I advances cursor by default tab stops" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "a\x1b[2Ib");
     try std.testing.expectEqual(@as(u16, 17), screen.cursor_col);
@@ -674,7 +676,7 @@ test "replay: CSI Z moves cursor to previous default tab stop" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "a\x1b[2I\x1b[Zb");
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_col);
@@ -686,7 +688,7 @@ test "replay: UTF-8 codepoint written to cell" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "\xC3\xA9");
     try std.testing.expectEqual(@as(u21, 0xE9), screen.cellAt(0, 0));
@@ -697,7 +699,7 @@ test "replay: invalid UTF-8 does not corrupt cursor state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 5;
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x80\xFE");
@@ -709,7 +711,7 @@ test "replay: unsupported CSI does not alter cell content or cursor" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "ab");
     feed(&pl, &screen, "\x1b[1m\x1b[0m");
@@ -722,7 +724,7 @@ test "replay: multi-line text via CR+LF sequence" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "row0\x0D\x0Arow1\x0D\x0Arow2");
     try std.testing.expectEqual(@as(u16, 2), screen.cursor_row);
@@ -736,7 +738,7 @@ test "replay: sequence of moves composes correctly" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     feed(&pl, &screen, "\x1b[10;10H");
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 9), screen.cursor_col);
@@ -753,7 +755,7 @@ test "replay: CSI K erases from cursor to end of line" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "hello");
     screen.cursor_col = 2;
@@ -769,7 +771,7 @@ test "replay: CSI J erases from cursor to end of screen" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 3, 5);
+    var screen = try Grid.GridModel.initWithCells(gpa, 3, 5);
     defer screen.deinit(gpa);
     screen.cursor_row = 0;
     screen.cursor_col = 0;
@@ -793,7 +795,7 @@ test "replay: cursor move then CSI K erase to end of line" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abcdef");
     feed(&pl, &screen, "\x1b[1;4H");
@@ -805,11 +807,11 @@ test "replay: cursor move then CSI K erase to end of line" {
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 5));
 }
 
-test "replay: DECSTR resets visible screen state" {
+test "replay: DECSTR resets visible grid state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 5);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 5);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abcdef");
     try std.testing.expectEqual(@as(u21, 'a'), screen.cellAt(0, 0));
@@ -825,7 +827,7 @@ test "replay: split CHT interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     try std.testing.expectEqual(@as(u16, 3), screen.cursor_col);
@@ -844,7 +846,7 @@ test "replay: split CHT after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abc");
     try std.testing.expectEqual(@as(u16, 3), screen.cursor_col);
@@ -861,7 +863,7 @@ test "replay: split CBT interrupted by DECSTR bytes remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "a\x1b[2I");
     try std.testing.expectEqual(@as(u16, 16), screen.cursor_col);
@@ -879,7 +881,7 @@ test "replay: split CBT after DECSTR applies from reset origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "a\x1b[2I");
     try std.testing.expectEqual(@as(u16, 16), screen.cursor_col);
@@ -896,7 +898,7 @@ test "replay: DEC private cursor visibility toggles mode state" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(2, 5);
+    var screen = Grid.GridModel.init(2, 5);
     try std.testing.expect(screen.cursor_visible);
     feed(&pl, &screen, "\x1b[?25l");
     try std.testing.expect(!screen.cursor_visible);
@@ -910,7 +912,7 @@ test "replay: interrupted split private cursor mode remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     try std.testing.expect(screen.cursor_visible);
     feed(&pl, &screen, "x");
@@ -929,7 +931,7 @@ test "replay: DEC private auto-wrap mode toggles wrap behavior" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 5);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 5);
     defer screen.deinit(gpa);
     try std.testing.expect(screen.auto_wrap);
     feed(&pl, &screen, "\x1b[?7l");
@@ -951,7 +953,7 @@ test "replay: interrupted split private auto-wrap mode remains deterministic" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 20);
     defer screen.deinit(gpa);
     try std.testing.expect(screen.auto_wrap);
     feed(&pl, &screen, "x");
@@ -970,7 +972,7 @@ test "replay: existing text and cursor paths unaffected by erase additions" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "hello\x0D\x0Aworld");
     try std.testing.expectEqual(@as(u21, 'h'), screen.cellAt(0, 0));
@@ -983,7 +985,7 @@ test "replay: CUP alternate final f positions cursor" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     feed(&pl, &screen, "\x1b[4;7f");
     try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 6), screen.cursor_col);
@@ -993,7 +995,7 @@ test "replay: CSI J mode 2 erases full screen" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 4);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 4);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "AAAA");
     feed(&pl, &screen, "\x0D\x0A");
@@ -1011,7 +1013,7 @@ test "replay: CSI J mode 1 erases through cursor inclusive" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 3, 4);
+    var screen = try Grid.GridModel.initWithCells(gpa, 3, 4);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "AAAA");
     feed(&pl, &screen, "\x0D\x0A");
@@ -1033,7 +1035,7 @@ test "replay: CSI K mode 1 erases line start through cursor" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 6);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 6);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "abcdef");
     screen.cursor_col = 2;
@@ -1048,7 +1050,7 @@ test "replay: CSI K mode 2 erases entire current line" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 5);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 5);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "hello");
     feed(&pl, &screen, "\x1b[2;1H");
@@ -1065,7 +1067,7 @@ test "replay: CSI J invalid param maps to mode 0 through end of screen" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 4);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 4);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "AAAA");
     feed(&pl, &screen, "\x0D\x0A");
@@ -1082,7 +1084,7 @@ test "replay: split CSI erase across parser feeds" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 1, 5);
+    var screen = try Grid.GridModel.initWithCells(gpa, 1, 5);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "hello");
     screen.cursor_col = 2;
@@ -1098,7 +1100,7 @@ test "replay: control BEL does not move cursor or alter cells" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 2, 8);
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 8);
     defer screen.deinit(gpa);
     feed(&pl, &screen, "ab\x07c");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
@@ -1112,7 +1114,7 @@ test "edge: CUU repeated moves from top clamps at row 0" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_row = 3;
     feed(&pl, &screen, "\x1b[1A");
     try std.testing.expectEqual(@as(u16, 2), screen.cursor_row);
@@ -1130,7 +1132,7 @@ test "edge: CUD repeated moves from bottom clamps at last row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(10, 80);
+    var screen = Grid.GridModel.init(10, 80);
     screen.cursor_row = 7;
     feed(&pl, &screen, "\x1b[1B");
     try std.testing.expectEqual(@as(u16, 8), screen.cursor_row);
@@ -1146,7 +1148,7 @@ test "edge: CUF repeated moves from right clamps at last column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 12);
+    var screen = Grid.GridModel.init(24, 12);
     screen.cursor_col = 10;
     feed(&pl, &screen, "\x1b[1C");
     try std.testing.expectEqual(@as(u16, 11), screen.cursor_col);
@@ -1160,7 +1162,7 @@ test "edge: CUB repeated moves from left clamps at column 0" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(24, 80);
+    var screen = Grid.GridModel.init(24, 80);
     screen.cursor_col = 3;
     feed(&pl, &screen, "\x1b[1D");
     try std.testing.expectEqual(@as(u16, 2), screen.cursor_col);
@@ -1176,7 +1178,7 @@ test "edge: mixed cursor moves (up/down/left/right) maintain saturation at edges
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(8, 8);
+    var screen = Grid.GridModel.init(8, 8);
     feed(&pl, &screen, "\x1b[999A");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     feed(&pl, &screen, "\x1b[999B");
@@ -1198,7 +1200,7 @@ test "edge: CR at column 0 leaves cursor unchanged" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     screen.cursor_row = 2;
     screen.cursor_col = 0;
@@ -1214,7 +1216,7 @@ test "edge: LF at bottom row clamps at last row" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 5, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 5, 20);
     defer screen.deinit(gpa);
     screen.cursor_row = 4;
     screen.cursor_col = 5;
@@ -1231,7 +1233,7 @@ test "edge: BS at column 0 clamps at column 0" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     screen.cursor_row = 1;
     screen.cursor_col = 0;
@@ -1247,7 +1249,7 @@ test "edge: CR then LF sequences from edge positions" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 5, 10);
+    var screen = try Grid.GridModel.initWithCells(gpa, 5, 10);
     defer screen.deinit(gpa);
     screen.cursor_col = 9;
     screen.cursor_row = 0;
@@ -1264,7 +1266,7 @@ test "edge: BS then CUB sequence does not corrupt cursor" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 4, 20);
+    var screen = try Grid.GridModel.initWithCells(gpa, 4, 20);
     defer screen.deinit(gpa);
     screen.cursor_col = 5;
     feed(&pl, &screen, "\x08\x08\x08\x08\x08");
@@ -1279,7 +1281,7 @@ test "edge: CR does not move row; LF only moves row; BS only moves column" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 8, 15);
+    var screen = try Grid.GridModel.initWithCells(gpa, 8, 15);
     defer screen.deinit(gpa);
     screen.cursor_row = 3;
     screen.cursor_col = 10;
@@ -1298,7 +1300,7 @@ test "edge: zero-dimension pipeline clear and reset are safe" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 0);
+    var screen = Grid.GridModel.init(0, 0);
     pl.feedSlice("test\x1b[5A");
     pl.clear();
     try std.testing.expect(pl.isEmpty());
@@ -1313,7 +1315,7 @@ test "zero-dim: rows=0, cols=8: cursor moves saturate, text/erase are safe no-op
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 8);
+    var screen = Grid.GridModel.init(0, 8);
     feed(&pl, &screen, "\x1b[5C");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
@@ -1332,7 +1334,7 @@ test "zero-dim: rows=8, cols=0: cursor moves saturate, text/erase are safe no-op
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(8, 0);
+    var screen = Grid.GridModel.init(8, 0);
     feed(&pl, &screen, "\x1b[3B");
     try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
@@ -1351,7 +1353,7 @@ test "zero-dim: rows=0, cols=0: all cursor moves saturate at origin, text/erase 
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 0);
+    var screen = Grid.GridModel.init(0, 0);
     feed(&pl, &screen, "\x1b[999A");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
@@ -1376,7 +1378,7 @@ test "zero-dim: rows=0, cols=8: CR/LF/BS control sequence determinism" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 8);
+    var screen = Grid.GridModel.init(0, 8);
     screen.cursor_col = 5;
     feed(&pl, &screen, "\x0D");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
@@ -1396,7 +1398,7 @@ test "zero-dim: rows=8, cols=0: CR/LF/BS control sequence determinism" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(8, 0);
+    var screen = Grid.GridModel.init(8, 0);
     screen.cursor_row = 3;
     feed(&pl, &screen, "\x0A");
     try std.testing.expectEqual(@as(u16, 4), screen.cursor_row);
@@ -1416,7 +1418,7 @@ test "zero-dim: rows=0, cols=0: CUP absolute position saturates at origin" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 0);
+    var screen = Grid.GridModel.init(0, 0);
     feed(&pl, &screen, "\x1b[999;999H");
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen.cursor_col);
@@ -1429,7 +1431,7 @@ test "zero-dim: rows=0, cols=10: repeated erase operations remain safe" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(0, 10);
+    var screen = Grid.GridModel.init(0, 10);
     screen.cursor_col = 5;
     feed(&pl, &screen, "\x1b[K");
     try std.testing.expectEqual(@as(u16, 5), screen.cursor_col);
@@ -1449,7 +1451,7 @@ test "zero-dim: rows=10, cols=0: repeated text writes remain safe" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = grid_mod.GridModel.init(10, 0);
+    var screen = Grid.GridModel.init(10, 0);
     screen.cursor_row = 3;
     feed(&pl, &screen, "test");
     try std.testing.expectEqual(@as(u16, 3), screen.cursor_row);
@@ -1467,14 +1469,14 @@ test "zero-dim: tab commands remain safe across all zero-dimension variants" {
 
     var pl_rows0 = try Pipeline.init(gpa);
     defer pl_rows0.deinit();
-    var screen_rows0 = grid_mod.GridModel.init(0, 8);
+    var screen_rows0 = Grid.GridModel.init(0, 8);
     feed(&pl_rows0, &screen_rows0, "\x09\x1b[2I\x1b[3Z");
     try std.testing.expectEqual(@as(u16, 0), screen_rows0.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen_rows0.cursor_col);
 
     var pl_cols0 = try Pipeline.init(gpa);
     defer pl_cols0.deinit();
-    var screen_cols0 = grid_mod.GridModel.init(8, 0);
+    var screen_cols0 = Grid.GridModel.init(8, 0);
     screen_cols0.cursor_row = 3;
     feed(&pl_cols0, &screen_cols0, "\x09\x1b[2I\x1b[3Z");
     try std.testing.expectEqual(@as(u16, 3), screen_cols0.cursor_row);
@@ -1482,7 +1484,7 @@ test "zero-dim: tab commands remain safe across all zero-dimension variants" {
 
     var pl_zero = try Pipeline.init(gpa);
     defer pl_zero.deinit();
-    var screen_zero = grid_mod.GridModel.init(0, 0);
+    var screen_zero = Grid.GridModel.init(0, 0);
     feed(&pl_zero, &screen_zero, "\x09\x1b[2I\x1b[3Z");
     try std.testing.expectEqual(@as(u16, 0), screen_zero.cursor_row);
     try std.testing.expectEqual(@as(u16, 0), screen_zero.cursor_col);
@@ -1647,7 +1649,7 @@ test "replay: snapshot parity across direct pipeline" {
 
     var pl = try Pipeline.init(gpa);
     defer pl.deinit();
-    var screen = try grid_mod.GridModel.initWithCells(gpa, 5, 10);
+    var screen = try Grid.GridModel.initWithCells(gpa, 5, 10);
     defer screen.deinit(gpa);
 
     pl.feedSlice(test_bytes);
