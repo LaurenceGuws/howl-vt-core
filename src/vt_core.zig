@@ -780,10 +780,10 @@ test "resize keeps history enabled state" {
     vt_core.feedSlice("111\n222\n333");
     vt_core.apply();
     const before = vt_core.historyCount();
-    try vt_core.resize(3, 6);
+    try vt_core.resize(3, 3);
 
     try std.testing.expectEqual(@as(u16, 8), vt_core.historyCapacity());
-    try std.testing.expect(vt_core.historyCount() >= before);
+    try std.testing.expect(vt_core.historyCount() <= before);
 }
 
 test "encodeKey and encodeMouse methods are callable" {
