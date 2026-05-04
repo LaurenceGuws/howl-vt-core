@@ -11,30 +11,30 @@ const CursorPos = struct {
     col: usize,
 };
 
-const CursorShape = enum {
+pub const CursorShape = enum {
     block,
     underline,
     bar,
 };
 
-const CursorStyle = struct {
+pub const CursorStyle = struct {
     shape: CursorShape,
     blink: bool,
 };
 
-const default_cursor_style = CursorStyle{ .shape = .block, .blink = true };
+pub const default_cursor_style = CursorStyle{ .shape = .block, .blink = true };
 
-const SelectionPos = Selection.SelectionPos;
-const TerminalSelection = Selection.TerminalSelection;
+pub const SelectionPos = Selection.SelectionPos;
+pub const TerminalSelection = Selection.TerminalSelection;
 
-const Color = struct {
+pub const Color = struct {
     r: u8,
     g: u8,
     b: u8,
     a: u8 = 255,
 };
 
-const CellAttrs = struct {
+pub const CellAttrs = struct {
     fg: Color,
     bg: Color,
     bold: bool,
@@ -46,7 +46,7 @@ const CellAttrs = struct {
     link_id: u32,
 };
 
-const Cell = struct {
+pub const Cell = struct {
     codepoint: u32,
     combining_len: u8 = 0,
     combining: [2]u32 = .{ 0, 0 },
@@ -57,19 +57,19 @@ const Cell = struct {
     attrs: CellAttrs,
 };
 
-fn isCellContinuation(cell: Cell) bool {
+pub fn isCellContinuation(cell: Cell) bool {
     return cell.x != 0 or cell.y != 0;
 }
 
-fn isMultiRowCellRoot(cell: Cell) bool {
+pub fn isMultiRowCellRoot(cell: Cell) bool {
     return cell.height > 1 and cell.x == 0 and cell.y == 0;
 }
 
-const default_fg = Color{ .r = 220, .g = 220, .b = 220 };
-const default_bg = Color{ .r = 24, .g = 25, .b = 33 };
-const default_underline_color = Color{ .r = 0, .g = 0, .b = 0, .a = 0 };
+pub const default_fg = Color{ .r = 220, .g = 220, .b = 220 };
+pub const default_bg = Color{ .r = 24, .g = 25, .b = 33 };
+pub const default_underline_color = Color{ .r = 0, .g = 0, .b = 0, .a = 0 };
 
-const default_cell_attrs = CellAttrs{
+pub const default_cell_attrs = CellAttrs{
     .fg = default_fg,
     .bg = default_bg,
     .bold = false,
@@ -81,12 +81,12 @@ const default_cell_attrs = CellAttrs{
     .link_id = 0,
 };
 
-const default_cell = Cell{
+pub const default_cell = Cell{
     .codepoint = 0,
     .attrs = default_cell_attrs,
 };
 
-fn defaultCell() Cell {
+pub fn defaultCell() Cell {
     return Cell{
         .codepoint = 0,
         .width = 1,

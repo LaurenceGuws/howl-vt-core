@@ -116,7 +116,7 @@ pub const VtCoreSnapshot = struct {
         if (screen.history) |history| {
             const size = history.len;
             const owned_history = try allocator.alloc(u21, size);
-            @memcpy(owned_history, history);
+            for (history, owned_history) |src, *dst| dst.* = @intCast(src.codepoint);
             snapshot.history = owned_history;
         }
 

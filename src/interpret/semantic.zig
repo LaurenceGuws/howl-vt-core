@@ -29,6 +29,10 @@ pub const SemanticEvent = union(enum) {
     horizontal_tab_back: u16,
     cursor_visible: bool,
     auto_wrap: bool,
+    sgr: struct {
+        params: [16]i32,
+        param_count: u8,
+    },
     enter_alt_screen: struct { clear: bool, save_cursor: bool },
     exit_alt_screen: struct { restore_cursor: bool },
     reset_screen,
@@ -93,6 +97,7 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         'd' => return SemanticEvent{ .cursor_vertical_absolute = paramOrDefault1(params[0]) - 1 },
         'I' => return SemanticEvent{ .horizontal_tab_forward = paramOrDefault1(params[0]) },
         'Z' => return SemanticEvent{ .horizontal_tab_back = paramOrDefault1(params[0]) },
+        'm' => return SemanticEvent{ .sgr = .{ .params = params, .param_count = count } },
         'H', 'f' => {
             const row = paramOrDefault1(params[0]);
             const col = paramOrDefault1(if (count >= 1) params[1] else 0);

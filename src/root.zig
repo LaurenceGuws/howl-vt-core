@@ -4,12 +4,13 @@
 
 const std = @import("std");
 const grid_owner = @import("grid.zig");
+const grid_model = @import("grid/model.zig");
 const input_mod = @import("input.zig");
 const interpret_owner = @import("interpret.zig");
 const selection_owner = @import("selection.zig");
 const snapshot_owner = @import("snapshot.zig");
 
-const Grid = grid_owner.Grid;
+const GridNs = grid_owner.Grid;
 const Input = input_mod.Input;
 const Interpret = interpret_owner.Interpret;
 const Selection = selection_owner.Selection;
@@ -17,6 +18,7 @@ const Snapshot = snapshot_owner.Snapshot;
 
 /// Host-neutral terminal facade.
 pub const VtCore = struct {
+    pub const DirtyRows = grid_model.DirtyRows;
     /// Host control signals routed to transport/runtime owner.
     pub const ControlSignal = enum {
         hangup,
@@ -99,18 +101,23 @@ pub const VtCore = struct {
         cursor_row: u16,
         cursor_col: u16,
         cursor_visible: bool,
+        cursor_shape: GridNs.CursorShape,
         is_alternate_screen: bool,
-        screen: *const Grid.GridModel,
+        screen: *const GridNs.GridModel,
 
         pub fn cellAt(self: RenderView, row: u16, col: u16) u21 {
             return self.screen.cellAt(row, col);
+        }
+
+        pub fn cellInfoAt(self: RenderView, row: u16, col: u16) GridNs.Cell {
+            return self.screen.cellInfoAt(row, col);
         }
     };
 
     allocator: std.mem.Allocator,
     pipeline: Interpret.Pipeline,
-    primary_state: Grid.GridModel,
-    alt_state: Grid.GridModel,
+    primary_state: GridNs.GridModel,
+    alt_state: GridNs.GridModel,
     alt_active: bool,
     saved_primary_cursor: ?struct {
         row: u16,
@@ -225,7 +232,7 @@ pub const VtCore = struct {
     }
 
     /// Return read-only grid model reference.
-    pub fn screen(self: *const VtCore) *const Grid.GridModel {
+    pub fn screen(self: *const VtCore) *const GridNs.GridModel {
         return self.activeState();
     }
 
@@ -237,9 +244,18 @@ pub const VtCore = struct {
             .cursor_row = self.activeState().cursor_row,
             .cursor_col = self.activeState().cursor_col,
             .cursor_visible = self.activeState().cursor_visible,
+            .cursor_shape = self.activeState().cursor_style.shape,
             .is_alternate_screen = self.alt_active,
             .screen = self.activeState(),
         };
+    }
+
+    pub fn peekDirtyRows(self: *const VtCore) ?DirtyRows {
+        return self.activeState().peekDirtyRows();
+    }
+
+    pub fn clearDirtyRows(self: *VtCore) void {
+        self.activeStateMut().clearDirtyRows();
     }
 
     /// Return queued event count.
@@ -265,6 +281,11 @@ pub const VtCore = struct {
     pub fn historyRowAt(self: *const VtCore, history_idx: usize, col: u16) u21 {
         if (self.alt_active) return 0;
         return self.primary_state.historyRowAt(history_idx, col);
+    }
+
+    pub fn historyCellAt(self: *const VtCore, history_idx: usize, col: u16) GridNs.Cell {
+        if (self.alt_active) return GridNs.default_cell;
+        return self.primary_state.historyCellAt(history_idx, col);
     }
 
     /// Return retained history row count.
@@ -360,11 +381,11 @@ pub const VtCore = struct {
         );
     }
 
-    fn activeState(self: *const VtCore) *const Grid.GridModel {
+    fn activeState(self: *const VtCore) *const GridNs.GridModel {
         return if (self.alt_active) &self.alt_state else &self.primary_state;
     }
 
-    fn activeStateMut(self: *VtCore) *Grid.GridModel {
+    fn activeStateMut(self: *VtCore) *GridNs.GridModel {
         return if (self.alt_active) &self.alt_state else &self.primary_state;
     }
 
@@ -405,6 +426,8 @@ pub const VtCore = struct {
     }
 };
 
+pub const Grid = grid_owner.Grid;
+
 test "VtCore facade methods remain available" {
     try std.testing.expect(@hasDecl(VtCore, "init"));
     try std.testing.expect(@hasDecl(VtCore, "initWithCells"));
@@ -422,7 +445,7 @@ test "VtCore facade methods remain available" {
 
 test "VtCore method signatures remain host-facing" {
     const Allocator = std.mem.Allocator;
-    const GridModel = Grid.GridModel;
+    const GridModel = GridNs.GridModel;
     const init_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.init;
     const init_cells_fn: fn (Allocator, u16, u16) anyerror!VtCore = VtCore.initWithCells;
     const deinit_fn: fn (*VtCore) void = VtCore.deinit;

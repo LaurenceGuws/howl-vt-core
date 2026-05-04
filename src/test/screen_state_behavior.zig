@@ -144,6 +144,43 @@ test "screen: write_text stores bytes in cells" {
     try std.testing.expectEqual(@as(u21, 'c'), s.cellAt(0, 2));
 }
 
+test "screen: sgr applies ansi and 256-color attrs to written cells" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCells(gpa, 2, 4);
+    defer s.deinit(gpa);
+
+    s.apply(SemanticEvent{ .sgr = .{ .params = .{ 38, 5, 196 } ++ [_]i32{0} ** 13, .param_count = 3 } });
+    s.apply(SemanticEvent{ .sgr = .{ .params = .{ 48, 5, 23 } ++ [_]i32{0} ** 13, .param_count = 3 } });
+    s.apply(SemanticEvent{ .write_text = "X" });
+
+    const cell = s.cellInfoAt(0, 0);
+    try std.testing.expectEqual(@as(u21, 'X'), s.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u8, 255), cell.attrs.fg.r);
+    try std.testing.expectEqual(@as(u8, 0), cell.attrs.fg.g);
+    try std.testing.expectEqual(@as(u8, 0), cell.attrs.fg.b);
+    try std.testing.expectEqual(@as(u8, 0), cell.attrs.bg.r);
+    try std.testing.expectEqual(@as(u8, 51), cell.attrs.bg.g);
+    try std.testing.expectEqual(@as(u8, 51), cell.attrs.bg.b);
+}
+
+test "screen: sgr reset restores default attrs for later writes" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCells(gpa, 2, 4);
+    defer s.deinit(gpa);
+
+    s.apply(SemanticEvent{ .sgr = .{ .params = .{ 31 } ++ [_]i32{0} ** 15, .param_count = 1 } });
+    s.apply(SemanticEvent{ .write_text = "A" });
+    s.apply(SemanticEvent{ .sgr = .{ .params = .{ 0 } ++ [_]i32{0} ** 15, .param_count = 1 } });
+    s.apply(SemanticEvent{ .write_text = "B" });
+
+    const a = s.cellInfoAt(0, 0);
+    const b = s.cellInfoAt(0, 1);
+    try std.testing.expectEqual(@as(u8, 170), a.attrs.fg.r);
+    try std.testing.expectEqual(grid_owner.Grid.default_fg.r, b.attrs.fg.r);
+    try std.testing.expectEqual(grid_owner.Grid.default_fg.g, b.attrs.fg.g);
+    try std.testing.expectEqual(grid_owner.Grid.default_fg.b, b.attrs.fg.b);
+}
+
 test "screen: write_text wraps to next row after filled column" {
     const gpa = std.testing.allocator;
     var s = try GridModel.initWithCells(gpa, 4, 5);
@@ -416,9 +453,9 @@ test "screen: scrollUp captures row to history" {
     s.apply(SemanticEvent.line_feed);
     try std.testing.expectEqual(@as(usize, 1), s.history_count);
     const h = s.history.?;
-    try std.testing.expectEqual(@as(u21, 'a'), h[0]);
-    try std.testing.expectEqual(@as(u21, 'b'), h[1]);
-    try std.testing.expectEqual(@as(u21, 'c'), h[2]);
+    try std.testing.expectEqual(@as(u21, 'a'), @as(u21, @intCast(h[0].codepoint)));
+    try std.testing.expectEqual(@as(u21, 'b'), @as(u21, @intCast(h[1].codepoint)));
+    try std.testing.expectEqual(@as(u21, 'c'), @as(u21, @intCast(h[2].codepoint)));
     try std.testing.expectEqual(@as(u21, 'x'), s.cellAt(0, 0));
     try std.testing.expectEqual(@as(u21, 'y'), s.cellAt(0, 1));
     try std.testing.expectEqual(@as(u21, 'z'), s.cellAt(0, 2));

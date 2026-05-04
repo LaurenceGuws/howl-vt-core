@@ -4,17 +4,25 @@
 
 const std = @import("std");
 const interpret_owner = @import("../interpret.zig");
+const types = @import("types.zig");
 
 /// Semantic event alias for grid application.
 const SemanticEvent = interpret_owner.Interpret.SemanticEvent;
+const Cell = types.Cell;
+const Color = types.Color;
+const CellAttrs = types.CellAttrs;
+const CursorStyle = types.CursorStyle;
+const default_cell = types.default_cell;
+const default_cell_attrs = types.default_cell_attrs;
+const default_underline_color = types.default_underline_color;
 
 const LogicalLine = struct {
-    cells: std.ArrayListUnmanaged(u21) = .empty,
+    cells: std.ArrayListUnmanaged(Cell) = .empty,
     cursor_offset: ?usize = null,
 };
 
 const HistoryLine = struct {
-    cells: std.ArrayListUnmanaged(u21) = .empty,
+    cells: std.ArrayListUnmanaged(Cell) = .empty,
 
     fn deinit(self: *HistoryLine, allocator: std.mem.Allocator) void {
         self.cells.deinit(allocator);
@@ -28,6 +36,11 @@ const RewrappedRow = struct {
     wrapped: bool,
 };
 
+pub const DirtyRows = struct {
+    start_row: u16,
+    end_row: u16,
+};
+
 /// Terminal grid model for cursor/cell/history behavior.
 pub const GridModel = struct {
     allocator: ?std.mem.Allocator,
@@ -37,18 +50,21 @@ pub const GridModel = struct {
     cursor_col: u16,
     wrap_pending: bool,
     cursor_visible: bool,
+    cursor_style: CursorStyle,
     auto_wrap: bool,
     view_padding_rows: u16,
     row_origin: u16,
-    cells: ?[]u21,
+    cells: ?[]Cell,
     row_wraps: ?[]bool,
-    history: ?[]u21,
+    history: ?[]Cell,
     history_wraps: ?[]bool,
     history_capacity: u16,
     history_count: usize,
     history_write_idx: usize,
     history_lines: std.ArrayListUnmanaged(HistoryLine),
     open_history_line: ?HistoryLine,
+    current_attrs: CellAttrs,
+    dirty_rows: ?DirtyRows,
 
     /// Initialize cursor-only grid state.
     pub fn init(rows: u16, cols: u16) GridModel {
@@ -60,6 +76,7 @@ pub const GridModel = struct {
             .cursor_col = 0,
             .wrap_pending = false,
             .cursor_visible = true,
+            .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
             .view_padding_rows = 0,
             .row_origin = 0,
@@ -72,15 +89,17 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .current_attrs = default_cell_attrs,
+            .dirty_rows = null,
         };
     }
 
     /// Initialize screen with owned cell storage.
     pub fn initWithCells(allocator: std.mem.Allocator, rows: u16, cols: u16) !GridModel {
         const size = @as(usize, rows) * @as(usize, cols);
-        const cells: ?[]u21 = if (size > 0) blk: {
-            const buf = try allocator.alloc(u21, size);
-            @memset(buf, 0);
+        const cells: ?[]Cell = if (size > 0) blk: {
+            const buf = try allocator.alloc(Cell, size);
+            @memset(buf, default_cell);
             break :blk buf;
         } else null;
         errdefer if (cells) |c| allocator.free(c);
@@ -97,6 +116,7 @@ pub const GridModel = struct {
             .cursor_col = 0,
             .wrap_pending = false,
             .cursor_visible = true,
+            .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
             .view_padding_rows = 0,
             .row_origin = 0,
@@ -109,15 +129,17 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .current_attrs = default_cell_attrs,
+            .dirty_rows = if (rows > 0) .{ .start_row = 0, .end_row = rows -| 1 } else null,
         };
     }
 
     /// Initialize screen with cells and history storage.
     pub fn initWithCellsAndHistory(allocator: std.mem.Allocator, rows: u16, cols: u16, history_capacity: u16) !GridModel {
         const size = @as(usize, rows) * @as(usize, cols);
-        const cells: ?[]u21 = if (size > 0) blk: {
-            const buf = try allocator.alloc(u21, size);
-            @memset(buf, 0);
+        const cells: ?[]Cell = if (size > 0) blk: {
+            const buf = try allocator.alloc(Cell, size);
+            @memset(buf, default_cell);
             break :blk buf;
         } else null;
         errdefer if (cells) |c| allocator.free(c);
@@ -127,8 +149,8 @@ pub const GridModel = struct {
             break :blk buf;
         } else null;
         errdefer if (row_wraps) |buf| allocator.free(buf);
-        const history: ?[]u21 = if (cells != null and history_capacity > 0) blk: {
-            const buf = try allocator.alloc(u21, 0);
+        const history: ?[]Cell = if (cells != null and history_capacity > 0) blk: {
+            const buf = try allocator.alloc(Cell, 0);
             break :blk buf;
         } else null;
         errdefer if (history) |buf| allocator.free(buf);
@@ -144,6 +166,7 @@ pub const GridModel = struct {
             .cursor_col = 0,
             .wrap_pending = false,
             .cursor_visible = true,
+            .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
             .view_padding_rows = 0,
             .row_origin = 0,
@@ -156,6 +179,8 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .current_attrs = default_cell_attrs,
+            .dirty_rows = if (rows > 0) .{ .start_row = 0, .end_row = rows -| 1 } else null,
         };
     }
 
@@ -240,7 +265,7 @@ pub const GridModel = struct {
             logical_lines.items.len = last_idx;
         }
 
-        var flat_rows: std.ArrayListUnmanaged(u21) = .empty;
+        var flat_rows: std.ArrayListUnmanaged(Cell) = .empty;
         defer flat_rows.deinit(allocator);
         var rewrapped: std.ArrayListUnmanaged(RewrappedRow) = .empty;
         defer rewrapped.deinit(allocator);
@@ -297,7 +322,7 @@ pub const GridModel = struct {
                     if (src_idx < line.cells.items.len) {
                         try flat_rows.append(allocator, line.cells.items[src_idx]);
                     } else {
-                        try flat_rows.append(allocator, 0);
+                        try flat_rows.append(allocator, default_cell);
                     }
                 }
             }
@@ -316,10 +341,10 @@ pub const GridModel = struct {
             0;
 
         const cell_count = @as(usize, rows) * @as(usize, cols);
-        var new_cells: ?[]u21 = null;
+        var new_cells: ?[]Cell = null;
         if (cell_count > 0) {
-            const buf = try allocator.alloc(u21, cell_count);
-            @memset(buf, 0);
+            const buf = try allocator.alloc(Cell, cell_count);
+            @memset(buf, default_cell);
             new_cells = buf;
         }
         errdefer if (new_cells) |buf| allocator.free(buf);
@@ -358,6 +383,7 @@ pub const GridModel = struct {
         self.history_write_idx = 0;
         self.row_origin = 0;
         self.view_padding_rows = 0;
+        self.dirty_rows = if (rows > 0) .{ .start_row = 0, .end_row = rows -| 1 } else null;
 
         try self.replaceHistoryAuthority(
             allocator,
@@ -410,7 +436,7 @@ pub const GridModel = struct {
 
         var col: u16 = 0;
         while (col < content_len) : (col += 1) {
-            try current_line.cells.append(allocator, self.cellAt(row_index, col));
+            try current_line.cells.append(allocator, self.cellInfoAt(row_index, col));
         }
 
         if (!wrapped) {
@@ -429,8 +455,8 @@ pub const GridModel = struct {
         var has_content = false;
         var col: u16 = 0;
         while (col < cols) : (col += 1) {
-            const value = self.cellAt(row_index, col);
-            if (value != 0) {
+            const value = self.cellInfoAt(row_index, col);
+            if (value.codepoint != 0) {
                 has_content = true;
                 last_non_zero = col + 1;
             }
@@ -451,13 +477,13 @@ pub const GridModel = struct {
         return self.cursor_col;
     }
 
-    fn cloneHistoryLine(allocator: std.mem.Allocator, cells: []const u21) !LogicalLine {
+    fn cloneHistoryLine(allocator: std.mem.Allocator, cells: []const Cell) !LogicalLine {
         var line = LogicalLine{};
         try line.cells.appendSlice(allocator, cells);
         return line;
     }
 
-    fn cloneHistoryAuthorityLine(allocator: std.mem.Allocator, cells: []const u21) !HistoryLine {
+    fn cloneHistoryAuthorityLine(allocator: std.mem.Allocator, cells: []const Cell) !HistoryLine {
         var line = HistoryLine{};
         try line.cells.appendSlice(allocator, cells);
         return line;
@@ -551,7 +577,7 @@ pub const GridModel = struct {
         defer row_lens.deinit(allocator);
         var row_wraps: std.ArrayListUnmanaged(bool) = .empty;
         defer row_wraps.deinit(allocator);
-        var flat_cells: std.ArrayListUnmanaged(u21) = .empty;
+        var flat_cells: std.ArrayListUnmanaged(Cell) = .empty;
         defer flat_cells.deinit(allocator);
 
         for (self.history_lines.items) |line| {
@@ -563,7 +589,7 @@ pub const GridModel = struct {
 
         self.history_count = row_wraps.items.len;
         self.history_write_idx = 0;
-        self.history = try allocator.alloc(u21, flat_cells.items.len);
+        self.history = try allocator.alloc(Cell, flat_cells.items.len);
         @memcpy(self.history.?, flat_cells.items);
         self.history_wraps = try allocator.alloc(bool, row_wraps.items.len);
         @memcpy(self.history_wraps.?, row_wraps.items);
@@ -572,12 +598,12 @@ pub const GridModel = struct {
     fn appendHistoryProjectionRows(
         self: *const GridModel,
         allocator: std.mem.Allocator,
-        cells: []const u21,
+        cells: []const Cell,
         continues_to_visible: bool,
         row_starts: *std.ArrayListUnmanaged(usize),
         row_lens: *std.ArrayListUnmanaged(usize),
         row_wraps: *std.ArrayListUnmanaged(bool),
-        flat_cells: *std.ArrayListUnmanaged(u21),
+        flat_cells: *std.ArrayListUnmanaged(Cell),
     ) !void {
         const cols = @as(usize, self.cols);
         if (cols == 0) return;
@@ -596,7 +622,7 @@ pub const GridModel = struct {
                 if (src_idx < cells.len) {
                     try flat_cells.append(allocator, cells[src_idx]);
                 } else {
-                    try flat_cells.append(allocator, 0);
+                    try flat_cells.append(allocator, default_cell);
                 }
             }
         }
@@ -611,7 +637,7 @@ pub const GridModel = struct {
         const open_line = &self.open_history_line.?;
         var col: u16 = 0;
         while (col < len) : (col += 1) {
-            open_line.cells.append(allocator, self.cellAt(row, col)) catch return;
+            open_line.cells.append(allocator, self.cellInfoAt(row, col)) catch return;
         }
         if (!wrapped) {
             const finalized = self.open_history_line.?;
@@ -630,7 +656,7 @@ pub const GridModel = struct {
         var col = self.cols;
         while (col > 0) {
             const idx = col - 1;
-            if (self.cellAt(row, idx) != 0) return col;
+            if (self.cellInfoAt(row, idx).codepoint != 0) return col;
             col -= 1;
         }
         if (self.rowWrapped(row) and self.cols > 0) return self.cols;
@@ -654,26 +680,45 @@ pub const GridModel = struct {
         self.cursor_col = 0;
         self.wrap_pending = false;
         self.cursor_visible = true;
+        self.cursor_style = types.default_cursor_style;
         self.auto_wrap = true;
         self.view_padding_rows = 0;
         self.row_origin = 0;
-        if (self.cells) |c| @memset(c, 0);
+        self.current_attrs = default_cell_attrs;
+        self.dirty_rows = if (self.rows > 0) .{ .start_row = 0, .end_row = self.rows -| 1 } else null;
+        if (self.cells) |c| @memset(c, default_cell);
         if (self.row_wraps) |buf| @memset(buf, false);
+    }
+
+    pub fn peekDirtyRows(self: *const GridModel) ?DirtyRows {
+        return self.dirty_rows;
+    }
+
+    pub fn clearDirtyRows(self: *GridModel) void {
+        self.dirty_rows = null;
     }
 
     /// Read visible cell value by row and column.
     pub fn cellAt(self: *const GridModel, row: u16, col: u16) u21 {
-        const c = self.cells orelse return 0;
-        if (row >= self.rows or col >= self.cols) return 0;
+        return @intCast(self.cellInfoAt(row, col).codepoint);
+    }
+
+    pub fn cellInfoAt(self: *const GridModel, row: u16, col: u16) Cell {
+        const c = self.cells orelse return default_cell;
+        if (row >= self.rows or col >= self.cols) return default_cell;
         const start = self.rowStart(row);
         return c[start + @as(usize, col)];
     }
 
     /// Read history cell by recency index and column.
     pub fn historyRowAt(self: *const GridModel, history_idx: usize, col: u16) u21 {
-        const h = self.history orelse return 0;
-        if (history_idx >= self.history_count or col >= self.cols) return 0;
-        const slot = self.historySlotForRecency(history_idx) orelse return 0;
+        return @intCast(self.historyCellAt(history_idx, col).codepoint);
+    }
+
+    pub fn historyCellAt(self: *const GridModel, history_idx: usize, col: u16) Cell {
+        const h = self.history orelse return default_cell;
+        if (history_idx >= self.history_count or col >= self.cols) return default_cell;
+        const slot = self.historySlotForRecency(history_idx) orelse return default_cell;
         return h[slot * @as(usize, self.cols) + @as(usize, col)];
     }
 
@@ -780,6 +825,7 @@ pub const GridModel = struct {
                 self.auto_wrap = enabled;
                 if (!enabled) self.wrap_pending = false;
             },
+            .sgr => |sgr| self.applySgr(sgr.params[0..sgr.param_count]),
             .enter_alt_screen, .exit_alt_screen => {},
             .reset_screen => self.reset(),
             .erase_display => |mode| {
@@ -798,25 +844,28 @@ pub const GridModel = struct {
         if (self.rows == 0 or self.cols == 0) return;
         switch (mode) {
             0 => {
+                self.markDirtyRows(self.cursor_row, self.rows -| 1);
                 self.clearRowRange(self.cursor_row, self.cursor_col, self.cols);
                 var r = self.cursor_row + 1;
                 while (r < self.rows) : (r += 1) {
                     const start = self.rowStart(r);
-                    @memset(c[start .. start + @as(usize, self.cols)], 0);
+                    @memset(c[start .. start + @as(usize, self.cols)], default_cell);
                     self.setRowWrapped(r, false);
                 }
             },
             1 => {
+                self.markDirtyRows(0, self.cursor_row);
                 var r: u16 = 0;
                 while (r < self.cursor_row) : (r += 1) {
                     const start = self.rowStart(r);
-                    @memset(c[start .. start + @as(usize, self.cols)], 0);
+                    @memset(c[start .. start + @as(usize, self.cols)], default_cell);
                     self.setRowWrapped(r, false);
                 }
                 self.clearRowRange(self.cursor_row, 0, self.cursor_col + 1);
             },
             2 => {
-                @memset(c, 0);
+                self.markAllRowsDirty();
+                @memset(c, default_cell);
                 if (self.row_wraps) |buf| @memset(buf, false);
             },
             3 => {},
@@ -826,6 +875,7 @@ pub const GridModel = struct {
     fn eraseLine(self: *GridModel, mode: u2) void {
         _ = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
+        self.markDirtyRow(self.cursor_row);
         switch (mode) {
             0 => self.clearRowRange(self.cursor_row, self.cursor_col, self.cols),
             1 => self.clearRowRange(self.cursor_row, 0, self.cursor_col + 1),
@@ -849,12 +899,87 @@ pub const GridModel = struct {
         }
         if (self.cells) |c| {
             const start = self.rowStart(self.cursor_row);
-            c[start + @as(usize, self.cursor_col)] = cp;
+            self.markDirtyRow(self.cursor_row);
+            c[start + @as(usize, self.cursor_col)] = .{
+                .codepoint = cp,
+                .attrs = self.current_attrs,
+            };
         }
         if (self.cursor_col < self.cols - 1) {
             self.cursor_col += 1;
         } else if (self.auto_wrap) {
             self.wrap_pending = true;
+        }
+    }
+
+    fn applySgr(self: *GridModel, params: []const i32) void {
+        if (params.len == 0) {
+            self.current_attrs = default_cell_attrs;
+            return;
+        }
+
+        var i: usize = 0;
+        while (i < params.len) : (i += 1) {
+            const p = params[i];
+            switch (p) {
+                0 => self.current_attrs = default_cell_attrs,
+                1 => self.current_attrs.bold = true,
+                4 => self.current_attrs.underline = true,
+                5, 6 => self.current_attrs.blink = true,
+                7 => self.current_attrs.reverse = true,
+                22 => self.current_attrs.bold = false,
+                24 => self.current_attrs.underline = false,
+                25 => {
+                    self.current_attrs.blink = false;
+                    self.current_attrs.blink_fast = false;
+                },
+                27 => self.current_attrs.reverse = false,
+                30...37 => self.current_attrs.fg = ansi16Color(@intCast(p - 30)),
+                39 => self.current_attrs.fg = default_cell_attrs.fg,
+                40...47 => self.current_attrs.bg = ansi16Color(@intCast(p - 40)),
+                49 => self.current_attrs.bg = default_cell_attrs.bg,
+                90...97 => self.current_attrs.fg = ansi16Color(@intCast((p - 90) + 8)),
+                100...107 => self.current_attrs.bg = ansi16Color(@intCast((p - 100) + 8)),
+                38, 48 => {
+                    const is_fg = p == 38;
+                    if (i + 1 >= params.len) break;
+                    const mode = params[i + 1];
+                    if (mode == 5) {
+                        if (i + 2 >= params.len) break;
+                        const color = indexed256Color(clampByte(params[i + 2]));
+                        if (is_fg) self.current_attrs.fg = color else self.current_attrs.bg = color;
+                        i += 2;
+                    } else if (mode == 2) {
+                        if (i + 4 >= params.len) break;
+                        const color = Color{
+                            .r = clampByte(params[i + 2]),
+                            .g = clampByte(params[i + 3]),
+                            .b = clampByte(params[i + 4]),
+                        };
+                        if (is_fg) self.current_attrs.fg = color else self.current_attrs.bg = color;
+                        i += 4;
+                    }
+                },
+                58 => {
+                    if (i + 1 >= params.len) break;
+                    const mode = params[i + 1];
+                    if (mode == 5) {
+                        if (i + 2 >= params.len) break;
+                        self.current_attrs.underline_color = indexed256Color(clampByte(params[i + 2]));
+                        i += 2;
+                    } else if (mode == 2) {
+                        if (i + 4 >= params.len) break;
+                        self.current_attrs.underline_color = .{
+                            .r = clampByte(params[i + 2]),
+                            .g = clampByte(params[i + 3]),
+                            .b = clampByte(params[i + 4]),
+                        };
+                        i += 4;
+                    }
+                },
+                59 => self.current_attrs.underline_color = default_underline_color,
+                else => {},
+            }
         }
     }
 
@@ -885,11 +1010,12 @@ pub const GridModel = struct {
     fn scrollUp(self: *GridModel) void {
         const c = self.cells orelse return;
         if (self.rows == 0 or self.cols == 0) return;
+        self.markAllRowsDirty();
         const row_len = @as(usize, self.cols);
         self.storeHistoryRow(0);
         self.row_origin = @intCast((@as(usize, self.row_origin) + 1) % @as(usize, self.rows));
         const bottom_start = self.rowStart(self.rows - 1);
-        @memset(c[bottom_start .. bottom_start + row_len], 0);
+        @memset(c[bottom_start .. bottom_start + row_len], default_cell);
         self.setRowWrapped(self.rows - 1, false);
     }
 
@@ -930,6 +1056,68 @@ pub const GridModel = struct {
     fn clearRowRange(self: *GridModel, row: u16, start_col: u16, end_col_exclusive: u16) void {
         const c = self.cells orelse return;
         const start = self.rowStart(row);
-        @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], 0);
+        @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], default_cell);
+    }
+
+    fn markDirtyRow(self: *GridModel, row: u16) void {
+        if (self.rows == 0 or row >= self.rows) return;
+        self.markDirtyRows(row, row);
+    }
+
+    fn markDirtyRows(self: *GridModel, start_row: u16, end_row: u16) void {
+        if (self.rows == 0) return;
+        const start = @min(start_row, self.rows -| 1);
+        const end = @min(end_row, self.rows -| 1);
+        if (self.dirty_rows) |*d| {
+            d.start_row = @min(d.start_row, start);
+            d.end_row = @max(d.end_row, end);
+        } else {
+            self.dirty_rows = .{ .start_row = start, .end_row = end };
+        }
+    }
+
+    fn markAllRowsDirty(self: *GridModel) void {
+        if (self.rows == 0) return;
+        self.dirty_rows = .{ .start_row = 0, .end_row = self.rows -| 1 };
+    }
+
+    fn clampByte(v: i32) u8 {
+        return @intCast(std.math.clamp(v, 0, 255));
+    }
+
+    fn ansi16Color(idx: u8) Color {
+        return switch (idx) {
+            0 => .{ .r = 0, .g = 0, .b = 0 },
+            1 => .{ .r = 170, .g = 0, .b = 0 },
+            2 => .{ .r = 0, .g = 170, .b = 0 },
+            3 => .{ .r = 170, .g = 85, .b = 0 },
+            4 => .{ .r = 0, .g = 0, .b = 170 },
+            5 => .{ .r = 170, .g = 0, .b = 170 },
+            6 => .{ .r = 0, .g = 170, .b = 170 },
+            7 => .{ .r = 170, .g = 170, .b = 170 },
+            8 => .{ .r = 85, .g = 85, .b = 85 },
+            9 => .{ .r = 255, .g = 85, .b = 85 },
+            10 => .{ .r = 85, .g = 255, .b = 85 },
+            11 => .{ .r = 255, .g = 255, .b = 85 },
+            12 => .{ .r = 85, .g = 85, .b = 255 },
+            13 => .{ .r = 255, .g = 85, .b = 255 },
+            14 => .{ .r = 85, .g = 255, .b = 255 },
+            15 => .{ .r = 255, .g = 255, .b = 255 },
+            else => default_cell_attrs.fg,
+        };
+    }
+
+    fn indexed256Color(idx: u8) Color {
+        if (idx < 16) return ansi16Color(idx);
+        if (idx < 232) {
+            const i: u32 = idx - 16;
+            return .{
+                .r = @intCast((i / 36) * 51),
+                .g = @intCast(((i / 6) % 6) * 51),
+                .b = @intCast((i % 6) * 51),
+            };
+        }
+        const gray: u8 = @intCast((@as(u32, idx) - 232) * 10 + 8);
+        return .{ .r = gray, .g = gray, .b = gray };
     }
 };
