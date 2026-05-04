@@ -15,6 +15,34 @@ fn feed(pl: *Pipeline, screen: *Grid.GridModel, bytes: []const u8) void {
     pl.feedSlice(bytes);
     pl.applyToScreen(screen);
 }
+
+fn repaintPromptLine(pl: *Pipeline, screen: *Grid.GridModel, prompt: []const u8, command: []const u8) void {
+    feed(pl, screen, "\r\x1b[K");
+    feed(pl, screen, prompt);
+    feed(pl, screen, command);
+}
+
+fn expectPromptLine(screen: *Grid.GridModel, prompt: []const u8, command: []const u8) !void {
+    const total_len = prompt.len + command.len;
+    try std.testing.expect(total_len <= screen.cols);
+    try std.testing.expectEqual(@as(u16, 0), screen.cursor_row);
+    try std.testing.expectEqual(@as(u16, @intCast(total_len)), screen.cursor_col);
+
+    var idx: usize = 0;
+    while (idx < prompt.len) : (idx += 1) {
+        try std.testing.expectEqual(@as(u21, prompt[idx]), screen.cellAt(0, @intCast(idx)));
+    }
+
+    var cmd_idx: usize = 0;
+    while (cmd_idx < command.len) : (cmd_idx += 1) {
+        try std.testing.expectEqual(@as(u21, command[cmd_idx]), screen.cellAt(0, @intCast(prompt.len + cmd_idx)));
+    }
+
+    var clear_idx: usize = total_len;
+    while (clear_idx < screen.cols) : (clear_idx += 1) {
+        try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, @intCast(clear_idx)));
+    }
+}
 test "pipeline: mixed text and CSI and text" {
     const gpa = std.testing.allocator;
     var pl = try Pipeline.init(gpa);
@@ -1705,4 +1733,78 @@ test "replay: snapshot wraparound history indices after eviction" {
             try std.testing.expectEqual(vt_core.historyRowAt(row, col), snap.historyRowAt(row, col));
         }
     }
+}
+
+test "replay: prompt redraw clears stale suffix after reset history entry" {
+    const gpa = std.testing.allocator;
+    var pl = try Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try Grid.GridModel.initWithCells(gpa, 1, 64);
+    defer screen.deinit(gpa);
+
+    const prompt = "$ ";
+
+    repaintPromptLine(&pl, &screen, prompt, "ll");
+    try expectPromptLine(&screen, prompt, "ll");
+
+    repaintPromptLine(&pl, &screen, prompt, "reset");
+    try expectPromptLine(&screen, prompt, "reset");
+
+    repaintPromptLine(&pl, &screen, prompt, "ll");
+    try expectPromptLine(&screen, prompt, "ll");
+
+    repaintPromptLine(&pl, &screen, prompt, "reset");
+    try expectPromptLine(&screen, prompt, "reset");
+
+    repaintPromptLine(&pl, &screen, prompt, "ll");
+    try expectPromptLine(&screen, prompt, "ll");
+}
+
+test "replay: prompt redraw fuzz clears stale suffix across random history entries" {
+    const gpa = std.testing.allocator;
+    var pl = try Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try Grid.GridModel.initWithCells(gpa, 1, 96);
+    defer screen.deinit(gpa);
+
+    const prompt = "$ ";
+    const commands = [_][]const u8{
+        "ll",
+        "reset",
+        "printf '\\033[3J\\033[H\\033[2J'",
+        "git status",
+        "zig build run",
+        "clear",
+        "nvim README.md",
+        "cargo test",
+        "ls -la",
+        "echo short",
+    };
+
+    var prng = std.Random.DefaultPrng.init(0xBADC0FFEE0DDF00D);
+    const rand = prng.random();
+
+    var i: usize = 0;
+    while (i < 20) : (i += 1) {
+        const command = commands[rand.uintLessThan(usize, commands.len)];
+        repaintPromptLine(&pl, &screen, prompt, command);
+        try expectPromptLine(&screen, prompt, command);
+    }
+}
+
+test "replay: bash history redraw with DCH clears reset suffix" {
+    const gpa = std.testing.allocator;
+    var pl = try Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try Grid.GridModel.initWithCells(gpa, 1, 64);
+    defer screen.deinit(gpa);
+
+    feed(&pl, &screen, "reset");
+    feed(&pl, &screen, "\x08\x08\x08\x08\x08\x1b[3Pll");
+
+    try std.testing.expectEqual(@as(u21, 'l'), screen.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'l'), screen.cellAt(0, 1));
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 2));
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 4));
 }

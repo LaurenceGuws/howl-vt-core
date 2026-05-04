@@ -56,6 +56,7 @@ pub const SemanticEvent = union(enum) {
     restore_cursor,
     insert_lines: u16,
     delete_lines: u16,
+    delete_chars: u16,
     scroll_up_lines: u16,
     scroll_down_lines: u16,
     set_scroll_region: struct {
@@ -198,6 +199,7 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         'Z' => return SemanticEvent{ .horizontal_tab_back = paramOrDefault1(params[0]) },
         'L' => return SemanticEvent{ .insert_lines = paramOrDefault1(params[0]) },
         'M' => return SemanticEvent{ .delete_lines = paramOrDefault1(params[0]) },
+        'P' => return SemanticEvent{ .delete_chars = paramOrDefault1(params[0]) },
         'S' => return SemanticEvent{ .scroll_up_lines = paramOrDefault1(params[0]) },
         'T' => return SemanticEvent{ .scroll_down_lines = paramOrDefault1(params[0]) },
         'm' => return SemanticEvent{ .sgr = .{ .params = params, .param_count = count } },
@@ -242,6 +244,7 @@ fn eraseMode(v: i32) u2 {
     return switch (v) {
         1 => 1,
         2 => 2,
+        3 => 3,
         else => 0,
     };
 }

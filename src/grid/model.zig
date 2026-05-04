@@ -938,6 +938,10 @@ pub const GridModel = struct {
                 self.wrap_pending = false;
                 self.deleteLines(count);
             },
+            .delete_chars => |count| {
+                self.wrap_pending = false;
+                self.deleteChars(count);
+            },
             .scroll_up_lines => |count| {
                 self.wrap_pending = false;
                 self.scrollUpRegion(self.scroll_top, self.scrollBottom(), count);
@@ -1043,6 +1047,26 @@ pub const GridModel = struct {
             },
             3 => {},
         }
+    }
+
+    fn deleteChars(self: *GridModel, count: u16) void {
+        const c = self.cells orelse return;
+        if (self.rows == 0 or self.cols == 0) return;
+        if (self.cursor_col >= self.cols) return;
+
+        const amount = @min(@max(count, 1), self.cols - self.cursor_col);
+        const start = self.rowStart(self.cursor_row);
+        const row = c[start .. start + @as(usize, self.cols)];
+        const dst_col: usize = self.cursor_col;
+        const src_col: usize = @min(@as(usize, self.cursor_col) + @as(usize, amount), @as(usize, self.cols));
+        const move_len = @as(usize, self.cols) - src_col;
+
+        self.markDirtyRow(self.cursor_row);
+        if (move_len > 0) {
+            std.mem.copyForwards(Cell, row[dst_col .. dst_col + move_len], row[src_col .. src_col + move_len]);
+        }
+        @memset(row[@as(usize, self.cols) - @as(usize, amount) .. @as(usize, self.cols)], default_cell);
+        self.setRowWrapped(self.cursor_row, false);
     }
 
     fn writeCell(self: *GridModel, cp: u21) void {

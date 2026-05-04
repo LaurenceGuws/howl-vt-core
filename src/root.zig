@@ -36,6 +36,10 @@ pub const VtCore = struct {
     pub const Key = Input.Key;
     /// Modifier type alias exported by vt-core facade.
     pub const Modifier = Input.Modifier;
+    /// Mouse button type alias exported by vt-core facade.
+    pub const MouseButton = Input.MouseButton;
+    /// Mouse event kind alias exported by vt-core facade.
+    pub const MouseEventKind = Input.MouseEventKind;
 
     /// No modifiers set.
     pub const mod_none: Modifier = Input.mod_none;
@@ -98,6 +102,18 @@ pub const VtCore = struct {
     pub const key_f11: Key = Input.key_f11;
     /// F12 key alias.
     pub const key_f12: Key = Input.key_f12;
+
+    pub const mouse_button_none: MouseButton = Input.MouseButton.none;
+    pub const mouse_button_left: MouseButton = Input.MouseButton.left;
+    pub const mouse_button_middle: MouseButton = Input.MouseButton.middle;
+    pub const mouse_button_right: MouseButton = Input.MouseButton.right;
+    pub const mouse_button_wheel_up: MouseButton = Input.MouseButton.wheel_up;
+    pub const mouse_button_wheel_down: MouseButton = Input.MouseButton.wheel_down;
+
+    pub const mouse_press: MouseEventKind = Input.MouseEventKind.press;
+    pub const mouse_release: MouseEventKind = Input.MouseEventKind.release;
+    pub const mouse_move: MouseEventKind = Input.MouseEventKind.move;
+    pub const mouse_wheel: MouseEventKind = Input.MouseEventKind.wheel;
 
     /// Read-only render-facing view of visible terminal state.
     pub const RenderView = struct {

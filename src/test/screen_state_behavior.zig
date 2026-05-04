@@ -535,6 +535,27 @@ test "screen: DECSTBM and DL shift rows up inside region" {
     try std.testing.expectEqual(@as(u21, 0), s.cellAt(3, 0));
 }
 
+test "screen: DCH deletes chars and clears tail" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCells(gpa, 1, 8);
+    defer s.deinit(gpa);
+
+    s.apply(SemanticEvent{ .write_text = "reset" });
+    s.apply(SemanticEvent.backspace);
+    s.apply(SemanticEvent.backspace);
+    s.apply(SemanticEvent.backspace);
+    s.apply(SemanticEvent.backspace);
+    s.apply(SemanticEvent.backspace);
+    s.apply(SemanticEvent{ .delete_chars = 3 });
+    s.apply(SemanticEvent{ .write_text = "ll" });
+
+    try std.testing.expectEqual(@as(u21, 'l'), s.cellAt(0, 0));
+    try std.testing.expectEqual(@as(u21, 'l'), s.cellAt(0, 1));
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 2));
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 3));
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 4));
+}
+
 test "screen: SU scrolls only within configured region" {
     const gpa = std.testing.allocator;
     var s = try GridModel.initWithCells(gpa, 4, 4);

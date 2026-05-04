@@ -174,6 +174,16 @@ test "semantic: DL defaults to one line" {
     try std.testing.expectEqual(@as(u16, 1), sem.delete_lines);
 }
 
+test "semantic: DCH explicit count" {
+    const sem = process(makeStyleChange('P', 3, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 3), sem.delete_chars);
+}
+
+test "semantic: DCH defaults to one char" {
+    const sem = process(makeStyleChange('P', 0, 0, 0)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 1), sem.delete_chars);
+}
+
 test "semantic: SU explicit count" {
     const sem = process(makeStyleChange('S', 2, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u16, 2), sem.scroll_up_lines);
@@ -498,6 +508,11 @@ test "semantic: ED mode 1 above" {
 test "semantic: ED mode 2 full" {
     const sem = process(makeStyleChange('J', 2, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u2, 2), sem.erase_display);
+}
+
+test "semantic: ED mode 3 scrollback" {
+    const sem = process(makeStyleChange('J', 3, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u2, 3), sem.erase_display);
 }
 
 test "semantic: EL mode 0 right" {
