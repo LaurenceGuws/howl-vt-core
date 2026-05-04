@@ -19,6 +19,8 @@ pub const Input = struct {
     pub const MouseEventKind = mouse.MouseEventKind;
     /// Mouse-event payload.
     pub const MouseEvent = mouse.MouseEvent;
+    pub const MouseTrackingMode = mouse.MouseTrackingMode;
+    pub const MouseProtocol = mouse.MouseProtocol;
 
     /// Input codec owner.
     pub const Codec = codec.InputCodec;

@@ -52,6 +52,7 @@ pub const GridModel = struct {
     cursor_visible: bool,
     cursor_style: CursorStyle,
     auto_wrap: bool,
+    origin_mode: bool,
     view_padding_rows: u16,
     row_origin: u16,
     scroll_top: u16,
@@ -65,6 +66,11 @@ pub const GridModel = struct {
     history_write_idx: usize,
     history_lines: std.ArrayListUnmanaged(HistoryLine),
     open_history_line: ?HistoryLine,
+    saved_cursor: ?struct {
+        row: u16,
+        col: u16,
+        wrap_pending: bool,
+    },
     current_attrs: CellAttrs,
     dirty_rows: ?DirtyRows,
 
@@ -80,6 +86,7 @@ pub const GridModel = struct {
             .cursor_visible = true,
             .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
+            .origin_mode = false,
             .view_padding_rows = 0,
             .row_origin = 0,
             .scroll_top = 0,
@@ -93,6 +100,7 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .saved_cursor = null,
             .current_attrs = default_cell_attrs,
             .dirty_rows = null,
         };
@@ -122,6 +130,7 @@ pub const GridModel = struct {
             .cursor_visible = true,
             .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
+            .origin_mode = false,
             .view_padding_rows = 0,
             .row_origin = 0,
             .scroll_top = 0,
@@ -135,6 +144,7 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .saved_cursor = null,
             .current_attrs = default_cell_attrs,
             .dirty_rows = if (rows > 0) .{ .start_row = 0, .end_row = rows -| 1 } else null,
         };
@@ -174,6 +184,7 @@ pub const GridModel = struct {
             .cursor_visible = true,
             .cursor_style = types.default_cursor_style,
             .auto_wrap = true,
+            .origin_mode = false,
             .view_padding_rows = 0,
             .row_origin = 0,
             .scroll_top = 0,
@@ -187,6 +198,7 @@ pub const GridModel = struct {
             .history_write_idx = 0,
             .history_lines = .empty,
             .open_history_line = null,
+            .saved_cursor = null,
             .current_attrs = default_cell_attrs,
             .dirty_rows = if (rows > 0) .{ .start_row = 0, .end_row = rows -| 1 } else null,
         };
@@ -740,10 +752,12 @@ pub const GridModel = struct {
         self.cursor_visible = true;
         self.cursor_style = types.default_cursor_style;
         self.auto_wrap = true;
+        self.origin_mode = false;
         self.view_padding_rows = 0;
         self.row_origin = 0;
         self.scroll_top = 0;
         self.scroll_bottom = self.rows -| 1;
+        self.saved_cursor = null;
         self.current_attrs = default_cell_attrs;
         self.dirty_rows = if (self.rows > 0) .{ .start_row = 0, .end_row = self.rows -| 1 } else null;
         if (self.cells) |c| @memset(c, default_cell);
@@ -850,7 +864,7 @@ pub const GridModel = struct {
             },
             .cursor_position => |pos| {
                 self.wrap_pending = false;
-                self.cursor_row = @min(pos.row, self.rows -| 1);
+                self.cursor_row = @min(self.resolveAbsoluteRow(pos.row), self.rows -| 1);
                 self.cursor_col = @min(pos.col, self.cols -| 1);
             },
             .write_text => |s| {
@@ -889,6 +903,31 @@ pub const GridModel = struct {
                 self.auto_wrap = enabled;
                 if (!enabled) self.wrap_pending = false;
             },
+            .origin_mode => |enabled| {
+                self.origin_mode = enabled;
+                self.wrap_pending = false;
+                self.cursor_row = if (enabled) self.scroll_top else 0;
+                self.cursor_col = 0;
+            },
+            .application_cursor_keys,
+            .focus_reporting,
+            .bracketed_paste,
+            .mouse_tracking_off,
+            .mouse_tracking_x10,
+            .mouse_tracking_button_event,
+            .mouse_tracking_any_event,
+            .mouse_protocol_sgr,
+            .hyperlink_set,
+            .hyperlink_clear,
+            .clipboard_set,
+            .dec_mode_query,
+            .device_status_report,
+            .cursor_position_report,
+            .primary_device_attributes,
+            .secondary_device_attributes,
+            => {},
+            .save_cursor => self.saveCursor(),
+            .restore_cursor => self.restoreCursor(),
             .sgr => |sgr| self.applySgr(sgr.params[0..sgr.param_count]),
             .enter_alt_screen, .exit_alt_screen => {},
             .insert_lines => |count| {
@@ -952,8 +991,43 @@ pub const GridModel = struct {
                 @memset(c, default_cell);
                 if (self.row_wraps) |buf| @memset(buf, false);
             },
-            3 => {},
+            3 => self.clearScrollback(),
         }
+    }
+
+    pub fn setCurrentLinkId(self: *GridModel, link_id: u32) void {
+        self.current_attrs.link_id = link_id;
+    }
+
+    fn resolveAbsoluteRow(self: *const GridModel, row: u16) u16 {
+        if (!self.origin_mode) return row;
+        const bottom = self.scrollBottom();
+        const region_len = bottom - self.scroll_top;
+        return self.scroll_top + @min(row, region_len);
+    }
+
+    fn saveCursor(self: *GridModel) void {
+        self.saved_cursor = .{
+            .row = self.cursor_row,
+            .col = self.cursor_col,
+            .wrap_pending = self.wrap_pending,
+        };
+    }
+
+    fn restoreCursor(self: *GridModel) void {
+        if (self.saved_cursor) |saved| {
+            self.cursor_row = @min(saved.row, self.rows -| 1);
+            self.cursor_col = @min(saved.col, self.cols -| 1);
+            self.wrap_pending = saved.wrap_pending;
+        }
+    }
+
+    fn clearScrollback(self: *GridModel) void {
+        const allocator = self.allocator orelse return;
+        self.clearHistoryAuthority(allocator);
+        self.history_count = 0;
+        self.history_write_idx = 0;
+        self.markAllRowsDirty();
     }
 
     fn eraseLine(self: *GridModel, mode: u2) void {
@@ -1127,7 +1201,7 @@ pub const GridModel = struct {
 
         self.scroll_top = new_top;
         self.scroll_bottom = new_bottom;
-        self.cursor_row = 0;
+        self.cursor_row = if (self.origin_mode) self.scroll_top else 0;
         self.cursor_col = 0;
     }
 

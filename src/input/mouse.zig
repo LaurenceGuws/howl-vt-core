@@ -33,3 +33,15 @@ pub const MouseEvent = struct {
     mod: keymap.Modifier,
     buttons_down: u8,
 };
+
+pub const MouseTrackingMode = enum(u8) {
+    off,
+    x10,
+    button_event,
+    any_event,
+};
+
+pub const MouseProtocol = enum(u8) {
+    none,
+    sgr,
+};

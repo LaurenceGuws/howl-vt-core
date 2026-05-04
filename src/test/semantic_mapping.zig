@@ -262,6 +262,21 @@ test "semantic: DEC private wrap enable maps to auto_wrap true" {
     try std.testing.expect(process(ev).?.auto_wrap);
 }
 
+test "semantic: DEC private origin mode enable maps true" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 6;
+    const ev = Event{ .style_change = .{
+        .final = 'h',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(process(ev).?.origin_mode);
+}
+
 test "semantic: DEC private wrap disable maps to auto_wrap false" {
     var params = [_]i32{0} ** 16;
     params[0] = 7;
@@ -311,8 +326,163 @@ test "semantic: invalid_sequence returns null" {
     try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event.invalid_sequence));
 }
 
-test "semantic: title_set returns null" {
-    try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .title_set = "My Title" }));
+test "semantic: OSC title transport returns null" {
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .osc = .{
+        .kind = .title,
+        .command = @as(?u16, 0),
+        .payload = "My Title",
+        .terminator = .bel,
+    } }));
+}
+
+test "semantic: OSC 8 maps to hyperlink set and clear" {
+    try std.testing.expectEqualStrings("https://example.com", process(Event{ .osc = .{
+        .kind = .hyperlink,
+        .command = @as(?u16, 8),
+        .payload = ";https://example.com",
+        .terminator = .bel,
+    } }).?.hyperlink_set);
+    try std.testing.expect(process(Event{ .osc = .{
+        .kind = .hyperlink,
+        .command = @as(?u16, 8),
+        .payload = ";",
+        .terminator = .bel,
+    } }).? == .hyperlink_clear);
+}
+
+test "semantic: OSC 52 maps to clipboard set" {
+    try std.testing.expectEqualStrings("c;Zm9v", process(Event{ .osc = .{
+        .kind = .clipboard,
+        .command = @as(?u16, 52),
+        .payload = "c;Zm9v",
+        .terminator = .bel,
+    } }).?.clipboard_set);
+}
+
+test "semantic: APC DCS and ESC transport return null" {
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .apc = "kitty" }));
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .dcs = "data" }));
+    try std.testing.expectEqual(@as(?SemanticEvent, null), process(Event{ .esc_final = 'M' }));
+}
+
+test "semantic: DEC save and restore cursor from ESC finals" {
+    try std.testing.expect(process(Event{ .esc_final = '7' }).? == .save_cursor);
+    try std.testing.expect(process(Event{ .esc_final = '8' }).? == .restore_cursor);
+}
+
+test "semantic: DEC private application cursor enable maps true" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 1;
+    const ev = Event{ .style_change = .{
+        .final = 'h',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(process(ev).?.application_cursor_keys);
+}
+
+test "semantic: DEC private focus reporting enable maps true" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 1004;
+    const ev = Event{ .style_change = .{
+        .final = 'h',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(process(ev).?.focus_reporting);
+}
+
+test "semantic: DEC private bracketed paste disable maps false" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 2004;
+    const ev = Event{ .style_change = .{
+        .final = 'l',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(!process(ev).?.bracketed_paste);
+}
+
+test "semantic: DEC private mouse tracking mode mappings" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 1000;
+    var ev = Event{ .style_change = .{
+        .final = 'h',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(process(ev).? == .mouse_tracking_x10);
+    params[0] = 1002;
+    ev.style_change.params = params;
+    try std.testing.expect(process(ev).? == .mouse_tracking_button_event);
+    params[0] = 1003;
+    ev.style_change.params = params;
+    try std.testing.expect(process(ev).? == .mouse_tracking_any_event);
+    params[0] = 1006;
+    ev.style_change.params = params;
+    try std.testing.expect(process(ev).?.mouse_protocol_sgr);
+}
+
+test "semantic: DSR 5 maps to device status report" {
+    const sem = process(makeStyleChange('n', 5, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .device_status_report);
+}
+
+test "semantic: DSR 6 maps to cursor position report" {
+    const sem = process(makeStyleChange('n', 6, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .cursor_position_report);
+}
+
+test "semantic: DA maps to primary device attributes" {
+    const sem = process(makeStyleChange('c', 0, 0, 0)) orelse return error.NoEvent;
+    try std.testing.expect(sem == .primary_device_attributes);
+}
+
+test "semantic: DA2 maps to secondary device attributes" {
+    const params = [_]i32{0} ** 16;
+    const ev = Event{ .style_change = .{
+        .final = 'c',
+        .params = params,
+        .param_count = 0,
+        .leader = '>',
+        .private = false,
+        .intermediates = [_]u8{0} ** 4,
+        .intermediates_len = 0,
+    } };
+    try std.testing.expect(process(ev).? == .secondary_device_attributes);
+}
+
+test "semantic: DECRQM maps to dec mode query" {
+    var params = [_]i32{0} ** 16;
+    params[0] = 1004;
+    var intermediates = [_]u8{0} ** 4;
+    intermediates[0] = '$';
+    const ev = Event{ .style_change = .{
+        .final = 'p',
+        .params = params,
+        .param_count = 1,
+        .leader = '?',
+        .private = true,
+        .intermediates = intermediates,
+        .intermediates_len = 1,
+    } };
+    try std.testing.expectEqual(@as(u16, 1004), process(ev).?.dec_mode_query);
 }
 
 test "semantic: ED no param defaults to mode 0" {

@@ -58,8 +58,9 @@ test "pipeline: stray ESC in OSC dropped, byte appended" {
     defer pl.deinit();
     pl.feedSlice("\x1b]ti\x1btle\x07");
     try std.testing.expectEqual(@as(usize, 1), pl.len());
-    try std.testing.expect(pl.events()[0] == .title_set);
-    try std.testing.expectEqualSlices(u8, "title", pl.events()[0].title_set);
+    try std.testing.expect(pl.events()[0] == .osc);
+    try std.testing.expectEqual(.title, pl.events()[0].osc.kind);
+    try std.testing.expectEqualSlices(u8, "title", pl.events()[0].osc.payload);
 }
 
 test "replay: pipeline clear drops pending bridge events before apply" {

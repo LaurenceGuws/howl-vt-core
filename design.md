@@ -5,12 +5,11 @@ Shared rules: [`../design/design-rules.md`](../design/design-rules.md)
 ## Purpose
 `howl-vt-core` owns the host-neutral terminal model.
 
-It parses terminal input streams, interprets them into semantic actions, applies them to grid state, tracks selection and snapshot state, and exposes a stable render-facing view.
+It parses terminal input streams, interprets them into semantic actions, applies them to grid state, tracks selection and snapshot state, and exposes stable render-facing and host-output-facing surfaces.
 
 ## Public Surface
 - `VtCore`: main runtime owner.
 - `Input`: input domain owner.
-- `ParserApi`: parser domain owner.
 - `Interpret`: interpret domain owner.
 - `Grid`: grid domain owner.
 - `Selection`: selection domain owner.
@@ -31,7 +30,6 @@ classDiagram
       +selectionState()
     }
     class Input
-    class ParserApi
     class Interpret
     class Grid
     class Selection
@@ -47,12 +45,12 @@ classDiagram
 ## Ownership Rules
 - `VtCore` owns lifecycle, parser pipeline ownership, grid state, and selection state.
 - `Input` owns key, modifier, mouse, and input codec vocabulary.
-- `ParserApi` owns byte-stream parsing contracts.
 - `Interpret` owns parser-to-grid translation flow.
 - `Grid` owns screen, cursor, and scrollback model state.
 - `Grid` treats scrollback truth as logical lines; history rows exposed to hosts and snapshots are width-dependent projections.
 - `Selection` owns selection state and validity against grid mutations.
 - `Snapshot` owns exported snapshot shapes only.
+- `parser.zig` remains a sibling internal owner for byte-stream parsing contracts used by interpret, tests, and fuzzing.
 
 ## Lifecycle
 ```mermaid
@@ -102,7 +100,7 @@ sequenceDiagram
 ## API Contracts
 - `init*` returns an owned `VtCore`; caller must later call `deinit`.
 - `feedByte` and `feedSlice` queue parser work only; they do not apply it to the grid.
-- `apply` is the boundary that mutates screen state.
+- `apply` is the boundary that mutates screen state and resolves any queued host-facing protocol output.
 - `renderView` returns a stable read-only projection for rendering.
 - `resize` preserves terminal semantics while updating visible geometry.
 - `historyCapacity` limits retained logical history lines; projected history row count may exceed that when narrow widths rewrap those lines.

@@ -7,7 +7,7 @@ const keymap = @import("keymap.zig");
 const mouse = @import("mouse.zig");
 
 pub const InputCodec = struct {
-    pub fn encodeKey(buf: []u8, key: keymap.Key, mod: keymap.Modifier) []const u8 {
+    pub fn encodeKey(buf: []u8, key: keymap.Key, mod: keymap.Modifier, application_cursor_keys: bool) []const u8 {
         var len: usize = 0;
         const shift_active = (mod & keymap.VTERM_MOD_SHIFT) != 0;
 
@@ -37,56 +37,76 @@ pub const InputCodec = struct {
             },
             keymap.VTERM_KEY_UP => {
                 buf[0] = '\x1b';
-                buf[1] = '[';
                 if (mod != keymap.VTERM_MOD_NONE) {
+                    buf[1] = '[';
                     buf[2] = '1';
                     buf[3] = ';';
                     buf[4] = '0' + (1 + mod);
                     buf[5] = 'A';
                     len = 6;
+                } else if (application_cursor_keys) {
+                    buf[1] = 'O';
+                    buf[2] = 'A';
+                    len = 3;
                 } else {
+                    buf[1] = '[';
                     buf[2] = 'A';
                     len = 3;
                 }
             },
             keymap.VTERM_KEY_DOWN => {
                 buf[0] = '\x1b';
-                buf[1] = '[';
                 if (mod != keymap.VTERM_MOD_NONE) {
+                    buf[1] = '[';
                     buf[2] = '1';
                     buf[3] = ';';
                     buf[4] = '0' + (1 + mod);
                     buf[5] = 'B';
                     len = 6;
+                } else if (application_cursor_keys) {
+                    buf[1] = 'O';
+                    buf[2] = 'B';
+                    len = 3;
                 } else {
+                    buf[1] = '[';
                     buf[2] = 'B';
                     len = 3;
                 }
             },
             keymap.VTERM_KEY_RIGHT => {
                 buf[0] = '\x1b';
-                buf[1] = '[';
                 if (mod != keymap.VTERM_MOD_NONE) {
+                    buf[1] = '[';
                     buf[2] = '1';
                     buf[3] = ';';
                     buf[4] = '0' + (1 + mod);
                     buf[5] = 'C';
                     len = 6;
+                } else if (application_cursor_keys) {
+                    buf[1] = 'O';
+                    buf[2] = 'C';
+                    len = 3;
                 } else {
+                    buf[1] = '[';
                     buf[2] = 'C';
                     len = 3;
                 }
             },
             keymap.VTERM_KEY_LEFT => {
                 buf[0] = '\x1b';
-                buf[1] = '[';
                 if (mod != keymap.VTERM_MOD_NONE) {
+                    buf[1] = '[';
                     buf[2] = '1';
                     buf[3] = ';';
                     buf[4] = '0' + (1 + mod);
                     buf[5] = 'D';
                     len = 6;
+                } else if (application_cursor_keys) {
+                    buf[1] = 'O';
+                    buf[2] = 'D';
+                    len = 3;
                 } else {
+                    buf[1] = '[';
                     buf[2] = 'D';
                     len = 3;
                 }
@@ -364,9 +384,66 @@ pub const InputCodec = struct {
         return buf[0..len];
     }
 
-    pub fn encodeMouse(buf: []u8, event: mouse.MouseEvent) []const u8 {
-        _ = event;
-        return buf[0..0];
+    pub fn encodeMouse(buf: []u8, event: mouse.MouseEvent, tracking: mouse.MouseTrackingMode, protocol: mouse.MouseProtocol) []const u8 {
+        if (tracking == .off or protocol != .sgr) return buf[0..0];
+
+        const emit = switch (event.kind) {
+            .press, .release, .wheel => true,
+            .move => switch (tracking) {
+                .button_event => event.buttons_down != 0,
+                .any_event => true,
+                else => false,
+            },
+        };
+        if (!emit) return buf[0..0];
+
+        const row1 = if (event.row < 0) 1 else event.row + 1;
+        const col1 = @as(u32, event.col) + 1;
+        const final: u8 = if (event.kind == .release) 'm' else 'M';
+        const cb = sgrMouseCode(event, tracking);
+        const text = std.fmt.bufPrint(buf, "\x1b[<{d};{d};{d}{c}", .{ cb, col1, row1, final }) catch return buf[0..0];
+        return text;
+    }
+
+    fn sgrMouseCode(event: mouse.MouseEvent, tracking: mouse.MouseTrackingMode) u16 {
+        var code: u16 = switch (event.kind) {
+            .press => pressButtonCode(event.button),
+            .release => 3,
+            .wheel => wheelButtonCode(event.button),
+            .move => moveBaseCode(event, tracking),
+        };
+        if ((event.mod & keymap.VTERM_MOD_SHIFT) != 0) code += 4;
+        if ((event.mod & keymap.VTERM_MOD_ALT) != 0) code += 8;
+        if ((event.mod & keymap.VTERM_MOD_CTRL) != 0) code += 16;
+        if (event.kind == .move) code += 32;
+        return code;
+    }
+
+    fn pressButtonCode(button: mouse.MouseButton) u16 {
+        return switch (button) {
+            .left => 0,
+            .middle => 1,
+            .right => 2,
+            .wheel_up => 64,
+            .wheel_down => 65,
+            .none => 3,
+        };
+    }
+
+    fn wheelButtonCode(button: mouse.MouseButton) u16 {
+        return switch (button) {
+            .wheel_up => 64,
+            .wheel_down => 65,
+            else => pressButtonCode(button),
+        };
+    }
+
+    fn moveBaseCode(event: mouse.MouseEvent, tracking: mouse.MouseTrackingMode) u16 {
+        _ = tracking;
+        if ((event.buttons_down & 0x01) != 0) return 0;
+        if ((event.buttons_down & 0x02) != 0) return 1;
+        if ((event.buttons_down & 0x04) != 0) return 2;
+        return 3;
     }
 
     pub fn parseKeyToken(name: []const u8) ?keymap.Key {

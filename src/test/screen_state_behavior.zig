@@ -56,6 +56,32 @@ test "screen: auto_wrap mode toggles and does not move cursor" {
     try std.testing.expectEqual(@as(u16, 4), s.cursor_col);
 }
 
+test "screen: origin mode makes cursor positioning relative to scroll region" {
+    var s = GridModel.init(6, 10);
+    s.apply(SemanticEvent{ .set_scroll_region = .{ .top = 2, .bottom = 4 } });
+    s.apply(SemanticEvent{ .origin_mode = true });
+    s.apply(SemanticEvent{ .cursor_position = .{ .row = 0, .col = 1 } });
+    try std.testing.expectEqual(@as(u16, 2), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 1), s.cursor_col);
+    s.apply(SemanticEvent{ .cursor_position = .{ .row = 2, .col = 0 } });
+    try std.testing.expectEqual(@as(u16, 4), s.cursor_row);
+}
+
+test "screen: save and restore cursor restores position and wrap" {
+    var s = GridModel.init(4, 8);
+    s.cursor_row = 1;
+    s.cursor_col = 5;
+    s.wrap_pending = true;
+    s.apply(.save_cursor);
+    s.cursor_row = 3;
+    s.cursor_col = 0;
+    s.wrap_pending = false;
+    s.apply(.restore_cursor);
+    try std.testing.expectEqual(@as(u16, 1), s.cursor_row);
+    try std.testing.expectEqual(@as(u16, 5), s.cursor_col);
+    try std.testing.expect(s.wrap_pending);
+}
+
 test "screen: cursor_up moves row" {
     var s = GridModel.init(24, 80);
     s.cursor_row = 5;
@@ -567,6 +593,17 @@ test "screen: reset does not truncate history" {
     try std.testing.expectEqual(@as(usize, 1), s.history_count);
     s.reset();
     try std.testing.expectEqual(@as(usize, 1), s.history_count);
+}
+
+test "screen: ED 3 clears scrollback history" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCellsAndHistory(gpa, 2, 4, 8);
+    defer s.deinit(gpa);
+
+    s.apply(SemanticEvent{ .write_text = "AAAA\nBBBB\nCCCC" });
+    try std.testing.expect(s.historyCount() > 0);
+    s.apply(SemanticEvent{ .erase_display = 3 });
+    try std.testing.expectEqual(@as(usize, 0), s.historyCount());
 }
 
 test "screen: row-only resize preserves live bottom and restores from history" {

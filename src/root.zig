@@ -16,6 +16,10 @@ const Interpret = interpret_owner.Interpret;
 const Selection = selection_owner.Selection;
 const Snapshot = snapshot_owner.Snapshot;
 
+const ClipboardRequest = struct {
+    raw: []u8,
+};
+
 
 /// Host-neutral terminal facade.
 pub const VtCore = struct {
@@ -127,6 +131,14 @@ pub const VtCore = struct {
         cursor_visible: bool,
     } = null,
     selection: Selection.SelectionState,
+    application_cursor_keys: bool = false,
+    focus_reporting: bool = false,
+    bracketed_paste: bool = false,
+    mouse_tracking: Input.MouseTrackingMode = .off,
+    mouse_protocol: Input.MouseProtocol = .none,
+    pending_output: std.ArrayList(u8),
+    hyperlink_targets: std.ArrayList([]u8),
+    pending_clipboard: ?ClipboardRequest = null,
     encode_buf: [64]u8 = undefined,
     encode_len: usize = 0,
 
@@ -143,6 +155,8 @@ pub const VtCore = struct {
             .alt_state = alt_state,
             .alt_active = false,
             .selection = Selection.SelectionState.init(),
+            .pending_output = std.ArrayList(u8).empty,
+            .hyperlink_targets = std.ArrayList([]u8).empty,
         };
     }
 
@@ -161,6 +175,8 @@ pub const VtCore = struct {
             .alt_state = alt_state,
             .alt_active = false,
             .selection = Selection.SelectionState.init(),
+            .pending_output = std.ArrayList(u8).empty,
+            .hyperlink_targets = std.ArrayList([]u8).empty,
         };
     }
 
@@ -179,11 +195,17 @@ pub const VtCore = struct {
             .alt_state = alt_state,
             .alt_active = false,
             .selection = Selection.SelectionState.init(),
+            .pending_output = std.ArrayList(u8).empty,
+            .hyperlink_targets = std.ArrayList([]u8).empty,
         };
     }
 
     /// Release vt_core-owned resources.
     pub fn deinit(self: *VtCore) void {
+        for (self.hyperlink_targets.items) |uri| self.allocator.free(uri);
+        self.hyperlink_targets.deinit(self.allocator);
+        if (self.pending_clipboard) |req| self.allocator.free(req.raw);
+        self.pending_output.deinit(self.allocator);
         self.primary_state.deinit(self.allocator);
         self.alt_state.deinit(self.allocator);
         self.pipeline.deinit();
@@ -213,6 +235,31 @@ pub const VtCore = struct {
     /// Clear queued events without applying.
     pub fn clear(self: *VtCore) void {
         self.pipeline.clear();
+    }
+
+    pub fn pendingOutput(self: *const VtCore) []const u8 {
+        return self.pending_output.items;
+    }
+
+    pub fn clearPendingOutput(self: *VtCore) void {
+        self.pending_output.clearRetainingCapacity();
+    }
+
+    pub fn hyperlinkUriForId(self: *const VtCore, link_id: u32) ?[]const u8 {
+        if (link_id == 0) return null;
+        const idx = link_id - 1;
+        if (idx >= self.hyperlink_targets.items.len) return null;
+        return self.hyperlink_targets.items[idx];
+    }
+
+    pub fn pendingClipboardSet(self: *const VtCore) ?[]const u8 {
+        if (self.pending_clipboard) |req| return req.raw;
+        return null;
+    }
+
+    pub fn clearPendingClipboardSet(self: *VtCore) void {
+        if (self.pending_clipboard) |req| self.allocator.free(req.raw);
+        self.pending_clipboard = null;
     }
 
     /// Reset parser state and clear queue.
@@ -271,7 +318,7 @@ pub const VtCore = struct {
             i -= 1;
             const ev = self.pipeline.events()[i];
             switch (ev) {
-                .title_set => |title| return title,
+                .osc => |osc| if (osc.kind == .title) return osc.payload,
                 else => {},
             }
         }
@@ -331,16 +378,44 @@ pub const VtCore = struct {
 
     /// Encode logical key and modifiers.
     pub fn encodeKey(self: *VtCore, key: Input.Key, mod: Input.Modifier) []const u8 {
-        const encoded = Input.Codec.encodeKey(self.encode_buf[0..], key, mod);
+        const encoded = Input.Codec.encodeKey(self.encode_buf[0..], key, mod, self.application_cursor_keys);
         self.encode_len = encoded.len;
         return encoded;
     }
 
     /// Encode mouse event payload (placeholder surface).
     pub fn encodeMouse(self: *VtCore, event: Input.MouseEvent) []const u8 {
-        const encoded = Input.Codec.encodeMouse(self.encode_buf[0..], event);
+        const encoded = Input.Codec.encodeMouse(self.encode_buf[0..], event, self.mouse_tracking, self.mouse_protocol);
         self.encode_len = encoded.len;
         return encoded;
+    }
+
+    pub fn encodeFocusIn(self: *VtCore) []const u8 {
+        const encoded = if (self.focus_reporting) "\x1b[I" else "";
+        @memcpy(self.encode_buf[0..encoded.len], encoded);
+        self.encode_len = encoded.len;
+        return self.encode_buf[0..encoded.len];
+    }
+
+    pub fn encodeFocusOut(self: *VtCore) []const u8 {
+        const encoded = if (self.focus_reporting) "\x1b[O" else "";
+        @memcpy(self.encode_buf[0..encoded.len], encoded);
+        self.encode_len = encoded.len;
+        return self.encode_buf[0..encoded.len];
+    }
+
+    pub fn encodePasteStart(self: *VtCore) []const u8 {
+        const encoded = if (self.bracketed_paste) "\x1b[200~" else "";
+        @memcpy(self.encode_buf[0..encoded.len], encoded);
+        self.encode_len = encoded.len;
+        return self.encode_buf[0..encoded.len];
+    }
+
+    pub fn encodePasteEnd(self: *VtCore) []const u8 {
+        const encoded = if (self.bracketed_paste) "\x1b[201~" else "";
+        @memcpy(self.encode_buf[0..encoded.len], encoded);
+        self.encode_len = encoded.len;
+        return self.encode_buf[0..encoded.len];
     }
 
     /// Parse host key token into vt-core key constant.
@@ -394,8 +469,81 @@ pub const VtCore = struct {
         switch (sem_ev) {
             .enter_alt_screen => |opts| self.enterAltScreen(opts.clear, opts.save_cursor),
             .exit_alt_screen => |opts| self.exitAltScreen(opts.restore_cursor),
+            .application_cursor_keys => |enabled| self.application_cursor_keys = enabled,
+            .focus_reporting => |enabled| self.focus_reporting = enabled,
+            .bracketed_paste => |enabled| self.bracketed_paste = enabled,
+            .mouse_tracking_off => self.mouse_tracking = .off,
+            .mouse_tracking_x10 => self.mouse_tracking = .x10,
+            .mouse_tracking_button_event => self.mouse_tracking = .button_event,
+            .mouse_tracking_any_event => self.mouse_tracking = .any_event,
+            .mouse_protocol_sgr => |enabled| self.mouse_protocol = if (enabled) .sgr else .none,
+            .hyperlink_set => |uri| self.activeStateMut().setCurrentLinkId(self.internHyperlink(uri)),
+            .hyperlink_clear => self.activeStateMut().setCurrentLinkId(0),
+            .clipboard_set => |payload| self.setPendingClipboard(payload),
+            .dec_mode_query => |mode| self.appendDecModeReport(mode),
+            .device_status_report => self.appendPendingOutput("\x1b[0n"),
+            .cursor_position_report => self.appendCursorPositionReport(),
+            .primary_device_attributes => self.appendPendingOutput("\x1b[?62;22c"),
+            .secondary_device_attributes => self.appendPendingOutput("\x1b[>1;10;0c"),
             else => self.activeStateMut().apply(sem_ev),
         }
+    }
+
+    fn appendPendingOutput(self: *VtCore, bytes: []const u8) void {
+        self.pending_output.appendSlice(self.allocator, bytes) catch {};
+    }
+
+    fn appendCursorPositionReport(self: *VtCore) void {
+        const view = self.renderView();
+        const text = std.fmt.bufPrint(self.encode_buf[0..], "\x1b[{d};{d}R", .{ view.cursor_row + 1, view.cursor_col + 1 }) catch return;
+        self.appendPendingOutput(text);
+    }
+
+    fn appendDecModeReport(self: *VtCore, mode: u16) void {
+        const state = self.decModeState(mode);
+        const text = std.fmt.bufPrint(self.encode_buf[0..], "\x1b[?{d};{d}$y", .{ mode, state }) catch return;
+        self.appendPendingOutput(text);
+    }
+
+    fn decModeState(self: *const VtCore, mode: u16) u8 {
+        return switch (mode) {
+            1 => boolToDecModeState(self.application_cursor_keys),
+            7 => boolToDecModeState(self.activeState().auto_wrap),
+            25 => boolToDecModeState(self.activeState().cursor_visible),
+            47, 1047, 1049 => boolToDecModeState(self.alt_active),
+            1000 => if (self.mouse_tracking == .x10) 1 else 2,
+            1002 => if (self.mouse_tracking == .button_event) 1 else 2,
+            1003 => if (self.mouse_tracking == .any_event) 1 else 2,
+            1004 => boolToDecModeState(self.focus_reporting),
+            1006 => boolToDecModeState(self.mouse_protocol == .sgr),
+            2004 => boolToDecModeState(self.bracketed_paste),
+            else => 0,
+        };
+    }
+
+    fn boolToDecModeState(enabled: bool) u8 {
+        return if (enabled) 1 else 2;
+    }
+
+    fn internHyperlink(self: *VtCore, uri: []const u8) u32 {
+        for (self.hyperlink_targets.items, 0..) |existing, idx| {
+            if (std.mem.eql(u8, existing, uri)) return @intCast(idx + 1);
+        }
+        const owned = self.allocator.dupe(u8, uri) catch return 0;
+        self.hyperlink_targets.append(self.allocator, owned) catch {
+            self.allocator.free(owned);
+            return 0;
+        };
+        return @intCast(self.hyperlink_targets.items.len);
+    }
+
+    fn setPendingClipboard(self: *VtCore, payload: []const u8) void {
+        if (self.pending_clipboard) |req| self.allocator.free(req.raw);
+        const owned = self.allocator.dupe(u8, payload) catch {
+            self.pending_clipboard = null;
+            return;
+        };
+        self.pending_clipboard = .{ .raw = owned };
     }
 
     fn enterAltScreen(self: *VtCore, clear_alt: bool, save_cursor: bool) void {
@@ -638,6 +786,166 @@ test "encodeMouse returns empty output and does not mutate state" {
     try std.testing.expectEqual(snap_before.cursor_col, snap_after.cursor_col);
     try std.testing.expectEqual(snap_before.selection, snap_after.selection);
     try std.testing.expectEqual(snap_before.history_count, snap_after.history_count);
+}
+
+test "mouse reporting is gated by DECSET mouse modes and SGR protocol" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 5, 10);
+    defer vt_core.deinit();
+
+    const mouse_event = Input.MouseEvent{
+        .kind = .press,
+        .button = .left,
+        .row = 2,
+        .col = 3,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 1,
+    };
+
+    try std.testing.expectEqualStrings("", vt_core.encodeMouse(mouse_event));
+    vt_core.feedSlice("\x1b[?1000h\x1b[?1006h");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[<0;4;3M", vt_core.encodeMouse(mouse_event));
+
+    const move_event = Input.MouseEvent{
+        .kind = .move,
+        .button = .left,
+        .row = 2,
+        .col = 3,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 1,
+    };
+    try std.testing.expectEqualStrings("", vt_core.encodeMouse(move_event));
+    vt_core.feedSlice("\x1b[?1002h");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[<32;4;3M", vt_core.encodeMouse(move_event));
+    vt_core.feedSlice("\x1b[?1003h");
+    vt_core.apply();
+    const hover_event = Input.MouseEvent{
+        .kind = .move,
+        .button = .none,
+        .row = 1,
+        .col = 1,
+        .pixel_x = null,
+        .pixel_y = null,
+        .mod = 0,
+        .buttons_down = 0,
+    };
+    try std.testing.expectEqualStrings("\x1b[<35;2;2M", vt_core.encodeMouse(hover_event));
+}
+
+test "latestTitleSet returns typed OSC title payload" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 8);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("\x1b]0;My Title\x07");
+    try std.testing.expectEqualStrings("My Title", vt_core.latestTitleSet().?);
+}
+
+test "OSC 8 assigns link ids and preserves URI lookup" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 16);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("\x1b]8;;https://example.com\x07abc\x1b]8;;\x07z");
+    vt_core.apply();
+
+    const first = vt_core.screen().cellInfoAt(0, 0).attrs.link_id;
+    const second = vt_core.screen().cellInfoAt(0, 1).attrs.link_id;
+    const third = vt_core.screen().cellInfoAt(0, 2).attrs.link_id;
+    const trailing = vt_core.screen().cellInfoAt(0, 3).attrs.link_id;
+    try std.testing.expect(first != 0);
+    try std.testing.expectEqual(first, second);
+    try std.testing.expectEqual(first, third);
+    try std.testing.expectEqual(@as(u32, 0), trailing);
+    try std.testing.expectEqualStrings("https://example.com", vt_core.hyperlinkUriForId(first).?);
+}
+
+test "OSC 52 produces pending clipboard request" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 16);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("\x1b]52;c;Zm9v\x07");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("c;Zm9v", vt_core.pendingClipboardSet().?);
+    vt_core.clearPendingClipboardSet();
+    try std.testing.expectEqual(@as(?[]const u8, null), vt_core.pendingClipboardSet());
+}
+
+test "application cursor mode changes arrow key encoding" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 8);
+    defer vt_core.deinit();
+
+    try std.testing.expectEqualStrings("\x1b[A", vt_core.encodeKey(VtCore.key_up, VtCore.mod_none));
+    vt_core.feedSlice("\x1b[?1h");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1bOA", vt_core.encodeKey(VtCore.key_up, VtCore.mod_none));
+    try std.testing.expectEqualStrings("\x1b[1;5A", vt_core.encodeKey(VtCore.key_up, VtCore.mod_ctrl));
+    vt_core.feedSlice("\x1b[?1l");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[A", vt_core.encodeKey(VtCore.key_up, VtCore.mod_none));
+}
+
+test "focus reports are gated by DECSET 1004" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 8);
+    defer vt_core.deinit();
+
+    try std.testing.expectEqualStrings("", vt_core.encodeFocusIn());
+    try std.testing.expectEqualStrings("", vt_core.encodeFocusOut());
+    vt_core.feedSlice("\x1b[?1004h");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[I", vt_core.encodeFocusIn());
+    try std.testing.expectEqualStrings("\x1b[O", vt_core.encodeFocusOut());
+    vt_core.feedSlice("\x1b[?1004l");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("", vt_core.encodeFocusIn());
+}
+
+test "bracketed paste wrappers are gated by DECSET 2004" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 3, 8);
+    defer vt_core.deinit();
+
+    try std.testing.expectEqualStrings("", vt_core.encodePasteStart());
+    try std.testing.expectEqualStrings("", vt_core.encodePasteEnd());
+    vt_core.feedSlice("\x1b[?2004h");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[200~", vt_core.encodePasteStart());
+    try std.testing.expectEqualStrings("\x1b[201~", vt_core.encodePasteEnd());
+    vt_core.feedSlice("\x1b[?2004l");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("", vt_core.encodePasteStart());
+}
+
+test "report queries append pending host output" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 4, 8);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("\x1b[2;3H\x1b[5n\x1b[6n\x1b[c\x1b[>c");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[0n\x1b[2;3R\x1b[?62;22c\x1b[>1;10;0c", vt_core.pendingOutput());
+
+    vt_core.clearPendingOutput();
+    try std.testing.expectEqualStrings("", vt_core.pendingOutput());
+}
+
+test "DEC mode queries append DECRPM replies" {
+    const allocator = std.testing.allocator;
+    var vt_core = try VtCore.initWithCells(allocator, 4, 8);
+    defer vt_core.deinit();
+
+    vt_core.feedSlice("\x1b[?1004h\x1b[?2004h\x1b[?1002h\x1b[?1006h\x1b[?1004$p\x1b[?2004$p\x1b[?1002$p\x1b[?1006$p\x1b[?25$p\x1b[?9999$p");
+    vt_core.apply();
+    try std.testing.expectEqualStrings("\x1b[?1004;1$y\x1b[?2004;1$y\x1b[?1002;1$y\x1b[?1006;1$y\x1b[?25;1$y\x1b[?9999;0$y", vt_core.pendingOutput());
 }
 
 test "VtCore exposes key and modifier constants" {

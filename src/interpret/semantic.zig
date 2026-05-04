@@ -29,12 +29,31 @@ pub const SemanticEvent = union(enum) {
     horizontal_tab_back: u16,
     cursor_visible: bool,
     auto_wrap: bool,
+    origin_mode: bool,
+    application_cursor_keys: bool,
+    focus_reporting: bool,
+    bracketed_paste: bool,
+    mouse_tracking_off,
+    mouse_tracking_x10,
+    mouse_tracking_button_event,
+    mouse_tracking_any_event,
+    mouse_protocol_sgr: bool,
+    hyperlink_set: []const u8,
+    hyperlink_clear,
+    clipboard_set: []const u8,
+    dec_mode_query: u16,
+    device_status_report,
+    cursor_position_report,
+    primary_device_attributes,
+    secondary_device_attributes,
     sgr: struct {
         params: [16]i32,
         param_count: u8,
     },
     enter_alt_screen: struct { clear: bool, save_cursor: bool },
     exit_alt_screen: struct { restore_cursor: bool },
+    save_cursor,
+    restore_cursor,
     insert_lines: u16,
     delete_lines: u16,
     scroll_up_lines: u16,
@@ -55,13 +74,39 @@ pub fn process(event: Event) ?SemanticEvent {
         .text => |s| return SemanticEvent{ .write_text = s },
         .codepoint => |cp| return SemanticEvent{ .write_codepoint = cp },
         .control => |c| return processControl(c),
-        .title_set, .invalid_sequence => return null,
+        .osc => |osc| return processOsc(osc.kind, osc.payload),
+        .esc_final => |final| return processEscFinal(final),
+        .apc, .dcs, .invalid_sequence => return null,
     }
+}
+
+fn processEscFinal(final: u8) ?SemanticEvent {
+    return switch (final) {
+        '7' => SemanticEvent.save_cursor,
+        '8' => SemanticEvent.restore_cursor,
+        else => null,
+    };
+}
+
+fn processOsc(kind: bridge_mod.OscKind, payload: []const u8) ?SemanticEvent {
+    return switch (kind) {
+        .hyperlink => blk: {
+            const separator = std.mem.indexOfScalar(u8, payload, ';') orelse break :blk null;
+            const uri = payload[separator + 1 ..];
+            if (uri.len == 0) break :blk SemanticEvent.hyperlink_clear;
+            break :blk SemanticEvent{ .hyperlink_set = uri };
+        },
+        .clipboard => SemanticEvent{ .clipboard_set = payload },
+        else => null,
+    };
 }
 
 fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, intermediates: [4]u8, intermediates_len: u8) ?SemanticEvent {
     if (private) {
         if (leader == '?' and count >= 1) {
+            if (final == 'p' and intermediatesLenHas(intermediates, intermediates_len, '$')) {
+                return SemanticEvent{ .dec_mode_query = paramOrDefault0(params[0]) };
+            }
             return switch (params[0]) {
                 25 => switch (final) {
                     'h' => SemanticEvent{ .cursor_visible = true },
@@ -71,6 +116,46 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
                 7 => switch (final) {
                     'h' => SemanticEvent{ .auto_wrap = true },
                     'l' => SemanticEvent{ .auto_wrap = false },
+                    else => null,
+                },
+                6 => switch (final) {
+                    'h' => SemanticEvent{ .origin_mode = true },
+                    'l' => SemanticEvent{ .origin_mode = false },
+                    else => null,
+                },
+                1 => switch (final) {
+                    'h' => SemanticEvent{ .application_cursor_keys = true },
+                    'l' => SemanticEvent{ .application_cursor_keys = false },
+                    else => null,
+                },
+                1004 => switch (final) {
+                    'h' => SemanticEvent{ .focus_reporting = true },
+                    'l' => SemanticEvent{ .focus_reporting = false },
+                    else => null,
+                },
+                2004 => switch (final) {
+                    'h' => SemanticEvent{ .bracketed_paste = true },
+                    'l' => SemanticEvent{ .bracketed_paste = false },
+                    else => null,
+                },
+                1000 => switch (final) {
+                    'h' => SemanticEvent.mouse_tracking_x10,
+                    'l' => SemanticEvent.mouse_tracking_off,
+                    else => null,
+                },
+                1002 => switch (final) {
+                    'h' => SemanticEvent.mouse_tracking_button_event,
+                    'l' => SemanticEvent.mouse_tracking_off,
+                    else => null,
+                },
+                1003 => switch (final) {
+                    'h' => SemanticEvent.mouse_tracking_any_event,
+                    'l' => SemanticEvent.mouse_tracking_off,
+                    else => null,
+                },
+                1006 => switch (final) {
+                    'h' => SemanticEvent{ .mouse_protocol_sgr = true },
+                    'l' => SemanticEvent{ .mouse_protocol_sgr = false },
                     else => null,
                 },
                 47 => switch (final) {
@@ -92,6 +177,12 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
             };
         }
         return null;
+    }
+    if (leader == '>') {
+        return switch (final) {
+            'c' => SemanticEvent.secondary_device_attributes,
+            else => null,
+        };
     }
     if (leader != 0) return null;
     switch (final) {
@@ -121,6 +212,12 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         } },
         'J' => return SemanticEvent{ .erase_display = eraseMode(params[0]) },
         'K' => return SemanticEvent{ .erase_line = eraseMode(params[0]) },
+        'n' => switch (paramOrDefault0(params[0])) {
+            5 => return SemanticEvent.device_status_report,
+            6 => return SemanticEvent.cursor_position_report,
+            else => return null,
+        },
+        'c' => return SemanticEvent.primary_device_attributes,
         'p' => {
             if (count == 0 and intermediates_len == 1 and intermediates[0] == '!') {
                 return SemanticEvent.reset_screen;
@@ -153,4 +250,18 @@ fn paramOrDefault1(v: i32) u16 {
     if (v <= 0) return 1;
     if (v > std.math.maxInt(u16)) return std.math.maxInt(u16);
     return @intCast(v);
+}
+
+fn paramOrDefault0(v: i32) u16 {
+    if (v <= 0) return 0;
+    if (v > std.math.maxInt(u16)) return std.math.maxInt(u16);
+    return @intCast(v);
+}
+
+fn intermediatesLenHas(intermediates: [4]u8, len: u8, needle: u8) bool {
+    var idx: usize = 0;
+    while (idx < len) : (idx += 1) {
+        if (intermediates[idx] == needle) return true;
+    }
+    return false;
 }

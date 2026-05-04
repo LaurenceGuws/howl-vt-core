@@ -21,8 +21,23 @@ pub const Event = union(enum) {
         intermediates: [ParserApi.max_intermediates]u8,
         intermediates_len: u8,
     },
-    title_set: []const u8,
+    osc: struct {
+        kind: OscKind,
+        command: ?u16,
+        payload: []const u8,
+        terminator: ParserApi.OscTerminator,
+    },
+    apc: []const u8,
+    dcs: []const u8,
+    esc_final: u8,
     invalid_sequence,
+};
+
+pub const OscKind = enum {
+    title,
+    clipboard,
+    hyperlink,
+    generic,
 };
 
 /// Owned event queue bridge for parser sink callbacks.
@@ -128,15 +143,64 @@ pub const Bridge = struct {
 
     fn onOsc(ptr: *anyopaque, data: []const u8, term: ParserApi.OscTerminator) void {
         const self: *Bridge = @ptrCast(@alignCast(ptr));
-        _ = term;
-        const owned = self.arena.allocator().dupe(u8, data) catch return;
-        self.events.append(self.allocator, Event{ .title_set = owned }) catch {};
+        const parsed = parseOsc(data);
+        const owned = self.arena.allocator().dupe(u8, parsed.payload) catch return;
+        self.events.append(self.allocator, Event{ .osc = .{
+            .kind = parsed.kind,
+            .command = parsed.command,
+            .payload = owned,
+            .terminator = term,
+        } }) catch {};
     }
 
-    fn onApc(_: *anyopaque, _: []const u8) void {}
-    fn onDcs(_: *anyopaque, _: []const u8) void {}
-    fn onEscFinal(_: *anyopaque, _: u8) void {}
+    fn onApc(ptr: *anyopaque, data: []const u8) void {
+        const self: *Bridge = @ptrCast(@alignCast(ptr));
+        const owned = self.arena.allocator().dupe(u8, data) catch return;
+        self.events.append(self.allocator, Event{ .apc = owned }) catch {};
+    }
+
+    fn onDcs(ptr: *anyopaque, data: []const u8) void {
+        const self: *Bridge = @ptrCast(@alignCast(ptr));
+        const owned = self.arena.allocator().dupe(u8, data) catch return;
+        self.events.append(self.allocator, Event{ .dcs = owned }) catch {};
+    }
+
+    fn onEscFinal(ptr: *anyopaque, byte: u8) void {
+        const self: *Bridge = @ptrCast(@alignCast(ptr));
+        self.events.append(self.allocator, Event{ .esc_final = byte }) catch {};
+    }
 };
+
+const ParsedOsc = struct {
+    kind: OscKind,
+    command: ?u16,
+    payload: []const u8,
+};
+
+fn parseOsc(data: []const u8) ParsedOsc {
+    const separator = std.mem.indexOfScalar(u8, data, ';') orelse return .{
+        .kind = .title,
+        .command = null,
+        .payload = data,
+    };
+    const command_text = data[0..separator];
+    const payload = data[separator + 1 ..];
+    const command = std.fmt.parseUnsigned(u16, command_text, 10) catch return .{
+        .kind = .generic,
+        .command = null,
+        .payload = data,
+    };
+    return .{
+        .kind = switch (command) {
+            0, 1, 2 => .title,
+            8 => .hyperlink,
+            52 => .clipboard,
+            else => .generic,
+        },
+        .command = command,
+        .payload = payload,
+    };
+}
 
 const bridge_mod = @import("bridge.zig");
 test "bridge: maps ASCII text to text event" {
@@ -206,14 +270,46 @@ test "bridge: preserves CSI leader private and intermediates" {
     try std.testing.expectEqual(@as(u8, '!'), bridge.events.items[1].style_change.intermediates[0]);
 }
 
-test "bridge: maps OSC to title_set event" {
+test "bridge: maps OSC title command to typed osc event" {
     const gpa = std.testing.allocator;
     var bridge = Bridge.init(gpa);
     defer bridge.deinit();
     var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
     defer parser.deinit();
-    parser.handleSlice("\x1b]My Window\x07");
+    parser.handleSlice("\x1b]0;My Window\x07");
     try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
-    try std.testing.expect(bridge.events.items[0] == .title_set);
-    try std.testing.expectEqualSlices(u8, "My Window", bridge.events.items[0].title_set);
+    try std.testing.expect(bridge.events.items[0] == .osc);
+    try std.testing.expectEqual(OscKind.title, bridge.events.items[0].osc.kind);
+    try std.testing.expectEqual(@as(?u16, 0), bridge.events.items[0].osc.command);
+    try std.testing.expectEqualSlices(u8, "My Window", bridge.events.items[0].osc.payload);
+}
+
+test "bridge: preserves OSC clipboard transport" {
+    const gpa = std.testing.allocator;
+    var bridge = Bridge.init(gpa);
+    defer bridge.deinit();
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
+    defer parser.deinit();
+    parser.handleSlice("\x1b]52;c;Zm9v\x07");
+    try std.testing.expectEqual(@as(usize, 1), bridge.events.items.len);
+    try std.testing.expect(bridge.events.items[0] == .osc);
+    try std.testing.expectEqual(OscKind.clipboard, bridge.events.items[0].osc.kind);
+    try std.testing.expectEqual(@as(?u16, 52), bridge.events.items[0].osc.command);
+    try std.testing.expectEqualSlices(u8, "c;Zm9v", bridge.events.items[0].osc.payload);
+}
+
+test "bridge: preserves APC, DCS, and ESC final transport" {
+    const gpa = std.testing.allocator;
+    var bridge = Bridge.init(gpa);
+    defer bridge.deinit();
+    var parser = try ParserApi.Parser.init(gpa, bridge.toSink());
+    defer parser.deinit();
+    parser.handleSlice("\x1b_kitty\x1b\\\x1bPdata\x1b\\\x1bM");
+    try std.testing.expectEqual(@as(usize, 3), bridge.events.items.len);
+    try std.testing.expect(bridge.events.items[0] == .apc);
+    try std.testing.expectEqualSlices(u8, "kitty", bridge.events.items[0].apc);
+    try std.testing.expect(bridge.events.items[1] == .dcs);
+    try std.testing.expectEqualSlices(u8, "data", bridge.events.items[1].dcs);
+    try std.testing.expect(bridge.events.items[2] == .esc_final);
+    try std.testing.expectEqual(@as(u8, 'M'), bridge.events.items[2].esc_final);
 }
