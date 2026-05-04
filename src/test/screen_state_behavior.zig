@@ -556,6 +556,42 @@ test "screen: DCH deletes chars and clears tail" {
     try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 4));
 }
 
+test "screen: erase_line uses current background for empty cells" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCells(gpa, 1, 5);
+    defer s.deinit(gpa);
+
+    s.current_attrs.bg = .{ .r = 40, .g = 44, .b = 52 };
+    s.apply(SemanticEvent{ .write_text = "~" });
+    s.apply(SemanticEvent{ .erase_line = 0 });
+
+    try std.testing.expectEqual(@as(u21, 0), s.cellAt(0, 1));
+    const cell = s.cellInfoAt(0, 1);
+    try std.testing.expectEqual(@as(u8, 40), cell.attrs.bg.r);
+    try std.testing.expectEqual(@as(u8, 44), cell.attrs.bg.g);
+    try std.testing.expectEqual(@as(u8, 52), cell.attrs.bg.b);
+}
+
+test "screen: ECH uses current background without moving cursor" {
+    const gpa = std.testing.allocator;
+    var s = try GridModel.initWithCells(gpa, 1, 8);
+    defer s.deinit(gpa);
+
+    s.current_attrs.bg = .{ .r = 40, .g = 44, .b = 52 };
+    s.cursor_col = 2;
+    s.apply(SemanticEvent{ .erase_chars = 3 });
+
+    try std.testing.expectEqual(@as(u16, 2), s.cursor_col);
+    var col: u16 = 2;
+    while (col < 5) : (col += 1) {
+        const cell = s.cellInfoAt(0, col);
+        try std.testing.expectEqual(@as(u21, 0), @as(u21, @intCast(cell.codepoint)));
+        try std.testing.expectEqual(@as(u8, 40), cell.attrs.bg.r);
+        try std.testing.expectEqual(@as(u8, 44), cell.attrs.bg.g);
+        try std.testing.expectEqual(@as(u8, 52), cell.attrs.bg.b);
+    }
+}
+
 test "screen: SU scrolls only within configured region" {
     const gpa = std.testing.allocator;
     var s = try GridModel.initWithCells(gpa, 4, 4);

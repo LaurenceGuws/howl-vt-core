@@ -1808,3 +1808,26 @@ test "replay: bash history redraw with DCH clears reset suffix" {
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 3));
     try std.testing.expectEqual(@as(u21, 0), screen.cellAt(0, 4));
 }
+
+test "replay: neovim colored empty cells through EL and ECH" {
+    const gpa = std.testing.allocator;
+    var pl = try Pipeline.init(gpa);
+    defer pl.deinit();
+    var screen = try Grid.GridModel.initWithCells(gpa, 2, 10);
+    defer screen.deinit(gpa);
+
+    feed(&pl, &screen, "\x1b[38;2;40;44;52m\x1b[48;2;40;44;52m~\x1b[K");
+    feed(&pl, &screen, "\x1b[2;3H\x1b[6X");
+
+    const el_cell = screen.cellInfoAt(0, 1);
+    try std.testing.expectEqual(@as(u21, 0), @as(u21, @intCast(el_cell.codepoint)));
+    try std.testing.expectEqual(@as(u8, 40), el_cell.attrs.bg.r);
+    try std.testing.expectEqual(@as(u8, 44), el_cell.attrs.bg.g);
+    try std.testing.expectEqual(@as(u8, 52), el_cell.attrs.bg.b);
+
+    const ech_cell = screen.cellInfoAt(1, 2);
+    try std.testing.expectEqual(@as(u21, 0), @as(u21, @intCast(ech_cell.codepoint)));
+    try std.testing.expectEqual(@as(u8, 40), ech_cell.attrs.bg.r);
+    try std.testing.expectEqual(@as(u8, 44), ech_cell.attrs.bg.g);
+    try std.testing.expectEqual(@as(u8, 52), ech_cell.attrs.bg.b);
+}

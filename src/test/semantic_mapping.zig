@@ -534,3 +534,13 @@ test "semantic: EL invalid mode maps to 0" {
     const sem = process(makeStyleChange('K', 5, 0, 1)) orelse return error.NoEvent;
     try std.testing.expectEqual(@as(u2, 0), sem.erase_line);
 }
+
+test "semantic: ECH explicit count" {
+    const sem = process(makeStyleChange('X', 6, 0, 1)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 6), sem.erase_chars);
+}
+
+test "semantic: ECH defaults to one char" {
+    const sem = process(makeStyleChange('X', 0, 0, 0)) orelse return error.NoEvent;
+    try std.testing.expectEqual(@as(u16, 1), sem.erase_chars);
+}

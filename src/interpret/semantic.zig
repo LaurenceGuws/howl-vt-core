@@ -66,6 +66,7 @@ pub const SemanticEvent = union(enum) {
     reset_screen,
     erase_display: u2,
     erase_line: u2,
+    erase_chars: u16,
 };
 
 /// Map bridge event to semantic event when supported.
@@ -214,6 +215,7 @@ fn processCsi(final: u8, params: [16]i32, count: u8, leader: u8, private: bool, 
         } },
         'J' => return SemanticEvent{ .erase_display = eraseMode(params[0]) },
         'K' => return SemanticEvent{ .erase_line = eraseMode(params[0]) },
+        'X' => return SemanticEvent{ .erase_chars = paramOrDefault1(params[0]) },
         'n' => switch (paramOrDefault0(params[0])) {
             5 => return SemanticEvent.device_status_report,
             6 => return SemanticEvent.cursor_position_report,

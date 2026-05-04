@@ -963,6 +963,10 @@ pub const GridModel = struct {
                 self.wrap_pending = false;
                 self.eraseLine(mode);
             },
+            .erase_chars => |count| {
+                self.wrap_pending = false;
+                self.eraseChars(count);
+            },
         }
     }
 
@@ -975,8 +979,7 @@ pub const GridModel = struct {
                 self.clearRowRange(self.cursor_row, self.cursor_col, self.cols);
                 var r = self.cursor_row + 1;
                 while (r < self.rows) : (r += 1) {
-                    const start = self.rowStart(r);
-                    @memset(c[start .. start + @as(usize, self.cols)], default_cell);
+                    self.clearRowRange(r, 0, self.cols);
                     self.setRowWrapped(r, false);
                 }
             },
@@ -984,15 +987,15 @@ pub const GridModel = struct {
                 self.markDirtyRows(0, self.cursor_row);
                 var r: u16 = 0;
                 while (r < self.cursor_row) : (r += 1) {
-                    const start = self.rowStart(r);
-                    @memset(c[start .. start + @as(usize, self.cols)], default_cell);
+                    self.clearRowRange(r, 0, self.cols);
                     self.setRowWrapped(r, false);
                 }
                 self.clearRowRange(self.cursor_row, 0, self.cursor_col + 1);
             },
             2 => {
                 self.markAllRowsDirty();
-                @memset(c, default_cell);
+                const cell = self.eraseCell();
+                @memset(c, cell);
                 if (self.row_wraps) |buf| @memset(buf, false);
             },
             3 => self.clearScrollback(),
@@ -1047,6 +1050,13 @@ pub const GridModel = struct {
             },
             3 => {},
         }
+    }
+
+    fn eraseChars(self: *GridModel, count: u16) void {
+        if (self.rows == 0 or self.cols == 0) return;
+        const amount = @min(@max(count, 1), self.cols - self.cursor_col);
+        self.markDirtyRow(self.cursor_row);
+        self.clearRowRange(self.cursor_row, self.cursor_col, self.cursor_col + amount);
     }
 
     fn deleteChars(self: *GridModel, count: u16) void {
@@ -1332,7 +1342,12 @@ pub const GridModel = struct {
     fn clearRowRange(self: *GridModel, row: u16, start_col: u16, end_col_exclusive: u16) void {
         const c = self.cells orelse return;
         const start = self.rowStart(row);
-        @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], default_cell);
+        const cell = self.eraseCell();
+        @memset(c[start + @as(usize, start_col) .. start + @as(usize, end_col_exclusive)], cell);
+    }
+
+    fn eraseCell(self: *const GridModel) Cell {
+        return .{ .codepoint = 0, .attrs = self.current_attrs };
     }
 
     fn clearFullRow(self: *GridModel, row: u16) void {
