@@ -3,10 +3,12 @@
 //! Reason: make deterministic replay and smoke fuzzing first-class build steps.
 
 const std = @import("std");
-const scrollback = @import("fuzz_scrollback");
+const protocol = @import("fuzz/protocol.zig");
+const scrollback = @import("fuzz/scrollback.zig");
 
 const Fuzzer = enum {
     smoke,
+    protocol,
     scrollback,
 };
 
@@ -25,6 +27,7 @@ pub fn main(init: std.process.Init) !void {
 
     switch (cli_args.fuzzer) {
         .smoke => try mainSmoke(gpa),
+        .protocol => try mainProtocol(gpa, cli_args),
         .scrollback => try mainScrollback(gpa, cli_args),
     }
 }
@@ -39,7 +42,16 @@ fn mainSmoke(gpa: std.mem.Allocator) !void {
     for (seeds) |seed| {
         try scrollback.runCanonicalPreservation(gpa, seed, scrollback.defaultPreservationOptions(64));
     }
-    std.log.info("scrollback smoke complete", .{});
+    try protocol.runSmoke(gpa);
+    std.log.info("fuzz smoke complete", .{});
+}
+
+fn mainProtocol(gpa: std.mem.Allocator, cli_args: CLIArgs) !void {
+    const seed = cli_args.seed orelse 0x70726f746f636f6c;
+    std.log.info("protocol fuzz seed = {}", .{seed});
+
+    try protocol.runDeterminism(gpa, seed, protocol.defaultOptions(cli_args.events_max));
+    std.log.info("protocol fuzz complete", .{});
 }
 
 fn mainScrollback(gpa: std.mem.Allocator, cli_args: CLIArgs) !void {
